@@ -1,0 +1,28 @@
+{
+  "name": "habbit-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "generate-pwa-assets": "pwa-assets-generator"
+  },
+  "dependencies": {
+    "idb": "8.0.4",
+    "web-push": "3.6.7",
+    "workbox-precaching": "7.4.1",
+    "workbox-routing": "7.4.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@vite-pwa/assets-generator": "2.0.0",
+    "fake-indexeddb": "6.2.6",
+    "tailwindcss": "4.3.3",
+    "vite": "8.3.4",
+    "vite-plugin-pwa": "2.0.0",
+    "vitest": "5.0.5"
+  }
+}

@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+html, body {
+  height: 100dvh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+#app {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Minimum 16px font-size to prevent iOS Safari auto-zoom (SPEC §8) */
+input, select, textarea {
+  font-size: 16px !important;
+  user-select: text;
+}
+
+/* Accessible touch targets >= 44px (SPEC §8) */
+button, a, input, select, textarea, [role="button"], [role="tab"] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Clear visible focus indicator (SPEC §8) */
+:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+/* Respect prefers-reduced-motion (SPEC §8) */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

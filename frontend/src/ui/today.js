@@ -8,6 +8,7 @@ import { today, formatLong } from '../domain/day.js';
 import { currentStreak } from '../domain/streak.js';
 import {
   listHabits,
+  addHabit,
   getCheckInDays,
   toggleCheckIn,
   getJournalEntry,
@@ -157,28 +158,154 @@ export function mount(el) {
     habitsListContainerEl.innerHTML = '';
 
     if (habitData.length === 0) {
-      // Empty state
+      // Empty state card
       const emptyCard = document.createElement('div');
+      emptyCard.id = 'habits-empty-state';
       emptyCard.className =
-        'flex flex-col items-center justify-center p-8 text-center bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-700';
+        'flex flex-col items-center justify-center p-6 sm:p-8 text-center bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-700 gap-5';
 
-      const emptyText = document.createElement('p');
-      emptyText.className = 'text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-4';
-      emptyText.textContent = 'No habits yet';
-      emptyCard.appendChild(emptyText);
+      // Icon & Greeting
+      const headerWrap = document.createElement('div');
+      headerWrap.className = 'flex flex-col items-center gap-1.5 max-w-sm';
+
+      const iconWrap = document.createElement('div');
+      iconWrap.className =
+        'w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-1';
+      iconWrap.innerHTML = `
+        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+      `;
+      headerWrap.appendChild(iconWrap);
+
+      const titleEl = document.createElement('h3');
+      titleEl.id = 'today-empty-title';
+      titleEl.className = 'text-base sm:text-lg font-semibold text-zinc-900 dark:text-zinc-100';
+      titleEl.textContent = 'Welcome to Habbit';
+      headerWrap.appendChild(titleEl);
+
+      const subtitleEl = document.createElement('p');
+      subtitleEl.id = 'today-empty-subtitle';
+      subtitleEl.className = 'text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed';
+      subtitleEl.textContent =
+        'Start building your daily momentum. Your data stays on this Device.';
+
+      emptyCard.appendChild(headerWrap);
+
+      // Inline Quick Add Form
+      const formEl = document.createElement('form');
+      formEl.id = 'today-empty-form';
+      formEl.className = 'w-full max-w-md flex flex-col sm:flex-row gap-2';
+      formEl.setAttribute('role', 'form');
+
+      const inputWrap = document.createElement('div');
+      inputWrap.className = 'relative flex-1';
+
+      const labelEl = document.createElement('label');
+      labelEl.htmlFor = 'today-empty-add-input';
+      labelEl.className = 'sr-only';
+      labelEl.textContent = 'Add your first habit';
+      inputWrap.appendChild(labelEl);
+
+      const inputEl = document.createElement('input');
+      inputEl.type = 'text';
+      inputEl.id = 'today-empty-add-input';
+      inputEl.className =
+        'w-full min-h-[44px] min-w-[44px] px-3.5 py-2.5 text-base rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition-colors shadow-xs';
+      inputEl.style.fontSize = '16px';
+      inputEl.placeholder = 'e.g. Drink 2L water, Morning walk...';
+
+      const addBtn = document.createElement('button');
+      addBtn.type = 'submit';
+      addBtn.id = 'today-empty-add-btn';
+      addBtn.className =
+        'min-h-[44px] min-w-[44px] px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-sm font-semibold rounded-xl shadow-xs transition-colors flex items-center justify-center cursor-pointer shrink-0';
+      addBtn.textContent = 'Add Habit';
+
+      let isSubmitting = false;
+      async function handleAddHabit(habitName) {
+        if (isSubmitting) return;
+        const nameToAdd = habitName || inputEl.value;
+        const trimmed = (nameToAdd || '').trim();
+        if (!trimmed) {
+          inputEl.focus?.();
+          return;
+        }
+        isSubmitting = true;
+        addBtn.disabled = true;
+        try {
+          await addHabit(trimmed);
+          inputEl.value = '';
+          showToast(`Habit "${trimmed}" created!`);
+        } catch (err) {
+          showToast('Failed to create habit: ' + (err?.message || 'Error'));
+        } finally {
+          isSubmitting = false;
+          addBtn.disabled = false;
+        }
+      }
+      const onSubmit = (e) => {
+        e?.preventDefault?.();
+        handleAddHabit();
+      };
+
+      formEl.addEventListener('submit', onSubmit);
+      addBtn.addEventListener('click', onSubmit);
+      inputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          onSubmit(e);
+        }
+      });
+      inputWrap.appendChild(inputEl);
+      formEl.appendChild(inputWrap);
+      formEl.appendChild(addBtn);
+      emptyCard.appendChild(formEl);
+
+      // Starter Chips Section
+      const startersWrap = document.createElement('div');
+      startersWrap.className = 'flex flex-col items-center gap-2 pt-1 w-full';
+
+      const startersLabel = document.createElement('span');
+      startersLabel.className =
+        'text-[11px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider';
+      startersLabel.textContent = 'Or try a popular starter:';
+      startersWrap.appendChild(startersLabel);
+
+      const chipsContainer = document.createElement('div');
+      chipsContainer.className = 'flex flex-wrap items-center justify-center gap-2';
+
+      const starterHabits = ['Drink 2L Water', 'Read 10 mins', 'Morning Walk'];
+      for (const starter of starterHabits) {
+        const chipBtn = document.createElement('button');
+        chipBtn.type = 'button';
+        chipBtn.dataset.starterChip = starter;
+        chipBtn.className =
+          'min-h-[44px] min-w-[44px] px-3.5 py-2 text-xs font-medium rounded-xl bg-white dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 border border-zinc-200 dark:border-zinc-700 shadow-2xs transition-colors cursor-pointer flex items-center justify-center';
+        chipBtn.textContent = `+ ${starter}`;
+        chipBtn.addEventListener('click', () => {
+          handleAddHabit(starter);
+        });
+        chipsContainer.appendChild(chipBtn);
+      }
+      startersWrap.appendChild(chipsContainer);
+      emptyCard.appendChild(startersWrap);
+
+      // Manage Habits link (satisfies SPEC §10 contract)
+      const manageWrap = document.createElement('div');
+      manageWrap.className = 'pt-1';
 
       const manageBtn = document.createElement('button');
       manageBtn.type = 'button';
       manageBtn.id = 'manage-habits-btn';
       manageBtn.className =
-        'min-h-[44px] min-w-[44px] px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-xs transition-colors flex items-center justify-center cursor-pointer';
-      manageBtn.style.minHeight = '44px';
-      manageBtn.style.minWidth = '44px';
-      manageBtn.textContent = 'Manage Habits';
+        'min-h-[44px] min-w-[44px] px-4 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors cursor-pointer inline-flex items-center gap-1.5 focus:outline-none focus:underline';
+      manageBtn.textContent = 'Manage Habits in Settings →';
       manageBtn.addEventListener('click', () => {
         navigate('settings');
       });
-      emptyCard.appendChild(manageBtn);
+      manageWrap.appendChild(manageBtn);
+      emptyCard.appendChild(manageWrap);
+
 
       habitsListContainerEl.appendChild(emptyCard);
     } else {

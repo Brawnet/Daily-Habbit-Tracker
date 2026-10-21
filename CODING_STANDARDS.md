@@ -28,19 +28,23 @@ Engineering conventions and review guidelines for the Habbit codebase.
 - **Touch Target Bounds**: All interactive buttons, tabs, links, and quick-add chips must meet minimum touch targets $\ge 44 \times 44\text{px}$.
 - **Input Font Size**: All text inputs, textareas, and select elements must specify `font-size: 16px` to prevent iOS Safari auto-zooming on focus.
 
-## 3. Dependencies & Scripts
+## 3. Responsive State Management
+
+- When applying responsive text suppression (e.g., `hidden min-[380px]:inline`), do not set it statically if the element reflects dynamic status. State update handlers must dynamically toggle visibility so critical alerts (`error`, `syncing`, `warning`) remain visible on narrow mobile viewports (<380px).
+
+## 4. Dependencies & Scripts
 
 - **Exact Versions**: All dependencies and devDependencies in `frontend/package.json` must use exact pinned versions (`npm install -E`). Floating range prefixes (`^`, `~`, `>`, `<`) are forbidden and rejected by `npm run check:deps`.
 - **Package Scripts**: Keep scripts minimal (`dev`, `build`, `preview`, `test`, `test:e2e`, `check:deps`, `check:structure`, `generate-pwa-assets`). Avoid proliferation of redundant aliases.
 - **Repository Structure**: All dependencies, configuration, and scripts belong in `/frontend`. Never create nested `package.json` files in `/gas-backend` or other subfolders.
 
-## 4. Apps Script Backend & Pure Logic Isolation
+## 5. Apps Script Backend & Pure Logic Isolation
 
 - **Pure Logic Isolation**: Functions designated as pure in `docs/SPEC.md` §6 (`formatDiaryHeading`, `parseDiaryHeading`, `findChronologicalInsertIndex`, `decideReminder`, `mergeRecordsLWW`) must remain isolated from Google Apps Script ambient globals (`SpreadsheetApp`, `DocumentApp`, `DriveApp`, `PropertiesService`, `LockService`, `UrlFetchApp`, `CacheService`, `Logger`).
 - **Explicit Parameters**: Any environmental dependencies (e.g., current date `todayJakarta`, monotonic timestamp `nowMonotonic`) must be accepted as explicit function arguments.
 - **Spec Contract Synchronization**: When editing any business rule in `docs/SPEC.md` or `docs/adr/` (e.g. lock conditions like `LOCKED`), search all references across contract documents to keep API contract (§5), backend implementation (§6), and client offline sync contract (§9) mutually synchronized.
 
-## 5. Domain Language (GLOSSARY.md)
+## 6. Domain Language (GLOSSARY.md)
 
 Use domain vocabulary strictly in symbol names, data keys, comments, and UI strings:
 - `Habit` (not task or activity)
@@ -52,7 +56,15 @@ Use domain vocabulary strictly in symbol names, data keys, comments, and UI stri
 - `Device` (local browser/phone installation)
 - `Reminder` (scheduled daily notification)
 
-## 6. Review Axis Separation & Code Smells
+## 7. Specification & Contract Preservation
+
+- Redesigns and empty states must retain all specification-mandated navigation links and contract routes (`docs/SPEC.md` §10). For example, empty state cards must preserve navigation to *Manage Habits* in Settings.
+
+## 8. Test Harness
+
+- UI tests under `frontend/src/ui/` must import shared DOM mocks (`MockElement`, `MockClassList`, `MockDocument`) from `src/ui/test-helpers.js`. Do not define duplicate mock DOM classes in individual test suites.
+
+## 9. Review Axis Separation & Code Smells
 
 Code review follows the two-axis model:
 - **Standards Axis**: Verifies adherence to this document, `GLOSSARY.md`, and Fowler smell baseline:

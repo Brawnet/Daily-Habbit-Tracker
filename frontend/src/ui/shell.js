@@ -55,7 +55,7 @@ function updateSyncIndicator(status) {
   switch (state) {
     case 'not-configured':
       syncDotElement.classList.add('bg-zinc-400', 'dark:bg-zinc-600');
-      syncTextElement.textContent = 'Not configured';
+      syncTextElement.textContent = 'Offline / Local';
       break;
     case 'idle':
       syncDotElement.classList.add('bg-emerald-500');
@@ -357,7 +357,8 @@ export function mountShell(rootEl) {
 
   syncTextElement = document.createElement('span');
   syncTextElement.id = 'sync-text';
-  syncTextElement.textContent = 'Not configured';
+  syncTextElement.className = 'truncate max-w-[90px] sm:max-w-none';
+  syncTextElement.textContent = 'Offline / Local';
 
   syncBadgeElement = document.createElement('span');
   syncBadgeElement.id = 'sync-badge';

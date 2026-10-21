@@ -351,7 +351,7 @@ describe('ui/shell.js', () => {
 
     expect(syncDot).toBeDefined();
     expect(syncText).toBeDefined();
-    expect(syncText.textContent).toBe('Not configured');
+    expect(syncText.textContent).toBe('Offline / Local');
     expect(syncBadge).toBeDefined();
     expect(syncBtn).toBeDefined();
     expect(tabContent).toBeDefined();
@@ -434,7 +434,7 @@ describe('ui/shell.js', () => {
     const syncText = mockDoc.getElementById('sync-text');
     const syncBadge = mockDoc.getElementById('sync-badge');
 
-    expect(syncText.textContent).toBe('Not configured');
+    expect(syncText.textContent).toBe('Offline / Local');
     expect(syncDot.classList.contains('bg-zinc-400')).toBe(true);
 
     // Change status to syncing with pending = 3

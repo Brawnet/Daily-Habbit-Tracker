@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "test:all": "npm test && npm run test:e2e",
+    "check:deps": "node scripts/check-deps.js",
     "generate-pwa-assets": "pwa-assets-generator"
   },
   "dependencies": {

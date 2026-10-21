@@ -333,7 +333,7 @@ export function mountShell(rootEl) {
   rootEl.innerHTML = '';
 
   const shellLayout = document.createElement('div');
-  shellLayout.className = 'shell-layout flex flex-col h-full w-full bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 antialiased select-none';
+  shellLayout.className = 'shell-layout flex flex-col bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 antialiased select-none';
 
   // --- Header ---
   const header = document.createElement('header');

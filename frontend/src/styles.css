@@ -23,6 +23,21 @@ html, body {
   inset: 0;
 }
 
+/* Standalone PWA adjustments (iOS Home Screen PWA) */
+@media all and (display-mode: standalone) {
+  /* iOS workaround: in Home Screen mode with viewport-fit=cover and black-translucent,
+     WebKit calculates 100dvh/fixed height as screen minus status bar (e.g. 848pt vs 896pt on iPhone 11).
+     Adding env(safe-area-inset-top) extends the shell to the full physical screen height (896pt). */
+  .shell-layout {
+    bottom: auto;
+    bottom: calc(-1 * env(safe-area-inset-top, 0px));
+    height: calc(100% + env(safe-area-inset-top, 0px));
+    height: calc(100vh + env(safe-area-inset-top, 0px));
+    height: calc(100dvh + env(safe-area-inset-top, 0px));
+    min-height: calc(100dvh + env(safe-area-inset-top, 0px));
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   html, body {
     background-color: #09090b;

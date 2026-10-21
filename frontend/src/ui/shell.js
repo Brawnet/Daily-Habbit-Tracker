@@ -333,6 +333,16 @@ export function mountShell(rootEl) {
   rootElement = rootEl;
   rootEl.innerHTML = '';
 
+  if (
+    typeof navigator !== 'undefined' &&
+    (navigator.standalone ||
+      (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(display-mode: standalone)').matches))
+  ) {
+    try {
+      document.documentElement.style.setProperty('--app-height', '100vh');
+    } catch {}
+  }
+
   const shellLayout = document.createElement('div');
   shellLayout.className = 'shell-layout flex flex-col bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 antialiased select-none';
 

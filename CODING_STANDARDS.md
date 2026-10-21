@@ -4,27 +4,35 @@ Engineering conventions and review guidelines for the Habbit codebase.
 
 ## 1. PWA & Mobile CSS Rules
 
-- **Fixed Full-Screen Shell**: Size the shell layout by pinning it to all four edges with fixed positioning (`position: fixed; inset: 0;`).
-  - *iOS Workaround*: In iOS Home Screen mode (`display-mode: standalone`) with `viewport-fit=cover` and `black-translucent`, iOS calculates viewport/fixed bounds as the screen minus the status bar (e.g. 848pt vs 896pt on iPhone 11). To eliminate the 48pt dark strip at the bottom, set `height: calc(100dvh + env(safe-area-inset-top, 0px))` with `bottom: calc(-1 * env(safe-area-inset-top, 0px))` under `@media (display-mode: standalone)`.
+- **Full-Screen Shell & Viewport Height Strategy**: Use CSS custom property `--app-height: 100dvh` in normal document flow (`html, body, #app, .shell-layout`).
+  - *iOS Standalone Resolution*: On iOS Safari, `100dvh` in standalone mode incorrectly subtracts the status bar (e.g. 848pt vs 896pt on iPhone 11), creating a ~48pt dark strip below `#bottom-nav`. Do NOT use `position: fixed` on the root shell (which creates an 848pt clipping box on WebKit). Instead, maintain normal document flow and override `--app-height: 100vh` in standalone mode via the inline `navigator.standalone` bootstrap in `index.html` and `@media (display-mode: standalone)` in CSS. In standalone mode on iOS, `100vh` equals the exact physical screen height (896pt) without status bar subtraction.
   ```css
+  :root {
+    --app-height: 100dvh;
+  }
+
+  @media all and (display-mode: standalone) {
+    :root {
+      --app-height: 100vh;
+    }
+  }
+
   html, body {
-    height: 100%;
+    height: var(--app-height, 100dvh);
+    min-height: var(--app-height, 100dvh);
+    margin: 0;
+    padding: 0;
     overflow: hidden;
     overscroll-behavior: none;
   }
 
-  .shell-layout {
-    position: fixed;
-    inset: 0;
-  }
-
-  @media all and (display-mode: standalone) {
-    .shell-layout {
-      bottom: auto;
-      bottom: calc(-1 * env(safe-area-inset-top, 0px));
-      height: calc(100dvh + env(safe-area-inset-top, 0px));
-      min-height: calc(100dvh + env(safe-area-inset-top, 0px));
-    }
+  #app, .shell-layout {
+    width: 100%;
+    height: var(--app-height, 100dvh);
+    min-height: var(--app-height, 100dvh);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
   ```
 - **Status Bar Meta**: Keep `<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />` in `index.html` to allow full-bleed rendering behind the status bar and Dynamic Island notch.

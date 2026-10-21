@@ -21,15 +21,15 @@ describe('PWA & iOS standalone layout contract', () => {
     expect(html).toContain('content="#09090b"');
   });
 
-  it('defines fixed inset-0 shell-layout with iOS standalone workaround and safe area variables in styles.css', async () => {
+  it('defines dynamic app-height architecture and safe area variables in styles.css and index.html', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
+    const html = readFileSync(resolve(__dirname, '../index.html'), 'utf8');
     const css = readFileSync(resolve(__dirname, './styles.css'), 'utf8');
 
-    expect(css).toMatch(/\.shell-layout\s*\{[^}]*position:\s*fixed;/);
-    expect(css).toMatch(/\.shell-layout\s*\{[^}]*inset:\s*0;/);
-    expect(css).toContain('(display-mode: standalone)');
-    expect(css).toContain('calc(100dvh + env(safe-area-inset-top, 0px))');
+    expect(html).toContain("document.documentElement.style.setProperty('--app-height', '100vh')");
+    expect(css).toContain('--app-height: 100dvh');
+    expect(css).toContain('--app-height: 100vh');
     expect(css).toContain('--sat: env(safe-area-inset-top, 0px)');
     expect(css).toContain('--sab: env(safe-area-inset-bottom, 0px)');
     expect(css).toContain('max(12px, env(safe-area-inset-bottom, 12px))');

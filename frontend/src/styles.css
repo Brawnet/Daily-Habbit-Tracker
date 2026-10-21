@@ -23,7 +23,6 @@ html, body {
   inset: 0;
 }
 
-
 @media (prefers-color-scheme: dark) {
   html, body {
     background-color: #09090b;

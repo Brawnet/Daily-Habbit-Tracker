@@ -265,7 +265,8 @@ export function showToast(message, { action } = {}) {
     container.setAttribute('aria-live', 'polite');
     container.setAttribute('aria-atomic', 'true');
     container.className =
-      'fixed bottom-20 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none w-full max-w-sm px-4';
+      'fixed left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none w-full max-w-sm px-4';
+    container.style.bottom = 'calc(max(12px, env(safe-area-inset-bottom, 12px)) + 64px)';
     rootElement.appendChild(container);
   }
 

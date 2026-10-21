@@ -330,10 +330,10 @@ export function mountShell(rootEl) {
   // --- Header ---
   const header = document.createElement('header');
   header.className =
-    'flex items-center justify-between px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur shrink-0';
-  header.style.paddingTop = 'max(8px, env(safe-area-inset-top, 8px))';
-  header.style.paddingLeft = 'max(16px, env(safe-area-inset-left, 16px))';
-  header.style.paddingRight = 'max(16px, env(safe-area-inset-right, 16px))';
+    'flex items-center justify-between px-4 pb-2.5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 shrink-0';
+  header.style.paddingTop = 'calc(env(safe-area-inset-top, 0px) + 8px)';
+  header.style.paddingLeft = 'max(16px, env(safe-area-inset-left, 0px))';
+  header.style.paddingRight = 'max(16px, env(safe-area-inset-right, 0px))';
 
   const titleWrap = document.createElement('div');
   titleWrap.className = 'flex items-center gap-2';
@@ -423,10 +423,10 @@ export function mountShell(rootEl) {
   bottomNavElement.setAttribute('role', 'tablist');
   bottomNavElement.setAttribute('aria-label', 'Main Navigation');
   bottomNavElement.className =
-    'flex items-center justify-around border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/90 dark:bg-zinc-900/90 backdrop-blur shrink-0 pt-2';
-  bottomNavElement.style.paddingBottom = 'max(16px, env(safe-area-inset-bottom, 16px))';
-  bottomNavElement.style.paddingLeft = 'max(8px, env(safe-area-inset-left, 8px))';
-  bottomNavElement.style.paddingRight = 'max(8px, env(safe-area-inset-right, 8px))';
+    'flex items-center justify-around border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 shrink-0 pt-1.5';
+  bottomNavElement.style.paddingBottom = 'env(safe-area-inset-bottom, 8px)';
+  bottomNavElement.style.paddingLeft = 'max(8px, env(safe-area-inset-left, 0px))';
+  bottomNavElement.style.paddingRight = 'max(8px, env(safe-area-inset-right, 0px))';
 
   shellLayout.appendChild(header);
   shellLayout.appendChild(tabContentElement);

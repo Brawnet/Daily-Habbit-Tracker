@@ -16,9 +16,9 @@ describe('PWA & iOS standalone layout contract', () => {
     const html = readFileSync(resolve(__dirname, '../index.html'), 'utf8');
 
     expect(html).toContain('viewport-fit=cover');
-    expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="default" />');
-    expect(html).toContain('content="#fafafa"');
-    expect(html).toContain('content="#18181b"');
+    expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />');
+    expect(html).toContain('content="#ffffff"');
+    expect(html).toContain('content="#09090b"');
   });
 
   it('defines dvh and standalone display-mode media queries in styles.css', async () => {

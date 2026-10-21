@@ -145,30 +145,37 @@ function createGasEnv(initialProps = {}) {
         getNumChildren: () => children.length,
         getChild: (i) => children[i],
         appendParagraph: (text) => {
-          let heading = 'Normal';
-          const p = {
-            getType: () => 'PARAGRAPH',
-            asParagraph: () => p,
-            getText: () => text,
-            getHeading: () => heading,
-            setHeading: (h) => { heading = h; }
-          };
+          const p = createMockParagraph(text, children);
           children.push(p);
           return p;
         },
         insertParagraph: (idx, text) => {
-          let heading = 'Normal';
-          const p = {
-            getType: () => 'PARAGRAPH',
-            asParagraph: () => p,
-            getText: () => text,
-            getHeading: () => heading,
-            setHeading: (h) => { heading = h; }
-          };
+          const p = createMockParagraph(text, children);
           children.splice(idx, 0, p);
           return p;
+        },
+        removeChild: (child) => {
+          const idx = children.indexOf(child);
+          if (idx !== -1) children.splice(idx, 1);
+          return child;
         }
       };
+      function createMockParagraph(text, container) {
+        let heading = 'Normal';
+        const p = {
+          getType: () => 'PARAGRAPH',
+          asParagraph: () => p,
+          getText: () => text,
+          getHeading: () => heading,
+          setHeading: (h) => { heading = h; },
+          removeFromParent: () => {
+            const idx = container.indexOf(p);
+            if (idx !== -1) container.splice(idx, 1);
+            return p;
+          }
+        };
+        return p;
+      }
       const doc = {
         getId: () => id,
         getName: () => name,
@@ -582,6 +589,71 @@ describe('Pure Functions', () => {
       expect(result[0].content).toBe('Today v2');
       expect(result[0].printedToDiaryAt).toBe('');
     });
+
+    it('allows editing today journal entry even when printedToDiaryAt is set when todayJakarta is passed', () => {
+      const existing = [
+        {
+          day: '2026-10-21',
+          content: 'Morning draft',
+          updatedAt: '2026-10-21T08:00:00Z',
+          printedToDiaryAt: '2026-10-21T08:10:00Z',
+          serverUpdatedAt: '2026-10-21T08:10:00Z'
+        }
+      ];
+      const incoming = [
+        {
+          day: '2026-10-21',
+          content: 'Evening revision',
+          updatedAt: '2026-10-21T20:00:00Z'
+        }
+      ];
+      const now = '2026-10-21T20:05:00Z';
+      const result = mergeRecordsLWW(existing, incoming, now, '2026-10-21');
+      expect(result.rejected).toEqual([]);
+      expect(result[0].content).toBe('Evening revision');
+      expect(result[0].printedToDiaryAt).toBe('2026-10-21T08:10:00Z');
+      expect(result[0].serverUpdatedAt).toBe(now);
+    });
+  });
+
+  describe('Pure Function Isolation Guardrail (SPEC §6)', () => {
+    it('ensures pure functions do not reference ambient GAS globals directly', () => {
+      const fs = require('node:fs');
+      const path = require('node:path');
+      const codePath = path.resolve(__dirname, '../Code.gs');
+      const code = fs.readFileSync(codePath, 'utf8');
+
+      const pureFunctions = [
+        'formatDiaryHeading',
+        'parseDiaryHeading',
+        'findChronologicalInsertIndex',
+        'decideReminder',
+        'mergeRecordsLWW'
+      ];
+
+      const bannedAmbientSymbols = [
+        'SpreadsheetApp',
+        'DocumentApp',
+        'DriveApp',
+        'PropertiesService',
+        'LockService',
+        'UrlFetchApp',
+        'CacheService',
+        'Logger'
+      ];
+
+      for (const fnName of pureFunctions) {
+        const fnRegex = new RegExp(`function\\s+${fnName}\\s*\\([^)]*\\)\\s*\\{([\\s\\S]*?)(?:\\nfunction|\\nif\\s*\\(typeof\\s+module|$)`);
+        const match = code.match(fnRegex);
+        expect(match, `Function ${fnName} should exist in Code.gs`).toBeTruthy();
+        const body = match[1];
+
+        for (const symbol of bannedAmbientSymbols) {
+          const symbolRegex = new RegExp(`\\b${symbol}\\b`);
+          expect(body).not.toMatch(symbolRegex);
+        }
+      }
+    });
   });
 });
 
@@ -756,6 +828,48 @@ describe('GAS Backend Actions', () => {
       const rowsAfter = jSheet.getDataRange().getValues();
       expect(rowsAfter[1][1]).toBe('Original content');
     });
+
+    it('allows editing today journal entry even when printedToDiaryAt is set', () => {
+      const todayJakarta = env.exports.getTodayJakarta();
+      const sync1 = {
+        pin: PIN,
+        deviceId: 'dev-1',
+        action: 'sync',
+        since: null,
+        changes: {
+          journalEntries: [
+            { day: todayJakarta, content: 'Morning thought', updatedAt: `${todayJakarta}T09:00:00Z` }
+          ]
+        }
+      };
+      env.exports.doPost({ postData: { contents: JSON.stringify(sync1) } });
+
+      // Simulate that this morning thought was exported to diary doc
+      const jSheet = env.ss.getSheetByName('Journal_Entries');
+      const rows = jSheet.getDataRange().getValues();
+      rows[1][3] = `${todayJakarta}T09:05:00Z`; // printedToDiaryAt
+      jSheet.getRange(1, 1, rows.length, 5).setValues(rows);
+
+      // Later today, user edits today's entry
+      const sync2 = {
+        pin: PIN,
+        deviceId: 'dev-1',
+        action: 'sync',
+        since: null,
+        changes: {
+          journalEntries: [
+            { day: todayJakarta, content: 'Morning thought and evening reflection', updatedAt: `${todayJakarta}T18:00:00Z` }
+          ]
+        }
+      };
+      const res2 = JSON.parse(env.exports.doPost({ postData: { contents: JSON.stringify(sync2) } }).getContent());
+      expect(res2.ok).toBe(true);
+      expect(res2.rejected).toEqual([]);
+
+      // Verify content in sheet was successfully updated
+      const rowsAfter = jSheet.getDataRange().getValues();
+      expect(rowsAfter[1][1]).toBe('Morning thought and evening reflection');
+    });
   });
 
   describe('Push Subscription Management', () => {
@@ -927,6 +1041,124 @@ describe('GAS Backend Actions', () => {
       expect(body.getChild(3).getText()).toBe('Monday, 19 October 2026');
       expect(body.getChild(4).getText()).toBe('Oct 19 notes');
     });
+
+    it('updates existing entry in-place without duplicating date heading', () => {
+      const doc = env.context.DocumentApp.create('Habbit – Diary 2026');
+      env.exports.insertEntryIntoDoc(doc, {
+        day: '2026-10-21',
+        content: 'Morning jog.\nFelt good.'
+      });
+
+      expect(doc.getBody().getNumChildren()).toBe(4);
+      expect(doc.getBody().getChild(0).getText()).toBe('Wednesday, 21 October 2026');
+      expect(doc.getBody().getChild(1).getText()).toBe('Morning jog.');
+      expect(doc.getBody().getChild(2).getText()).toBe('Felt good.');
+      expect(doc.getBody().getChild(3).getText()).toBe('');
+
+      // Update the same day with new content
+      env.exports.insertEntryIntoDoc(doc, {
+        day: '2026-10-21',
+        content: 'Morning jog.\nAfternoon meeting.\nEvening reading.'
+      });
+
+      const body = doc.getBody();
+      const headings = [];
+      for (let i = 0; i < body.getNumChildren(); i++) {
+        if (body.getChild(i).getHeading() === 'HEADING_2') {
+          headings.push(body.getChild(i).getText());
+        }
+      }
+      expect(headings).toEqual(['Wednesday, 21 October 2026']);
+      expect(body.getChild(0).getText()).toBe('Wednesday, 21 October 2026');
+      expect(body.getChild(1).getText()).toBe('Morning jog.');
+      expect(body.getChild(2).getText()).toBe('Afternoon meeting.');
+      expect(body.getChild(3).getText()).toBe('Evening reading.');
+      expect(body.getChild(4).getText()).toBe('');
+      expect(body.getNumChildren()).toBe(5);
+    });
+
+    it('removes date heading and section when content is cleared/empty', () => {
+      const doc = env.context.DocumentApp.create('Habbit – Diary 2026');
+      // Insert Oct 20 and Oct 21
+      env.exports.insertEntryIntoDoc(doc, {
+        day: '2026-10-20',
+        content: 'Oct 20 entry'
+      });
+      env.exports.insertEntryIntoDoc(doc, {
+        day: '2026-10-21',
+        content: 'Oct 21 entry'
+      });
+
+      expect(doc.getBody().getNumChildren()).toBe(6);
+
+      // Clear Oct 20
+      env.exports.insertEntryIntoDoc(doc, {
+        day: '2026-10-20',
+        content: ''
+      });
+
+      const body = doc.getBody();
+      const headings = [];
+      for (let i = 0; i < body.getNumChildren(); i++) {
+        if (body.getChild(i).getHeading() === 'HEADING_2') {
+          headings.push(body.getChild(i).getText());
+        }
+      }
+      // Oct 20 should be completely removed, Oct 21 remains
+      expect(headings).toEqual(['Wednesday, 21 October 2026']);
+      expect(body.getChild(0).getText()).toBe('Wednesday, 21 October 2026');
+      expect(body.getChild(1).getText()).toBe('Oct 21 entry');
+      expect(body.getChild(2).getText()).toBe('');
+      expect(body.getNumChildren()).toBe(3);
+    });
+
+    it('handles body text with markdown headings without breaking date boundary in-place replacement', () => {
+      const doc = env.context.DocumentApp.create('Habbit – Diary 2026');
+      env.exports.insertEntryIntoDoc(doc, {
+        day: '2026-10-21',
+        content: '## Personal Heading\nRegular line\n### Another Heading'
+      });
+
+      // Update in place
+      env.exports.insertEntryIntoDoc(doc, {
+        day: '2026-10-21',
+        content: '## Updated Heading\nUpdated line'
+      });
+
+      const body = doc.getBody();
+      const headings = [];
+      for (let i = 0; i < body.getNumChildren(); i++) {
+        if (body.getChild(i).getHeading() === 'HEADING_2') {
+          headings.push(body.getChild(i).getText());
+        }
+      }
+      expect(headings).toEqual(['Wednesday, 21 October 2026']);
+      expect(body.getChild(1).getText()).toBe('## Updated Heading');
+      expect(body.getChild(2).getText()).toBe('Updated line');
+    });
+
+    it('batches exports by year, opening and saving each yearly Doc only once', () => {
+      const jSheet = env.ss.getSheetByName('Journal_Entries');
+      const rows = jSheet.getDataRange().getValues();
+      rows.push(['2026-10-18', 'Oct 18 entry', '2026-10-18T10:00:00Z', '', '2026-10-18T10:00:00Z']);
+      rows.push(['2026-10-19', 'Oct 19 entry', '2026-10-19T10:00:00Z', '', '2026-10-19T10:00:00Z']);
+      jSheet.getRange(1, 1, rows.length, 5).setValues(rows);
+
+      env.exports.printDiary();
+
+      const docs = Array.from(env.docs.values());
+      expect(docs.length).toBe(1); // Exactly one Doc for 2026
+      const doc = docs[0];
+      expect(doc.getName()).toBe('Habbit – Diary 2026');
+      const headings = [];
+      const body = doc.getBody();
+      for (let i = 0; i < body.getNumChildren(); i++) {
+        if (body.getChild(i).getHeading() === 'HEADING_2') {
+          headings.push(body.getChild(i).getText());
+        }
+      }
+      expect(headings).toEqual(['Sunday, 18 October 2026', 'Monday, 19 October 2026']);
+    });
   });
 
   describe('checkReminder()', () => {
@@ -978,6 +1210,107 @@ describe('GAS Backend Actions', () => {
 
       // LAST_REMINDER_DAY set
       expect(env.props['LAST_REMINDER_DAY']).toBeDefined();
+    });
+
+    it('auto-exports today journal entry to Google Doc during 10-minute checkReminder run', () => {
+      const todayJakarta = env.exports.getTodayJakarta();
+      const jSheet = env.ss.getSheetByName('Journal_Entries');
+      const rows = jSheet.getDataRange().getValues();
+      rows.push([todayJakarta, 'First draft today', `${todayJakarta}T10:00:00Z`, '', `${todayJakarta}T10:00:00Z`]);
+      jSheet.getRange(1, 1, rows.length, 5).setValues(rows);
+
+      env.exports.checkReminder();
+
+      // Verify sheet marked as printedToDiaryAt
+      const rowsAfter = jSheet.getDataRange().getValues();
+      expect(rowsAfter[1][3]).not.toBe('');
+      const firstPrintedAt = rowsAfter[1][3];
+
+      // Verify Google Doc was created in folder and contains today's entry
+      const docs = Array.from(env.docs.values());
+      expect(docs.length).toBe(1);
+      const doc = docs[0];
+      const year = todayJakarta.slice(0, 4);
+      expect(doc.getName()).toBe(`Habbit – Diary ${year}`);
+      expect(doc.getBody().getChild(1).getText()).toBe('First draft today');
+
+      // User updates today's entry later
+      rowsAfter[1][1] = 'First draft today + evening thoughts';
+      rowsAfter[1][2] = `${todayJakarta}T20:00:00Z`;
+      rowsAfter[1][4] = `${todayJakarta}T20:00:00Z`; // serverUpdatedAt
+      jSheet.getRange(1, 1, rowsAfter.length, 5).setValues(rowsAfter);
+      env.exports.checkReminder();
+
+      // Verify Doc was updated in-place
+      const rowsAfterSecond = jSheet.getDataRange().getValues();
+      expect(rowsAfterSecond[1][3]).not.toBe(firstPrintedAt);
+      expect(doc.getBody().getChild(1).getText()).toBe('First draft today + evening thoughts');
+    });
+
+    it('handles Google Doc export error gracefully without crashing checkReminder', () => {
+      const todayJakarta = env.exports.getTodayJakarta();
+      const jSheet = env.ss.getSheetByName('Journal_Entries');
+      const rows = jSheet.getDataRange().getValues();
+      rows.push([todayJakarta, 'Will fail export', `${todayJakarta}T10:00:00Z`, '', `${todayJakarta}T10:00:00Z`]);
+      jSheet.getRange(1, 1, rows.length, 5).setValues(rows);
+
+      // Break DocumentApp.create to simulate transient error
+      const originalCreate = env.context.DocumentApp.create;
+      env.context.DocumentApp.create = () => {
+        throw new Error('Google Drive quota exceeded');
+      };
+
+      try {
+        // Should not throw
+        expect(() => env.exports.checkReminder()).not.toThrow();
+        // Sheet printedToDiaryAt remains empty so next run can retry
+        const rowsAfter = jSheet.getDataRange().getValues();
+        expect(rowsAfter[1][3]).toBe('');
+      } finally {
+        env.context.DocumentApp.create = originalCreate;
+      }
+    });
+
+    it('is immune to client clock skew and does not repeatedly re-export when serverUpdatedAt has not changed', () => {
+      const todayJakarta = env.exports.getTodayJakarta();
+      const jSheet = env.ss.getSheetByName('Journal_Entries');
+      const rows = jSheet.getDataRange().getValues();
+      // Fast client clock: updatedAt is 3 hours in the future, serverUpdatedAt is current
+      rows.push([todayJakarta, 'Clock skew entry', `${todayJakarta}T23:00:00Z`, '', `${todayJakarta}T10:00:00Z`]);
+      jSheet.getRange(1, 1, rows.length, 5).setValues(rows);
+
+      env.exports.checkReminder();
+
+      const rowsAfterFirst = jSheet.getDataRange().getValues();
+      const initialPrintedAt = rowsAfterFirst[1][3];
+      expect(initialPrintedAt).not.toBe('');
+
+      // Run checkReminder again without any new server edits
+      env.exports.checkReminder();
+
+      const rowsAfterSecond = jSheet.getDataRange().getValues();
+      // printedToDiaryAt should NOT be updated again because serverUpdatedAt has not changed
+      expect(rowsAfterSecond[1][3]).toBe(initialPrintedAt);
+    });
+
+    it('does not export future-dated journal entries in checkReminder or syncDiaryEntries', () => {
+      const todayJakarta = env.exports.getTodayJakarta();
+      const futureDay = '2099-12-31';
+      const jSheet = env.ss.getSheetByName('Journal_Entries');
+      const rows = jSheet.getDataRange().getValues();
+      rows.push([futureDay, 'Future entry draft', `${futureDay}T10:00:00Z`, '', `${todayJakarta}T10:00:00Z`]);
+      jSheet.getRange(1, 1, rows.length, 5).setValues(rows);
+
+      env.exports.checkReminder();
+
+      // Verify sheet marked as printedToDiaryAt is still empty
+      const rowsAfter = jSheet.getDataRange().getValues();
+      expect(rowsAfter[1][3]).toBe('');
+
+      // Verify no doc was created for 2099
+      const docs = Array.from(env.docs.values());
+      const futureDoc = docs.find(d => d.getName().includes('2099'));
+      expect(futureDoc).toBeUndefined();
     });
   });
 });

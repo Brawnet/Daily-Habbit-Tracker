@@ -1,3 +1,7 @@
+> **HISTORICAL REFERENCE ONLY**
+> This file documents the initial 4-wave bootstrapping prompt used during the project's inception.
+> For active development rules, refer to `AGENTS.md`, `CODING_STANDARDS.md`, `docs/SPEC.md`, and `GLOSSARY.md`.
+
 # Prompt untuk agent implementasi
 
 Salin seluruh blok di bawah ke agent. Prompt ini sengaja hanya berisi *cara kerja*; *apa* yang dibangun ada di `docs/SPEC.md`.

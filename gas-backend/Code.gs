@@ -205,7 +205,7 @@ function isJournalRecord(rec) {
  * @param {string} nowMonotonic
  * @returns {Array|object}
  */
-function mergeRecordsLWW(existingRecords, incomingRecords, nowMonotonic) {
+function mergeRecordsLWW(existingRecords, incomingRecords, nowMonotonic, todayJakarta) {
   if (!Array.isArray(incomingRecords)) {
     const merged = {};
     const updated = {};
@@ -214,7 +214,7 @@ function mergeRecordsLWW(existingRecords, incomingRecords, nowMonotonic) {
     for (const store of stores) {
       const exList = (existingRecords && existingRecords[store]) || [];
       const inList = (incomingRecords && incomingRecords[store]) || [];
-      const res = mergeRecordsLWW(exList, inList, nowMonotonic);
+      const res = mergeRecordsLWW(exList, inList, nowMonotonic, todayJakarta);
       merged[store] = res.merged || res;
       updated[store] = res.updated || [];
       if (res.rejected && res.rejected.length > 0) {
@@ -243,12 +243,17 @@ function mergeRecordsLWW(existingRecords, incomingRecords, nowMonotonic) {
     const isJournal = isJournalRecord(incoming) || isJournalRecord(existing);
 
     if (isJournal && existing && existing.printedToDiaryAt && String(existing.printedToDiaryAt).trim() !== '') {
-      rejected.push({
-        type: 'journalEntries',
-        key: key,
-        reason: 'LOCKED'
-      });
-      continue;
+      const today = todayJakarta !== undefined
+        ? todayJakarta
+        : (typeof getTodayJakarta === 'function' ? getTodayJakarta() : '');
+      if (!today || key < today) {
+        rejected.push({
+          type: 'journalEntries',
+          key: key,
+          reason: 'LOCKED'
+        });
+        continue;
+      }
     }
 
     if (!existing || !existing.updatedAt || (incoming.updatedAt && incoming.updatedAt > existing.updatedAt)) {
@@ -508,6 +513,7 @@ function syncJournalEntries(sheet, incomingJournalEntries, nowMonotonic) {
     if (data[i][0]) rowMap.set(String(data[i][0]), i);
   }
 
+  const todayJakarta = getTodayJakarta();
   const rejected = [];
   for (const entry of incomingJournalEntries) {
     const day = String(entry.day);
@@ -515,7 +521,7 @@ function syncJournalEntries(sheet, incomingJournalEntries, nowMonotonic) {
     const rowIndex = rowMap.get(day);
     if (rowIndex !== undefined) {
       const printedToDiaryAt = String(data[rowIndex][3] || '');
-      if (printedToDiaryAt.trim() !== '') {
+      if (day < todayJakarta && printedToDiaryAt.trim() !== '') {
         rejected.push({
           type: 'journalEntries',
           key: day,
@@ -745,6 +751,17 @@ function getOrCreateDiaryDoc(folder, year, props) {
   return doc;
 }
 
+function writeEntryParagraphs(body, startIndex, lines) {
+  let pos = startIndex;
+  for (const line of lines) {
+    const p = pos === -1 ? body.appendParagraph(line) : body.insertParagraph(pos++, line);
+    p.setHeading(DocumentApp.ParagraphHeading.NORMAL);
+  }
+  const blank = pos === -1 ? body.appendParagraph('') : body.insertParagraph(pos++, '');
+  blank.setHeading(DocumentApp.ParagraphHeading.NORMAL);
+  return pos;
+}
+
 function insertEntryIntoDoc(doc, entry) {
   const body = doc.getBody();
   const existingHeadings = [];
@@ -761,6 +778,43 @@ function insertEntryIntoDoc(doc, entry) {
     }
   }
 
+  const existingIndex = existingHeadings.findIndex(h => h.day === entry.day);
+  const hasContent = entry.content && String(entry.content).trim() !== '';
+
+  if (existingIndex !== -1) {
+    const currentHeading = existingHeadings[existingIndex];
+    const nextHeading = existingHeadings[existingIndex + 1];
+    const endIndex = nextHeading ? nextHeading.childIndex : body.getNumChildren();
+
+    if (!hasContent) {
+      // Content cleared: remove heading and all following paragraphs for this entry
+      for (let i = endIndex - 1; i >= currentHeading.childIndex; i--) {
+        if (body.getNumChildren() > 1) {
+          body.removeChild(body.getChild(i));
+        } else {
+          const blank = body.appendParagraph('');
+          blank.setHeading(DocumentApp.ParagraphHeading.NORMAL);
+          body.removeChild(body.getChild(i));
+        }
+      }
+      return;
+    }
+
+    // Content updated: remove previous body paragraphs and insert updated content
+    for (let i = endIndex - 1; i > currentHeading.childIndex; i--) {
+      body.removeChild(body.getChild(i));
+    }
+
+    const lines = (entry.content || '').split('\n');
+    writeEntryParagraphs(body, currentHeading.childIndex + 1, lines);
+    return;
+  }
+
+  // Not in doc yet: if no content, do not insert empty section
+  if (!hasContent) {
+    return;
+  }
+
   const insertIndex = findChronologicalInsertIndex(existingHeadings, entry.day);
   const headingText = formatDiaryHeading(entry.day);
   const lines = (entry.content || '').split('\n');
@@ -768,24 +822,16 @@ function insertEntryIntoDoc(doc, entry) {
   if (insertIndex === -1) {
     const h2 = body.appendParagraph(headingText);
     h2.setHeading(DocumentApp.ParagraphHeading.HEADING_2);
-    for (const line of lines) {
-      const p = body.appendParagraph(line);
-      p.setHeading(DocumentApp.ParagraphHeading.NORMAL);
-    }
-    const blank = body.appendParagraph('');
-    blank.setHeading(DocumentApp.ParagraphHeading.NORMAL);
+    writeEntryParagraphs(body, -1, lines);
   } else {
     let pos = insertIndex;
     const h2 = body.insertParagraph(pos++, headingText);
     h2.setHeading(DocumentApp.ParagraphHeading.HEADING_2);
-    for (const line of lines) {
-      const p = body.insertParagraph(pos++, line);
-      p.setHeading(DocumentApp.ParagraphHeading.NORMAL);
-    }
-    const blank = body.insertParagraph(pos++, '');
-    blank.setHeading(DocumentApp.ParagraphHeading.NORMAL);
+    writeEntryParagraphs(body, pos, lines);
   }
 }
+
+const upsertEntryInDoc = insertEntryIntoDoc;
 
 function updateJournalEntryInSheet(sheet, entry) {
   const data = sheet.getDataRange().getValues();
@@ -1045,57 +1091,112 @@ function setup() {
   }
 }
 
-function printDiary() {
-  const props = PropertiesService.getScriptProperties();
-  const folderId = props.getProperty('DIARY_FOLDER_ID');
-  if (!folderId) {
-    if (typeof Logger !== 'undefined') Logger.log('DIARY_FOLDER_ID not set');
+function syncDiaryEntries(ss, props, options) {
+  const lock = LockService.getScriptLock();
+  let hasLock = false;
+  try {
+    hasLock = lock.waitLock(10000);
+  } catch (err) {
+    hasLock = false;
+  }
+  if (!hasLock) {
+    if (typeof Logger !== 'undefined') {
+      Logger.log('syncDiaryEntries: could not obtain script lock; skipping run');
+    }
     return;
   }
-  const folder = DriveApp.getFolderById(folderId);
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('Journal_Entries');
-  if (!sheet) return;
 
-  const todayJakarta = getTodayJakarta();
-  const entries = readAllJournalEntries(sheet);
-  const toPrint = entries.filter(e => {
-    const isPast = e.day < todayJakarta;
-    const notPrinted = !e.printedToDiaryAt || String(e.printedToDiaryAt).trim() === '';
-    const hasContent = e.content && String(e.content).trim() !== '';
-    return isPast && notPrinted && hasContent;
-  });
-
-  toPrint.sort((a, b) => a.day.localeCompare(b.day));
-
-  for (const entry of toPrint) {
+  try {
+    const includeToday = options && options.includeToday !== undefined ? options.includeToday : true;
+    const folderId = props.getProperty('DIARY_FOLDER_ID');
+    if (!folderId) {
+      if (typeof Logger !== 'undefined') Logger.log('DIARY_FOLDER_ID not set');
+      return;
+    }
+    let folder = null;
     try {
-      const year = entry.day.slice(0, 4);
-      const doc = getOrCreateDiaryDoc(folder, year, props);
-      insertEntryIntoDoc(doc, entry);
-      doc.saveAndClose();
-
-      const serverNow = getMonotonicNow();
-      entry.printedToDiaryAt = serverNow;
-      entry.serverUpdatedAt = serverNow;
-      updateJournalEntryInSheet(sheet, entry);
+      folder = DriveApp.getFolderById(folderId);
     } catch (err) {
-      if (typeof Logger !== 'undefined') {
-        Logger.log('Error printing Journal Entry ' + entry.day + ': ' + err.message);
+      if (typeof Logger !== 'undefined') Logger.log('Failed to access DIARY_FOLDER_ID: ' + err.message);
+      return;
+    }
+    if (!folder) return;
+
+    const sheet = ss.getSheetByName('Journal_Entries');
+    if (!sheet) return;
+
+    const todayJakarta = getTodayJakarta();
+    const entries = readAllJournalEntries(sheet);
+    const toExport = entries.filter(e => {
+      if (e.day > todayJakarta) return false;
+      if (!includeToday && e.day === todayJakarta) return false;
+      const notPrinted = !e.printedToDiaryAt || String(e.printedToDiaryAt).trim() === '';
+      const hasContent = e.content && String(e.content).trim() !== '';
+      if (notPrinted) {
+        return hasContent;
+      }
+      return Boolean(e.serverUpdatedAt && e.serverUpdatedAt > e.printedToDiaryAt);
+    });
+
+    toExport.sort((a, b) => a.day.localeCompare(b.day));
+
+    // Group entries by year to batch Doc open/save operations
+    const entriesByYear = new Map();
+    for (const entry of toExport) {
+      const year = entry.day.slice(0, 4);
+      if (!entriesByYear.has(year)) entriesByYear.set(year, []);
+      entriesByYear.get(year).push(entry);
+    }
+
+    for (const [year, entriesForYear] of entriesByYear) {
+      try {
+        const doc = getOrCreateDiaryDoc(folder, year, props);
+        for (const entry of entriesForYear) {
+          insertEntryIntoDoc(doc, entry);
+        }
+        doc.saveAndClose();
+
+        const serverNow = getMonotonicNow();
+        for (const entry of entriesForYear) {
+          entry.printedToDiaryAt = serverNow;
+          entry.serverUpdatedAt = serverNow;
+          updateJournalEntryInSheet(sheet, entry);
+        }
+      } catch (err) {
+        if (typeof Logger !== 'undefined') {
+          Logger.log('Error exporting Journal Entries for year ' + year + ': ' + err.message);
+        }
       }
     }
+  } finally {
+    lock.releaseLock();
   }
+}
+
+function printDiary() {
+  const props = PropertiesService.getScriptProperties();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  syncDiaryEntries(ss, props, { includeToday: false });
 }
 
 function checkReminder() {
   const props = PropertiesService.getScriptProperties();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Auto-sync journal entries to Google Doc (10-minute background cycle)
+  try {
+    syncDiaryEntries(ss, props, { includeToday: true });
+  } catch (err) {
+    if (typeof Logger !== 'undefined') {
+      Logger.log('Error auto-syncing diary in checkReminder: ' + err.message);
+    }
+  }
+
   const pushEndpointUrl = props.getProperty('PUSH_ENDPOINT_URL') || '';
   const pushSharedSecret = props.getProperty('PUSH_SHARED_SECRET') || '';
   const lastReminderDay = props.getProperty('LAST_REMINDER_DAY') || '';
   const todayJakarta = getTodayJakarta();
   const nowHHMM = getNowHHMMJakarta();
-
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
   const settingsSheet = ss.getSheetByName('Settings');
   let reminderTime = '20:00';
   if (settingsSheet) {
@@ -1219,12 +1320,14 @@ if (typeof module !== 'undefined' && module.exports) {
     handleTestPush,
     getOrCreateDiaryDoc,
     insertEntryIntoDoc,
+    upsertEntryInDoc,
     updateJournalEntryInSheet,
     deletePushSubscriptionsByEndpoints,
     doGet,
     doPost,
     setup,
     printDiary,
-    checkReminder
+    checkReminder,
+    syncDiaryEntries
   };
 }

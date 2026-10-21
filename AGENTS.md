@@ -10,15 +10,18 @@ Habbit is a personal, offline-first Progressive Web App (PWA) Habit Tracker and 
 ## Primary Navigation Pointers
 - **Domain & Architecture Contracts**: Read [`docs/SPEC.md`](docs/SPEC.md). Note rules for Day (local date `YYYY-MM-DD`), Check-in (today and yesterday editable only), and Journal Entry (editable only on Day).
 - **Domain Vocabulary**: Read [`GLOSSARY.md`](GLOSSARY.md). Use exact terms in code, UI, and comments (e.g. `Habit`, `Check-in`, `Journal Entry`, `Diary`, `Device`). Avoid forbidden terms.
-- **Coding Standards**: Read [`CODING_STANDARDS.md`](CODING_STANDARDS.md) for mobile layout conventions, safe-area rules, CSS cascade rules, and dependency policies.
+- **Key Decisions**: Read [`docs/adr/`](docs/adr/) for offline-first architecture, Sheets source of truth, and reminder decisions.
+- **Coding Standards**: Read [`CODING_STANDARDS.md`](CODING_STANDARDS.md) for mobile layout conventions, safe-area rules, Apps Script pure function isolation, and dependency policies.
 - **Deployment & Setup**: Read [`README.md`](README.md) for GAS deployment, Google Drive diary setup, and VAPID push keys.
 
 ## Commands
+All dependencies and scripts are isolated in `frontend/`:
 - Unit & contract tests: `cd frontend && npm test` (Vitest runs frontend + GAS VM tests).
-- Dependency contract check: `cd frontend && npm run check:deps`.
+- Structure check: `cd frontend && npm run check:structure`.
+- Dependency & structure check: `cd frontend && npm run check:deps`.
 - Production build: `cd frontend && npm run build`.
 - E2E tests: `cd frontend && npm run test:e2e`.
 
 ## Worktrees & Branches
-- Work in dedicated Git worktrees for isolated features or fixes (`Daily-Habbit-Tracker-worktree-<feature>`).
+- Work in dedicated Git worktrees for isolated features or fixes (`../Daily-Habbit-Tracker-worktree-<feature>`).
 - Always compare PR diffs against the true pre-feature merge-base commit.

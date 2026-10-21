@@ -112,7 +112,7 @@ Server: `JSON.parse(e.postData.contents)`. Selalu HTTP 200 (Apps Script tak bisa
 Aturan `sync` di server (di dalam `LockService.getScriptLock().waitLock(20000)`):
 
 1. `now` = waktu server, dipaksa monoton (> nilai terakhir di Script Properties).
-2. Per record masuk: cari by key. Tulis bila belum ada **atau** `incoming.updatedAt > existing.updatedAt`; set `serverUpdatedAt = now`. `printedToDiaryAt` dari klien diabaikan. Journal Entry yang `printedToDiaryAt` sudah terisi → tolak dengan reason `LOCKED`.
+2. Per record masuk: cari by key. Tulis bila belum ada **atau** `incoming.updatedAt > existing.updatedAt`; set `serverUpdatedAt = now`. `printedToDiaryAt` dari klien diabaikan. Journal Entry hari lampau (`day < todayJakarta`) yang `printedToDiaryAt` sudah terisi → tolak dengan reason `LOCKED` (entri hari ini tetap bebas diedit dan di-sync sepanjang hari).
 3. Balas semua record dengan `serverUpdatedAt > since` (`since` null = semua). `cursor = now`.
 
 Auth: bandingkan `pin` dengan Script Property `PIN`. Gagal >10x dalam 10 menit (CacheService) → `RATE_LIMITED` selama 10 menit.
@@ -131,20 +131,27 @@ Satu file, tetapi logika murni (format/parse heading Diary, posisi sisip, keputu
 
 Buat sheet + header + format teks bila belum ada; buat folder Drive `Habbit Diary`; generate `PUSH_SHARED_SECRET` bila kosong; hapus lalu pasang ulang trigger `printDiary` (harian ~02:00) dan `checkReminder` (tiap 10 menit); log ringkasan + langkah berikutnya.
 
-### 6.3 `printDiary()` (trigger harian)
+### 6.3 `syncDiaryEntries()` & `printDiary()` (auto-sync 10 menit & trigger harian)
 
-Ambil Journal Entry dengan `day < todayJakarta`, `printedToDiaryAt` kosong, `content` tidak kosong; urut naik. Per entry: buka/buat doc `Habbit – Diary <YYYY>` di folder; sisipkan blok di **posisi kronologis**:
+Auto-sync jurnal ke Google Drive Doc dijalankan setiap 10 menit di dalam siklus background `checkReminder()` serta di-catch up harian pada `printDiary()` (~02:00 Jakarta).
 
-- Heading 2: `EEEE, d MMMM yyyy` (contoh `Tuesday, 20 October 2026`)
-- satu paragraf Normal per baris `content`
-- satu paragraf kosong sebagai pemisah
-
-Posisi: kumpulkan semua Heading 2, parse balik ke `day`, sisipkan sebelum heading pertama yang `day`-nya lebih besar, kalau tidak ada → append. Lalu set `printedToDiaryAt`. Entry yang gagal dicoba lagi di run berikutnya.
+Ambil Journal Entry yang belum dicetak (`!printedToDiaryAt`) atau telah diedit setelah pencetakan (`serverUpdatedAt > printedToDiaryAt`). Entri dikelompokkan per tahun (`YYYY`) untuk membuka dan menyimpan setiap Google Doc sekali per siklus di folder `DIARY_FOLDER_ID`:
+- Bila heading tanggal sudah ada di Doc:
+  - Jika content diisi: update isi paragraf secara in-place di bawah heading tanggal tersebut tanpa membuat heading duplikat.
+  - Jika content kosong/dihapus: hapus heading tanggal dan paragraf pemisahnya dari Doc.
+- Bila heading tanggal belum ada dan content tidak kosong: sisipkan blok di **posisi kronologis**:
+  - Heading 2: `EEEE, d MMMM yyyy` (contoh `Tuesday, 20 October 2026`)
+  - satu paragraf Normal per baris `content`
+  - satu paragraf kosong sebagai pemisah
+- Set `printedToDiaryAt = serverNow`. Entry yang gagal dicoba lagi di run berikutnya.
+- Aturan `LOCKED`: hanya mengunci entri hari lampau (`day < todayJakarta && printedToDiaryAt !== ''`). Entri hari ini tetap bebas diedit dan di-sync sepanjang hari.
 
 ### 6.4 `checkReminder()` (trigger 10 menit)
 
-Keluar bila: `nowHHMM < reminderTime`, atau `LAST_REMINDER_DAY === todayJakarta`, atau tidak ada subscription, atau `PUSH_ENDPOINT_URL` kosong. Hitung Habit aktif tanpa Check-in (non-deleted) hari ini dan apakah Journal Entry hari ini ada. Tidak ada yang tertunda → set `LAST_REMINDER_DAY`, keluar. Selain itu `UrlFetchApp` POST ke `PUSH_ENDPOINT_URL` dengan header `x-push-secret` dan body `{ subscriptions, notification: { title: 'Habbit', body, url: '/?tab=today' } }`. Teks body: `2 habits left · Journal not written yet` / `1 habit left` / `Journal not written yet`. Hapus subscription yang hasilnya 404/410. Set `LAST_REMINDER_DAY`.
+Menjalankan `syncDiaryEntries(ss, props, { includeToday: true })` dalam blok `try/catch` agar entri jurnal hari ini otomatis tersimpan ke Google Doc setiap 10 menit tanpa menunggu pergantian hari.
 
+Kemudian mengevaluasi pengiriman push notification:
+Keluar bila: `nowHHMM < reminderTime`, atau `LAST_REMINDER_DAY === todayJakarta`, atau tidak ada subscription, atau `PUSH_ENDPOINT_URL` kosong. Hitung Habit aktif tanpa Check-in (non-deleted) hari ini dan apakah Journal Entry hari ini ada. Tidak ada yang tertunda → set `LAST_REMINDER_DAY`, keluar. Selain itu `UrlFetchApp` POST ke `PUSH_ENDPOINT_URL` dengan header `x-push-secret` dan body `{ subscriptions, notification: { title: 'Habbit', body, url: '/?tab=today' } }`. Teks body: `2 habits left · Journal not written yet` / `1 habit left` / `Journal not written yet`. Hapus subscription yang hasilnya 404/410. Set `LAST_REMINDER_DAY`.
 ## 7. Web Push
 
 - VAPID dibuat user: `npx web-push generate-vapid-keys`.

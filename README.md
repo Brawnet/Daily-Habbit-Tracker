@@ -88,9 +88,9 @@ Aplikasi ini mengadopsi arsitektur **offline-first**: setiap Device menyimpan da
    - Periksa **Execution log**:
      - Fungsi `setup` secara idempoten akan:
        1. Membuat 5 sheet: `Habits`, `Check_Ins`, `Journal_Entries`, `Settings`, `Push_Subscriptions` lengkap dengan header dan format teks `@`.
-       2. Membuat folder `Habbit Diary` di Google Drive Anda.
+       2. Membuat folder `Habbit Diary` di Google Drive Anda (bisa diarahkan ke folder lain dengan mengubah Script Property `DIARY_FOLDER_ID`).
        3. Membuat `PUSH_SHARED_SECRET` otomatis di Script Properties (lihat log).
-       4. Memasang trigger harian `printDiary` (~02:00) dan trigger interval `checkReminder` (setiap 10 menit).
+       4. Memasang trigger interval `checkReminder` (setiap 10 menit: auto-save jurnal hari ini ke Google Doc tahunan `Habbit – Diary <YYYY>` dan evaluasi reminder) serta trigger harian `printDiary` (~02:00 Jakarta sebagai catch-up).
      - Catat nilai `PUSH_SHARED_SECRET` dari log atau Script Properties.
 
 7. **Deploy sebagai Web App**:

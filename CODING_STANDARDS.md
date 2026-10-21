@@ -4,20 +4,20 @@ Engineering conventions and review guidelines for the Habbit codebase.
 
 ## 1. PWA & Mobile CSS Rules
 
-- **Fixed Full-Screen Shell**: Size the shell layout by pinning it to all four edges with fixed positioning (`position: fixed; inset: 0;`). Do not use `vh` or `dvh` viewport-height units for the shell height.
-  - *Reasoning*: In iOS Home Screen mode (`display-mode: standalone`) with `viewport-fit=cover` and `black-translucent`, iOS calculates `100vh` and `100dvh` as the screen height minus the status bar height (e.g. 896 − 48 = 848pt on iPhone 11), leaving an empty ~48pt dark strip at the bottom of the screen. Fixed edge pinning (`inset: 0`) spans the full physical display reliably while `env(safe-area-inset-*)` protects headers and navigation bars.
+- **Viewport Height**: Always use modern dynamic viewport height (`100dvh`) for full-screen shell layout (`html, body, #app, .shell-layout`).
+- **Cascade Order**: Progressive fallbacks (`100%`, `100vh`, `-webkit-fill-available`) must always precede `100dvh` in CSS declarations so that modern browsers favor `100dvh`.
   ```css
-  html, body {
+  html, body, #app, .shell-layout {
     height: 100%;
-    overflow: hidden;
-    overscroll-behavior: none;
-  }
-
-  .shell-layout {
-    position: fixed;
-    inset: 0;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 100%;
+    min-height: -webkit-fill-available;
+    min-height: 100vh;
+    min-height: 100dvh;
   }
   ```
+- **Duplication Policy**: Consolidate shared selector declarations rather than repeating identical declaration blocks across selectors or inside `@media (display-mode: standalone)`.
 - **Status Bar Meta**: Keep `<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />` in `index.html` to allow full-bleed rendering behind the status bar and Dynamic Island notch.
 
 ## 2. Touch Ergonomics & Safe Areas

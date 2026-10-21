@@ -165,7 +165,7 @@ Keluar bila: `nowHHMM < reminderTime`, atau `LAST_REMINDER_DAY === todayJakarta`
 - `<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">` (tanpa `maximum-scale`).
 - `apple-mobile-web-app-capable=yes`, `mobile-web-app-capable=yes`, `apple-mobile-web-app-status-bar-style=black-translucent`, `apple-mobile-web-app-title=Habbit`, `<link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png">`, `theme-color` untuk light & dark (`media="(prefers-color-scheme: …)"`).
 - Manifest: `name`/`short_name` `Habbit`, `start_url: "/"`, `scope: "/"`, `display: "standalone"`, ikon 192/512/maskable.
-- Header: `padding-top: env(safe-area-inset-top)`; bottom nav: `padding-bottom: env(safe-area-inset-bottom)`; kiri/kanan juga untuk landscape. Shell layout dipin ke empat sisi layar secara fixed (`position: fixed; inset: 0;`), tanpa unit `vh`/`dvh` untuk menghindari celah status bar pada iOS Home Screen mode.
+- Header: `padding-top: env(safe-area-inset-top)`; bottom nav: `padding-bottom: env(safe-area-inset-bottom)`; kiri/kanan juga untuk landscape. Tinggi layout pakai `100dvh`.
 - Semua `input`, `select`, `textarea`: `font-size: 16px` minimum.
 - Install: `beforeinstallprompt` → tombol Install (Android). iOS Safari & belum standalone (`navigator.standalone !== true` dan bukan `display-mode: standalone`) → instruksi "Tap Share → Add to Home Screen" **plus** catatan: aplikasi terpasang punya storage terpisah, atur sync setelah install. Sudah terpasang → "Installed ✓".
 - Panggil `navigator.storage.persist()` saat startup bila tersedia.

@@ -5,10 +5,18 @@
   --sab: env(safe-area-inset-bottom, 0px);
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
+  --app-height: 100dvh;
+}
+
+@media all and (display-mode: standalone) {
+  :root {
+    --app-height: 100vh;
+  }
 }
 
 html, body {
-  height: 100%;
+  height: var(--app-height, 100dvh);
+  min-height: var(--app-height, 100dvh);
   margin: 0;
   padding: 0;
   overflow: hidden;
@@ -18,34 +26,16 @@ html, body {
   background-color: #ffffff;
 }
 
-.shell-layout {
-  position: fixed;
-  inset: 0;
-}
-
-/* Standalone PWA adjustments (iOS Home Screen PWA) */
-@media all and (display-mode: standalone) {
-  /* iOS workaround: in Home Screen mode with viewport-fit=cover and black-translucent,
-     WebKit calculates 100dvh/fixed height as screen minus status bar (e.g. 848pt vs 896pt on iPhone 11).
-     Adding env(safe-area-inset-top) extends the shell to the full physical screen height (896pt). */
-  .shell-layout {
-    bottom: auto;
-    bottom: calc(-1 * env(safe-area-inset-top, 0px));
-    height: calc(100% + env(safe-area-inset-top, 0px));
-    height: calc(100vh + env(safe-area-inset-top, 0px));
-    height: calc(100dvh + env(safe-area-inset-top, 0px));
-    min-height: calc(100dvh + env(safe-area-inset-top, 0px));
-  }
-}
-
 @media (prefers-color-scheme: dark) {
   html, body {
     background-color: #09090b;
   }
 }
 
-#app {
+#app, .shell-layout {
   width: 100%;
+  height: var(--app-height, 100dvh);
+  min-height: var(--app-height, 100dvh);
   display: flex;
   flex-direction: column;
   overflow: hidden;

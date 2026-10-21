@@ -12,6 +12,13 @@
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#09090b" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <title>Habbit</title>
+    <script>
+      try {
+        if (typeof navigator !== 'undefined' && (navigator.standalone || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches))) {
+          document.documentElement.style.setProperty('--app-height', '100vh');
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body class="bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 antialiased">
     <div id="app"></div>

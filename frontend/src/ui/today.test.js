@@ -1,210 +1,11 @@
 import 'fake-indexeddb/auto';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
-class MockClassList {
-  constructor(el) {
-    this.el = el;
-    this.classes = new Set();
-  }
-  add(...names) {
-    for (const name of names) {
-      if (name) this.classes.add(name);
-    }
-    this.el._className = Array.from(this.classes).join(' ');
-  }
-  remove(...names) {
-    for (const name of names) {
-      this.classes.delete(name);
-    }
-    this.el._className = Array.from(this.classes).join(' ');
-  }
-  contains(name) {
-    return this.classes.has(name);
-  }
-}
-
-class MockElement {
-  constructor(tagName, doc) {
-    this.tagName = tagName.toUpperCase();
-    this.doc = doc;
-    this.children = [];
-    this.attributes = {};
-    this.dataset = {};
-    this.style = {};
-    this.listeners = {};
-    this.parentElement = null;
-    this._className = '';
-    this.classList = new MockClassList(this);
-    this._textContent = '';
-    this._innerHTML = '';
-    this._value = '';
-    this.disabled = false;
-    this._id = '';
-    this.type = 'button';
-  }
-
-  get id() {
-    return this._id;
-  }
-  set id(val) {
-    this._id = String(val || '');
-    this.attributes['id'] = this._id;
-    if (this.doc && this._id) {
-      this.doc.elementsById.set(this._id, this);
-    }
-  }
-
-  get value() {
-    return this._value;
-  }
-  set value(val) {
-    this._value = String(val ?? '');
-  }
-
-  get className() {
-    return this._className;
-  }
-  set className(val) {
-    this._className = val || '';
-    this.classList.classes.clear();
-    for (const part of this._className.split(/\s+/)) {
-      if (part) this.classList.classes.add(part);
-    }
-  }
-
-  get textContent() {
-    return this._textContent;
-  }
-  set textContent(val) {
-    this._textContent = String(val ?? '');
-  }
-
-  get innerHTML() {
-    return this._innerHTML;
-  }
-  set innerHTML(val) {
-    this._innerHTML = String(val ?? '');
-    this.children = [];
-  }
-
-  setAttribute(name, val) {
-    this.attributes[name] = String(val);
-    if (name === 'id') {
-      this.id = val;
-    }
-    if (name.startsWith('data-')) {
-      const key = name.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-      this.dataset[key] = String(val);
-    }
-  }
-
-  getAttribute(name) {
-    return this.attributes[name] ?? null;
-  }
-
-  removeAttribute(name) {
-    delete this.attributes[name];
-    if (name === 'id') {
-      if (this.doc && this._id) {
-        this.doc.elementsById.delete(this._id);
-      }
-      this._id = '';
-    }
-  }
-
-  appendChild(child) {
-    child.parentElement = this;
-    this.children.push(child);
-    return child;
-  }
-
-  remove() {
-    if (this.parentElement) {
-      const idx = this.parentElement.children.indexOf(this);
-      if (idx !== -1) {
-        this.parentElement.children.splice(idx, 1);
-      }
-      this.parentElement = null;
-    }
-  }
-
-  addEventListener(type, handler) {
-    if (!this.listeners[type]) this.listeners[type] = [];
-    this.listeners[type].push(handler);
-  }
-
-  removeEventListener(type, handler) {
-    if (!this.listeners[type]) return;
-    this.listeners[type] = this.listeners[type].filter((h) => h !== handler);
-  }
-
-  dispatchEvent(event) {
-    const handlers = this.listeners[event.type] || [];
-    for (const handler of handlers) {
-      handler(event);
-    }
-    return true;
-  }
-
-  click() {
-    const event = {
-      type: 'click',
-      target: this,
-      preventDefault: () => {},
-      stopPropagation: () => {},
-    };
-    this.dispatchEvent(event);
-  }
-
-  querySelector(selector) {
-    const all = this.querySelectorAll(selector);
-    return all.length > 0 ? all[0] : null;
-  }
-
-  querySelectorAll(selector) {
-    const results = [];
-    const check = (el) => {
-      let match = true;
-      if (selector.startsWith('#')) {
-        const id = selector.slice(1);
-        if (el.id !== id && el.getAttribute('id') !== id) match = false;
-      } else if (selector.startsWith('.')) {
-        const cls = selector.slice(1);
-        if (!el.classList.contains(cls)) match = false;
-      } else if (selector.includes('[data-action=')) {
-        const action = selector.match(/\[data-action="?([^"\]]+)"?\]/)?.[1];
-        if (el.dataset.action !== action) match = false;
-      } else if (selector.includes('[data-starter-chip]')) {
-        if (!('starterChip' in el.dataset)) match = false;
-      }
-      if (match && el !== this) results.push(el);
-
-      for (const child of el.children) {
-        check(child);
-      }
-    };
-    check(this);
-    return results;
-  }
-}
-
-class MockDocument {
-  constructor() {
-    this.elementsById = new Map();
-  }
-
-  createElement(tag) {
-    return new MockElement(tag, this);
-  }
-
-  getElementById(id) {
-    return this.elementsById.get(id) || null;
-  }
-}
+import { MockElement, MockDocument } from './test-helpers.js';
 
 describe('ui/today.js empty state & first-launch onboarding', () => {
   let mockDoc;
   let repoModule;
+  let shellModule;
   let mount;
 
   beforeEach(async () => {
@@ -224,10 +25,11 @@ describe('ui/today.js empty state & first-launch onboarding', () => {
     });
 
     // Mock shell
-    vi.doMock('./shell.js', () => ({
+    shellModule = {
       navigate: vi.fn(),
       showToast: vi.fn(),
-    }));
+    };
+    vi.doMock('./shell.js', () => shellModule);
 
     // Mock repo
     let habitsList = [];
@@ -283,7 +85,7 @@ describe('ui/today.js empty state & first-launch onboarding', () => {
     const subtitle = mockDoc.getElementById('today-empty-subtitle');
     expect(subtitle).toBeDefined();
     expect(subtitle.textContent).toContain('Start building your daily momentum');
-    expect(subtitle.textContent).toContain('stays on this device');
+    expect(subtitle.textContent).toContain('stays on this Device');
 
     const input = mockDoc.getElementById('today-empty-add-input');
     expect(input).toBeDefined();
@@ -292,6 +94,10 @@ describe('ui/today.js empty state & first-launch onboarding', () => {
     const addBtn = mockDoc.getElementById('today-empty-add-btn');
     expect(addBtn).toBeDefined();
     expect(addBtn.textContent).toBe('Add Habit');
+
+    const manageBtn = mockDoc.getElementById('manage-habits-btn');
+    expect(manageBtn).toBeDefined();
+    expect(manageBtn.textContent).toContain('Manage Habits');
   });
 
   it('allows adding habit inline by clicking Add Habit button', async () => {
@@ -348,6 +154,19 @@ describe('ui/today.js empty state & first-launch onboarding', () => {
     expect(repoModule.addHabit).toHaveBeenCalled();
   });
 
+  it('navigates to settings when Manage Habits link is clicked', async () => {
+    const root = mockDoc.createElement('div');
+    mount(root);
+
+    await new Promise((r) => setTimeout(r, 20));
+
+    const manageBtn = mockDoc.getElementById('manage-habits-btn');
+    expect(manageBtn).toBeDefined();
+    manageBtn.click();
+
+    expect(shellModule.navigate).toHaveBeenCalledWith('settings');
+  });
+
   it('ensures interactive elements on empty state satisfy min 44x44px touch targets', async () => {
     const root = mockDoc.createElement('div');
     mount(root);
@@ -356,12 +175,15 @@ describe('ui/today.js empty state & first-launch onboarding', () => {
 
     const input = mockDoc.getElementById('today-empty-add-input');
     const addBtn = mockDoc.getElementById('today-empty-add-btn');
+    const manageBtn = mockDoc.getElementById('manage-habits-btn');
     const chips = root.querySelectorAll('[data-starter-chip]');
 
     expect(input.classList.contains('min-h-[44px]')).toBe(true);
     expect(input.classList.contains('min-w-[44px]')).toBe(true);
     expect(addBtn.classList.contains('min-h-[44px]')).toBe(true);
     expect(addBtn.classList.contains('min-w-[44px]')).toBe(true);
+    expect(manageBtn.classList.contains('min-h-[44px]')).toBe(true);
+    expect(manageBtn.classList.contains('min-w-[44px]')).toBe(true);
     for (const chip of chips) {
       expect(chip.classList.contains('min-h-[44px]')).toBe(true);
       expect(chip.classList.contains('min-w-[44px]')).toBe(true);

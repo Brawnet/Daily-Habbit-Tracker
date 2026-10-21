@@ -57,26 +57,32 @@ function updateSyncIndicator(status) {
   switch (state) {
     case 'not-configured':
       syncDotElement.classList.add('bg-zinc-400', 'dark:bg-zinc-600');
+      syncTextElement.className = 'hidden min-[380px]:inline truncate max-w-[120px]';
       syncTextElement.textContent = UNCONFIGURED_SYNC_LABEL;
       break;
     case 'idle':
       syncDotElement.classList.add('bg-emerald-500');
+      syncTextElement.className = 'inline truncate max-w-[120px]';
       syncTextElement.textContent = 'Synced';
       break;
     case 'syncing':
       syncDotElement.classList.add('bg-amber-400', 'animate-pulse');
+      syncTextElement.className = 'inline truncate max-w-[120px]';
       syncTextElement.textContent = 'Syncing...';
       break;
     case 'offline':
       syncDotElement.classList.add('bg-zinc-500');
+      syncTextElement.className = 'inline truncate max-w-[120px]';
       syncTextElement.textContent = 'Offline';
       break;
     case 'error':
       syncDotElement.classList.add('bg-rose-500');
+      syncTextElement.className = 'inline truncate max-w-[120px]';
       syncTextElement.textContent = 'Error';
       break;
     default:
       syncDotElement.classList.add('bg-zinc-400');
+      syncTextElement.className = 'inline truncate max-w-[120px]';
       syncTextElement.textContent = state;
   }
 

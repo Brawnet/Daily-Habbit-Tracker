@@ -188,8 +188,7 @@ export function mount(el) {
       subtitleEl.id = 'today-empty-subtitle';
       subtitleEl.className = 'text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed';
       subtitleEl.textContent =
-        'Start building your daily momentum. Your data stays on this device.';
-      headerWrap.appendChild(subtitleEl);
+        'Start building your daily momentum. Your data stays on this Device.';
 
       emptyCard.appendChild(headerWrap);
 
@@ -245,24 +244,18 @@ export function mount(el) {
           addBtn.disabled = false;
         }
       }
-
-      addBtn.addEventListener('click', (e) => {
-        e.preventDefault();
+      const onSubmit = (e) => {
+        e?.preventDefault?.();
         handleAddHabit();
-      });
+      };
 
-      formEl.addEventListener('submit', (e) => {
-        e.preventDefault();
-        handleAddHabit();
-      });
-
+      formEl.addEventListener('submit', onSubmit);
+      addBtn.addEventListener('click', onSubmit);
       inputEl.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
-          e.preventDefault();
-          handleAddHabit();
+          onSubmit(e);
         }
       });
-
       inputWrap.appendChild(inputEl);
       formEl.appendChild(inputWrap);
       formEl.appendChild(addBtn);
@@ -296,6 +289,22 @@ export function mount(el) {
       }
       startersWrap.appendChild(chipsContainer);
       emptyCard.appendChild(startersWrap);
+
+      // Manage Habits link (satisfies SPEC §10 contract)
+      const manageWrap = document.createElement('div');
+      manageWrap.className = 'pt-1';
+
+      const manageBtn = document.createElement('button');
+      manageBtn.type = 'button';
+      manageBtn.id = 'manage-habits-btn';
+      manageBtn.className =
+        'min-h-[44px] min-w-[44px] px-4 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors cursor-pointer inline-flex items-center gap-1.5 focus:outline-none focus:underline';
+      manageBtn.textContent = 'Manage Habits in Settings →';
+      manageBtn.addEventListener('click', () => {
+        navigate('settings');
+      });
+      manageWrap.appendChild(manageBtn);
+      emptyCard.appendChild(manageWrap);
 
 
       habitsListContainerEl.appendChild(emptyCard);

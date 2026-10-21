@@ -205,7 +205,7 @@ function isJournalRecord(rec) {
  * @param {string} nowMonotonic
  * @returns {Array|object}
  */
-function mergeRecordsLWW(existingRecords, incomingRecords, nowMonotonic) {
+function mergeRecordsLWW(existingRecords, incomingRecords, nowMonotonic, todayJakarta) {
   if (!Array.isArray(incomingRecords)) {
     const merged = {};
     const updated = {};
@@ -214,7 +214,7 @@ function mergeRecordsLWW(existingRecords, incomingRecords, nowMonotonic) {
     for (const store of stores) {
       const exList = (existingRecords && existingRecords[store]) || [];
       const inList = (incomingRecords && incomingRecords[store]) || [];
-      const res = mergeRecordsLWW(exList, inList, nowMonotonic);
+      const res = mergeRecordsLWW(exList, inList, nowMonotonic, todayJakarta);
       merged[store] = res.merged || res;
       updated[store] = res.updated || [];
       if (res.rejected && res.rejected.length > 0) {
@@ -243,8 +243,10 @@ function mergeRecordsLWW(existingRecords, incomingRecords, nowMonotonic) {
     const isJournal = isJournalRecord(incoming) || isJournalRecord(existing);
 
     if (isJournal && existing && existing.printedToDiaryAt && String(existing.printedToDiaryAt).trim() !== '') {
-      const todayJakarta = typeof getTodayJakarta === 'function' ? getTodayJakarta() : '';
-      if (!todayJakarta || key < todayJakarta) {
+      const today = todayJakarta !== undefined
+        ? todayJakarta
+        : (typeof getTodayJakarta === 'function' ? getTodayJakarta() : '');
+      if (!today || key < today) {
         rejected.push({
           type: 'journalEntries',
           key: key,
@@ -749,6 +751,17 @@ function getOrCreateDiaryDoc(folder, year, props) {
   return doc;
 }
 
+function writeEntryParagraphs(body, startIndex, lines) {
+  let pos = startIndex;
+  for (const line of lines) {
+    const p = pos === -1 ? body.appendParagraph(line) : body.insertParagraph(pos++, line);
+    p.setHeading(DocumentApp.ParagraphHeading.NORMAL);
+  }
+  const blank = pos === -1 ? body.appendParagraph('') : body.insertParagraph(pos++, '');
+  blank.setHeading(DocumentApp.ParagraphHeading.NORMAL);
+  return pos;
+}
+
 function insertEntryIntoDoc(doc, entry) {
   const body = doc.getBody();
   const existingHeadings = [];
@@ -792,14 +805,8 @@ function insertEntryIntoDoc(doc, entry) {
       body.removeChild(body.getChild(i));
     }
 
-    let pos = currentHeading.childIndex + 1;
     const lines = (entry.content || '').split('\n');
-    for (const line of lines) {
-      const p = body.insertParagraph(pos++, line);
-      p.setHeading(DocumentApp.ParagraphHeading.NORMAL);
-    }
-    const blank = body.insertParagraph(pos++, '');
-    blank.setHeading(DocumentApp.ParagraphHeading.NORMAL);
+    writeEntryParagraphs(body, currentHeading.childIndex + 1, lines);
     return;
   }
 
@@ -815,24 +822,16 @@ function insertEntryIntoDoc(doc, entry) {
   if (insertIndex === -1) {
     const h2 = body.appendParagraph(headingText);
     h2.setHeading(DocumentApp.ParagraphHeading.HEADING_2);
-    for (const line of lines) {
-      const p = body.appendParagraph(line);
-      p.setHeading(DocumentApp.ParagraphHeading.NORMAL);
-    }
-    const blank = body.appendParagraph('');
-    blank.setHeading(DocumentApp.ParagraphHeading.NORMAL);
+    writeEntryParagraphs(body, -1, lines);
   } else {
     let pos = insertIndex;
     const h2 = body.insertParagraph(pos++, headingText);
     h2.setHeading(DocumentApp.ParagraphHeading.HEADING_2);
-    for (const line of lines) {
-      const p = body.insertParagraph(pos++, line);
-      p.setHeading(DocumentApp.ParagraphHeading.NORMAL);
-    }
-    const blank = body.insertParagraph(pos++, '');
-    blank.setHeading(DocumentApp.ParagraphHeading.NORMAL);
+    writeEntryParagraphs(body, pos, lines);
   }
 }
+
+const upsertEntryInDoc = insertEntryIntoDoc;
 
 function updateJournalEntryInSheet(sheet, entry) {
   const data = sheet.getDataRange().getValues();
@@ -1129,7 +1128,8 @@ function syncDiaryEntries(ss, props, options) {
     const todayJakarta = getTodayJakarta();
     const entries = readAllJournalEntries(sheet);
     const toExport = entries.filter(e => {
-      if (!includeToday && e.day >= todayJakarta) return false;
+      if (e.day > todayJakarta) return false;
+      if (!includeToday && e.day === todayJakarta) return false;
       const notPrinted = !e.printedToDiaryAt || String(e.printedToDiaryAt).trim() === '';
       const hasContent = e.content && String(e.content).trim() !== '';
       if (notPrinted) {
@@ -1320,6 +1320,7 @@ if (typeof module !== 'undefined' && module.exports) {
     handleTestPush,
     getOrCreateDiaryDoc,
     insertEntryIntoDoc,
+    upsertEntryInDoc,
     updateJournalEntryInSheet,
     deletePushSubscriptionsByEndpoints,
     doGet,

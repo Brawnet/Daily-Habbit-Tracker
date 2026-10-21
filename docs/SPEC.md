@@ -112,7 +112,7 @@ Server: `JSON.parse(e.postData.contents)`. Selalu HTTP 200 (Apps Script tak bisa
 Aturan `sync` di server (di dalam `LockService.getScriptLock().waitLock(20000)`):
 
 1. `now` = waktu server, dipaksa monoton (> nilai terakhir di Script Properties).
-2. Per record masuk: cari by key. Tulis bila belum ada **atau** `incoming.updatedAt > existing.updatedAt`; set `serverUpdatedAt = now`. `printedToDiaryAt` dari klien diabaikan. Journal Entry yang `printedToDiaryAt` sudah terisi → tolak dengan reason `LOCKED`.
+2. Per record masuk: cari by key. Tulis bila belum ada **atau** `incoming.updatedAt > existing.updatedAt`; set `serverUpdatedAt = now`. `printedToDiaryAt` dari klien diabaikan. Journal Entry hari lampau (`day < todayJakarta`) yang `printedToDiaryAt` sudah terisi → tolak dengan reason `LOCKED` (entri hari ini tetap bebas diedit dan di-sync sepanjang hari).
 3. Balas semua record dengan `serverUpdatedAt > since` (`since` null = semua). `cursor = now`.
 
 Auth: bandingkan `pin` dengan Script Property `PIN`. Gagal >10x dalam 10 menit (CacheService) → `RATE_LIMITED` selama 10 menit.

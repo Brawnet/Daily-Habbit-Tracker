@@ -589,6 +589,31 @@ describe('Pure Functions', () => {
       expect(result[0].content).toBe('Today v2');
       expect(result[0].printedToDiaryAt).toBe('');
     });
+
+    it('allows editing today journal entry even when printedToDiaryAt is set when todayJakarta is passed', () => {
+      const existing = [
+        {
+          day: '2026-10-21',
+          content: 'Morning draft',
+          updatedAt: '2026-10-21T08:00:00Z',
+          printedToDiaryAt: '2026-10-21T08:10:00Z',
+          serverUpdatedAt: '2026-10-21T08:10:00Z'
+        }
+      ];
+      const incoming = [
+        {
+          day: '2026-10-21',
+          content: 'Evening revision',
+          updatedAt: '2026-10-21T20:00:00Z'
+        }
+      ];
+      const now = '2026-10-21T20:05:00Z';
+      const result = mergeRecordsLWW(existing, incoming, now, '2026-10-21');
+      expect(result.rejected).toEqual([]);
+      expect(result[0].content).toBe('Evening revision');
+      expect(result[0].printedToDiaryAt).toBe('2026-10-21T08:10:00Z');
+      expect(result[0].serverUpdatedAt).toBe(now);
+    });
   });
 });
 
@@ -1226,6 +1251,26 @@ describe('GAS Backend Actions', () => {
       const rowsAfterSecond = jSheet.getDataRange().getValues();
       // printedToDiaryAt should NOT be updated again because serverUpdatedAt has not changed
       expect(rowsAfterSecond[1][3]).toBe(initialPrintedAt);
+    });
+
+    it('does not export future-dated journal entries in checkReminder or syncDiaryEntries', () => {
+      const todayJakarta = env.exports.getTodayJakarta();
+      const futureDay = '2099-12-31';
+      const jSheet = env.ss.getSheetByName('Journal_Entries');
+      const rows = jSheet.getDataRange().getValues();
+      rows.push([futureDay, 'Future entry draft', `${futureDay}T10:00:00Z`, '', `${todayJakarta}T10:00:00Z`]);
+      jSheet.getRange(1, 1, rows.length, 5).setValues(rows);
+
+      env.exports.checkReminder();
+
+      // Verify sheet marked as printedToDiaryAt is still empty
+      const rowsAfter = jSheet.getDataRange().getValues();
+      expect(rowsAfter[1][3]).toBe('');
+
+      // Verify no doc was created for 2099
+      const docs = Array.from(env.docs.values());
+      const futureDoc = docs.find(d => d.getName().includes('2099'));
+      expect(futureDoc).toBeUndefined();
     });
   });
 });

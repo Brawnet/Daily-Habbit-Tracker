@@ -15,15 +15,21 @@ html, body {
   position: fixed;
   inset: 0;
 }
+
+@media all and (display-mode: standalone) {
+  .shell-layout {
+    bottom: auto;
+    bottom: calc(-1 * env(safe-area-inset-top, 0px));
+    height: calc(100dvh + env(safe-area-inset-top, 0px));
+    min-height: calc(100dvh + env(safe-area-inset-top, 0px));
+  }
+}
 ```
 
 Semua perlindungan notch dan home indicator tetap dikelola secara modular oleh nilai safe-area padding:
 - Header: `calc(env(safe-area-inset-top, 0px) + 12px)`
 - Bottom Nav: `padding-bottom: max(12px, env(safe-area-inset-bottom, 12px))`
 - Toast Floating Container: `bottom: calc(max(12px, env(safe-area-inset-bottom, 12px)) + 64px)`
-
 ## Considered Options
-
-- **`100dvh` / `100vh` cascade**: ditolak karena WebKit iOS standalone mengecualikan area status bar dari perhitungan viewport height saat `black-translucent` aktif.
-- **`calc(100dvh + env(safe-area-inset-top))` via standalone media query**: ditolak karena menambah kompleksitas selektor dan rentan bug saat keyboard virtual muncul atau orientasi layar diputar.
+- **`100dvh` / `100vh` tanpa kompensasi status bar**: ditolak karena WebKit iOS standalone mengecualikan area status bar dari perhitungan viewport height saat `black-translucent` aktif, menyisakan celah 48pt di dasar layar.
 - **`-webkit-fill-available`**: ditolak karena berperilaku tidak konsisten antar versi iOS Safari dan deprecated pada beberapa implementasi modern.

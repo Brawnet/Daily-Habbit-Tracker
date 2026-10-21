@@ -4,8 +4,8 @@ Engineering conventions and review guidelines for the Habbit codebase.
 
 ## 1. PWA & Mobile CSS Rules
 
-- **Fixed Full-Screen Shell**: Size the shell layout by pinning it to all four edges with fixed positioning (`position: fixed; inset: 0;`). Do not use `vh` or `dvh` viewport-height units for the shell height.
-  - *Reasoning*: In iOS Home Screen mode (`display-mode: standalone`) with `viewport-fit=cover` and `black-translucent`, iOS calculates `100vh` and `100dvh` as the screen height minus the status bar height (e.g. 896 − 48 = 848pt on iPhone 11), leaving an empty ~48pt dark strip at the bottom of the screen. Fixed edge pinning (`inset: 0`) spans the full physical display reliably while `env(safe-area-inset-*)` protects headers and navigation bars.
+- **Fixed Full-Screen Shell**: Size the shell layout by pinning it to all four edges with fixed positioning (`position: fixed; inset: 0;`).
+  - *iOS Workaround*: In iOS Home Screen mode (`display-mode: standalone`) with `viewport-fit=cover` and `black-translucent`, iOS calculates viewport/fixed bounds as the screen minus the status bar (e.g. 848pt vs 896pt on iPhone 11). To eliminate the 48pt dark strip at the bottom, set `height: calc(100dvh + env(safe-area-inset-top, 0px))` with `bottom: calc(-1 * env(safe-area-inset-top, 0px))` under `@media (display-mode: standalone)`.
   ```css
   html, body {
     height: 100%;
@@ -16,6 +16,15 @@ Engineering conventions and review guidelines for the Habbit codebase.
   .shell-layout {
     position: fixed;
     inset: 0;
+  }
+
+  @media all and (display-mode: standalone) {
+    .shell-layout {
+      bottom: auto;
+      bottom: calc(-1 * env(safe-area-inset-top, 0px));
+      height: calc(100dvh + env(safe-area-inset-top, 0px));
+      min-height: calc(100dvh + env(safe-area-inset-top, 0px));
+    }
   }
   ```
 - **Status Bar Meta**: Keep `<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />` in `index.html` to allow full-bleed rendering behind the status bar and Dynamic Island notch.

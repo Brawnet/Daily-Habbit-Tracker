@@ -6,6 +6,11 @@ dist/
 .vercel/
 coverage/
 
+# Test outputs
+test-results/
+playwright-report/
+playwright/.cache/
+
 # Environment and secrets
 .env
 .env.*

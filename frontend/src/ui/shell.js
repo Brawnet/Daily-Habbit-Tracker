@@ -330,8 +330,8 @@ export function mountShell(rootEl) {
   // --- Header ---
   const header = document.createElement('header');
   header.className =
-    'flex items-center justify-between px-4 pb-2.5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 shrink-0';
-  header.style.paddingTop = 'calc(env(safe-area-inset-top, 0px) + 8px)';
+    'flex items-center justify-between px-4 pb-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 shrink-0';
+  header.style.paddingTop = 'calc(env(safe-area-inset-top, 0px) + 12px)';
   header.style.paddingLeft = 'max(16px, env(safe-area-inset-left, 0px))';
   header.style.paddingRight = 'max(16px, env(safe-area-inset-right, 0px))';
 
@@ -415,16 +415,16 @@ export function mountShell(rootEl) {
   toastContainer.setAttribute('aria-live', 'polite');
   toastContainer.setAttribute('aria-atomic', 'true');
   toastContainer.className =
-    'fixed bottom-20 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none w-full max-w-sm px-4';
-
+    'fixed left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none w-full max-w-sm px-4';
+  toastContainer.style.bottom = 'calc(max(12px, env(safe-area-inset-bottom, 12px)) + 64px)';
   // --- Bottom Navigation Bar ---
   bottomNavElement = document.createElement('nav');
   bottomNavElement.id = 'bottom-nav';
   bottomNavElement.setAttribute('role', 'tablist');
   bottomNavElement.setAttribute('aria-label', 'Main Navigation');
   bottomNavElement.className =
-    'flex items-center justify-around border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 shrink-0 pt-1.5';
-  bottomNavElement.style.paddingBottom = 'env(safe-area-inset-bottom, 8px)';
+    'flex items-center justify-around border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 shrink-0 pt-2';
+  bottomNavElement.style.paddingBottom = 'max(12px, env(safe-area-inset-bottom, 12px))';
   bottomNavElement.style.paddingLeft = 'max(8px, env(safe-area-inset-left, 0px))';
   bottomNavElement.style.paddingRight = 'max(8px, env(safe-area-inset-right, 0px))';
 

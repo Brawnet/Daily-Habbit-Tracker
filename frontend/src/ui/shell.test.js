@@ -358,6 +358,31 @@ describe('ui/shell.js', () => {
     expect(bottomNav).toBeDefined();
     expect(toastContainer).toBeDefined();
   });
+  it('applies iOS standalone safe area insets and resilient padding on shell layout elements', () => {
+    const root = mockDoc.createElement('div');
+    root.id = 'app';
+
+    mountShell(root);
+
+    const shellLayout = root.children[0];
+    expect(shellLayout).toBeDefined();
+    expect(shellLayout.className).toContain('shell-layout');
+
+    const header = shellLayout.children[0];
+    expect(header.tagName).toBe('HEADER');
+    expect(header.style.paddingTop).toBe('calc(env(safe-area-inset-top, 0px) + 12px)');
+    expect(header.style.paddingLeft).toBe('max(16px, env(safe-area-inset-left, 0px))');
+    expect(header.style.paddingRight).toBe('max(16px, env(safe-area-inset-right, 0px))');
+
+    const bottomNav = mockDoc.getElementById('bottom-nav');
+    expect(bottomNav.style.paddingBottom).toBe('max(12px, env(safe-area-inset-bottom, 12px))');
+    expect(bottomNav.style.paddingLeft).toBe('max(8px, env(safe-area-inset-left, 0px))');
+    expect(bottomNav.style.paddingRight).toBe('max(8px, env(safe-area-inset-right, 0px))');
+
+    const toastContainer = mockDoc.getElementById('toast-container');
+    expect(toastContainer.style.bottom).toBe('calc(max(12px, env(safe-area-inset-bottom, 12px)) + 64px)');
+  });
+
 
   it('registers tabs, mounts active tab and switches tabs with cleanup', () => {
     const root = mockDoc.createElement('div');

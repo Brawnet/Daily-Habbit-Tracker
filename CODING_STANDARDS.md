@@ -28,12 +28,16 @@ Engineering conventions and review guidelines for the Habbit codebase.
 - **Touch Target Bounds**: All interactive buttons, tabs, links, and quick-add chips must meet minimum touch targets $\ge 44 \times 44\text{px}$.
 - **Input Font Size**: All text inputs, textareas, and select elements must specify `font-size: 16px` to prevent iOS Safari auto-zooming on focus.
 
-## 3. Dependencies & Scripts
+## 3. Responsive State Management
+
+- When applying responsive text suppression (e.g., `hidden min-[380px]:inline`), do not set it statically if the element reflects dynamic status. State update handlers must dynamically toggle visibility so critical alerts (`error`, `syncing`, `warning`) remain visible on narrow mobile viewports (<380px).
+
+## 4. Dependencies & Scripts
 
 - **Exact Versions**: All dependencies and devDependencies in `frontend/package.json` must use exact pinned versions (`npm install -E`). Floating range prefixes (`^`, `~`, `>`, `<`) are forbidden and rejected by `npm run check:deps`.
 - **Package Scripts**: Keep scripts minimal (`dev`, `build`, `preview`, `test`, `test:e2e`, `check:deps`, `generate-pwa-assets`). Avoid proliferation of redundant aliases.
 
-## 4. Domain Language (GLOSSARY.md)
+## 5. Domain Language (GLOSSARY.md)
 
 Use domain vocabulary strictly in symbol names, data keys, comments, and UI strings:
 - `Habit` (not task or activity)
@@ -45,7 +49,15 @@ Use domain vocabulary strictly in symbol names, data keys, comments, and UI stri
 - `Device` (local browser/phone installation)
 - `Reminder` (scheduled daily notification)
 
-## 5. Review Axis Separation
+## 6. Specification & Contract Preservation
+
+- Redesigns and empty states must retain all specification-mandated navigation links and contract routes (`docs/SPEC.md` §10). For example, empty state cards must preserve navigation to *Manage Habits* in Settings.
+
+## 7. Test Harness
+
+- UI tests under `frontend/src/ui/` must import shared DOM mocks (`MockElement`, `MockClassList`, `MockDocument`) from `src/ui/test-helpers.js`. Do not define duplicate mock DOM classes in individual test suites.
+
+## 8. Review Axis Separation
 
 Code review follows the two-axis model:
 - **Standards Axis**: Verifies adherence to this document, `GLOSSARY.md`, and Fowler smell baseline (duplication, primitive obsession, shotgun surgery). Mechanical violations are backed by automated tests or linter checks.

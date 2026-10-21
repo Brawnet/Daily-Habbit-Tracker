@@ -499,22 +499,25 @@ describe('Data Layer - API & Sync Flow', () => {
 
   it('handles offline state during syncNow', async () => {
     globalThis.fetch = vi.fn().mockRejectedValue(new Error('Failed to fetch'));
-    const originalOnLine = Object.getOwnPropertyDescriptor(navigator, 'onLine');
-    Object.defineProperty(navigator, 'onLine', {
-      value: false,
+    const origNavDesc = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+    const navObj = globalThis.navigator || {};
+    Object.defineProperty(globalThis, 'navigator', {
+      value: { ...navObj, onLine: false },
       configurable: true,
       writable: true,
     });
 
-    await syncNow();
+    try {
+      await syncNow();
 
-    const status = getSyncStatus();
-    expect(status.state).toBe('offline');
-
-    if (originalOnLine) {
-      Object.defineProperty(navigator, 'onLine', originalOnLine);
-    } else {
-      delete navigator.onLine;
+      const status = getSyncStatus();
+      expect(status.state).toBe('offline');
+    } finally {
+      if (origNavDesc) {
+        Object.defineProperty(globalThis, 'navigator', origNavDesc);
+      } else {
+        delete globalThis.navigator;
+      }
     }
   });
 

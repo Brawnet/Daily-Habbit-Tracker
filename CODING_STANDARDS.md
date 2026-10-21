@@ -1,20 +1,62 @@
-# Coding Standards & Review Guidelines
+# Coding Standards
 
-Guidelines enforced during code review and development in this repository:
+Engineering conventions and review guidelines for the Habbit codebase.
 
-## 1. Spec Contract Synchronization
-- When editing any business rule in `docs/SPEC.md` or `docs/adr/` (e.g. lock conditions like `LOCKED`), search all references across contract documents.
-- The API contract (§5), backend implementation (§6), and client offline sync contract (§9) must remain strictly mutually consistent without contradictory criteria.
+## 1. PWA & Mobile CSS Rules
 
-## 2. Apps Script Pure Logic Isolation
-- Logic designated as pure in `docs/SPEC.md` §6 (`formatDiaryHeading`, `parseDiaryHeading`, `findChronologicalInsertIndex`, `decideReminder`, `mergeRecordsLWW`) must remain isolated from Google Apps Script ambient globals (`SpreadsheetApp`, `DocumentApp`, `DriveApp`, `PropertiesService`, `LockService`, `UrlFetchApp`, `CacheService`, `Logger`).
-- Any environmental dependencies (e.g., current date `todayJakarta`, monotonic timestamp `nowMonotonic`) must be accepted as explicit function arguments.
+- **Viewport Height**: Always use modern dynamic viewport height (`100dvh`) for full-screen shell layout (`html, body, #app, .shell-layout`).
+- **Cascade Order**: Progressive fallbacks (`100%`, `100vh`, `-webkit-fill-available`) must always precede `100dvh` in CSS declarations so that modern browsers favor `100dvh`.
+  ```css
+  html, body, #app, .shell-layout {
+    height: 100%;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 100%;
+    min-height: -webkit-fill-available;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+  ```
+- **Duplication Policy**: Consolidate shared selector declarations rather than repeating identical declaration blocks across selectors or inside `@media (display-mode: standalone)`.
+- **Status Bar Meta**: Keep `<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />` in `index.html` to allow full-bleed rendering behind the status bar and Dynamic Island notch.
 
-## 3. Repository Structure & Tooling
-- All dependencies, configuration, and scripts belong in `/frontend`.
-- Never create nested `package.json` files in `/gas-backend` or other subfolders. Tests for Apps Script run through Vitest in `/frontend`.
+## 2. Touch Ergonomics & Safe Areas
 
-## 4. Code Smells Baseline
-- **Mysterious Name**: Functions that upsert, update, or prune document sections must not carry misleading insert-only names.
-- **Duplicated Code**: Shared paragraph writing, formatting, and separator logic in document generation must be extracted into reusable helpers.
-- **Divergent Change**: Avoid bundling unrelated periodic actions (e.g., diary document exports vs. push notification checks) inside a single trigger function without distinct helper isolation.
+- **Top Safe Area**: Header must pad for hardware cutouts: `calc(env(safe-area-inset-top, 0px) + 12px)`.
+- **Bottom Safe Area**: Bottom navigation must protect the iOS home gesture indicator: `max(12px, env(safe-area-inset-bottom, 12px))`.
+- **Lateral Insets**: Pad lateral edges for landscape orientation: `max(16px, env(safe-area-inset-left, 0px))` / `max(16px, env(safe-area-inset-right, 0px))`.
+- **Touch Target Bounds**: All interactive buttons, tabs, links, and quick-add chips must meet minimum touch targets $\ge 44 \times 44\text{px}$.
+- **Input Font Size**: All text inputs, textareas, and select elements must specify `font-size: 16px` to prevent iOS Safari auto-zooming on focus.
+
+## 3. Dependencies & Scripts
+
+- **Exact Versions**: All dependencies and devDependencies in `frontend/package.json` must use exact pinned versions (`npm install -E`). Floating range prefixes (`^`, `~`, `>`, `<`) are forbidden and rejected by `npm run check:deps`.
+- **Package Scripts**: Keep scripts minimal (`dev`, `build`, `preview`, `test`, `test:e2e`, `check:deps`, `check:structure`, `generate-pwa-assets`). Avoid proliferation of redundant aliases.
+- **Repository Structure**: All dependencies, configuration, and scripts belong in `/frontend`. Never create nested `package.json` files in `/gas-backend` or other subfolders.
+
+## 4. Apps Script Backend & Pure Logic Isolation
+
+- **Pure Logic Isolation**: Functions designated as pure in `docs/SPEC.md` §6 (`formatDiaryHeading`, `parseDiaryHeading`, `findChronologicalInsertIndex`, `decideReminder`, `mergeRecordsLWW`) must remain isolated from Google Apps Script ambient globals (`SpreadsheetApp`, `DocumentApp`, `DriveApp`, `PropertiesService`, `LockService`, `UrlFetchApp`, `CacheService`, `Logger`).
+- **Explicit Parameters**: Any environmental dependencies (e.g., current date `todayJakarta`, monotonic timestamp `nowMonotonic`) must be accepted as explicit function arguments.
+- **Spec Contract Synchronization**: When editing any business rule in `docs/SPEC.md` or `docs/adr/` (e.g. lock conditions like `LOCKED`), search all references across contract documents to keep API contract (§5), backend implementation (§6), and client offline sync contract (§9) mutually synchronized.
+
+## 5. Domain Language (GLOSSARY.md)
+
+Use domain vocabulary strictly in symbol names, data keys, comments, and UI strings:
+- `Habit` (not task or activity)
+- `Archived Habit` (not deleted habit)
+- `Check-in` (not completion or log)
+- `Day` (local `YYYY-MM-DD`, not UTC or server date)
+- `Journal Entry` (not note or diary entry)
+- `Diary` (only the human-readable compiled Google Doc export)
+- `Device` (local browser/phone installation)
+- `Reminder` (scheduled daily notification)
+
+## 6. Review Axis Separation & Code Smells
+
+Code review follows the two-axis model:
+- **Standards Axis**: Verifies adherence to this document, `GLOSSARY.md`, and Fowler smell baseline:
+  - *Mysterious Name*: Functions that upsert, update, or prune document sections must not carry misleading insert-only names.
+  - *Duplicated Code*: Shared paragraph writing, formatting, and separator logic in document generation must be extracted into reusable helpers.
+  - *Divergent Change*: Avoid bundling unrelated periodic actions inside a single trigger function without distinct helper isolation.
+- **Spec Axis**: Verifies behavioral compliance against the originating GitHub issue and `docs/SPEC.md` without conflating code style preferences with functional scope.

@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "check:structure": "node scripts/check-structure.js",
+    "check:deps": "node scripts/check-deps.js && node scripts/check-structure.js",
     "test": "npm run check:structure && vitest run",
+    "test:e2e": "playwright test",
     "generate-pwa-assets": "pwa-assets-generator"
   },
   "dependencies": {
@@ -18,6 +20,7 @@
     "workbox-routing": "7.4.1"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@tailwindcss/vite": "4.3.3",
     "@vite-pwa/assets-generator": "2.0.0",
     "fake-indexeddb": "6.2.6",

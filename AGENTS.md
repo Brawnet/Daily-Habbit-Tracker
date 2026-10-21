@@ -1,18 +1,27 @@
-# Repository Guide for Coding Agents
+# AGENTS.md — Contributor & Agent Navigation
 
-## Navigation Pointers
-- **Domain vocabulary**: Read `GLOSSARY.md` for official terms (Habit, Check-in, Day, Journal Entry, Diary, Device).
-- **Architecture & contracts**: Read `docs/SPEC.md` (§4 types, §5 API contract, §6 Apps Script, §8 PWA, §9 sync).
-- **Key decisions**: Read `docs/adr/` (offline-first sync hub, Sheets single truth / Docs one-way diary, push notifications).
-- **Coding standards & review rules**: Read `CODING_STANDARDS.md`.
+Habbit is a personal, offline-first Progressive Web App (PWA) Habit Tracker and Daily Journal for multi-device use (iOS Safari Home Screen & Android Chrome) with zero operating cost.
 
-## Worktree Layout
-- Feature branches live in sibling worktrees: `../Daily-Habbit-Tracker-worktree-issue-<N>`.
-- Root directory remains on `main` or active orchestration branch.
+## Repository Layout
+- `frontend/`: Vite vanilla JS PWA (Vercel root). UI tabs under `src/ui/`, data layer under `src/data/`, pure domain under `src/domain/`, PWA under `src/pwa/`.
+- `gas-backend/`: Google Apps Script (`Code.gs`) synchronization hub bound to Google Spreadsheet.
+- `docs/`: Specs and Architecture Decision Records (`SPEC.md`, `adr/`).
 
-## Build & Test Commands
+## Primary Navigation Pointers
+- **Domain & Architecture Contracts**: Read [`docs/SPEC.md`](docs/SPEC.md). Note rules for Day (local date `YYYY-MM-DD`), Check-in (today and yesterday editable only), and Journal Entry (editable only on Day).
+- **Domain Vocabulary**: Read [`GLOSSARY.md`](GLOSSARY.md). Use exact terms in code, UI, and comments (e.g. `Habit`, `Check-in`, `Journal Entry`, `Diary`, `Device`). Avoid forbidden terms.
+- **Key Decisions**: Read [`docs/adr/`](docs/adr/) for offline-first architecture, Sheets source of truth, and reminder decisions.
+- **Coding Standards**: Read [`CODING_STANDARDS.md`](CODING_STANDARDS.md) for mobile layout conventions, safe-area rules, Apps Script pure function isolation, and dependency policies.
+- **Deployment & Setup**: Read [`README.md`](README.md) for GAS deployment, Google Drive diary setup, and VAPID push keys.
+
+## Commands
 All dependencies and scripts are isolated in `frontend/`:
-- Test: `npm --prefix frontend test`
-- Build: `npm --prefix frontend run build`
-- Structure check: `npm --prefix frontend run check:structure`
-- Apps Script tests are automatically executed via Vitest in `frontend/vitest.config.js`.
+- Unit & contract tests: `cd frontend && npm test` (Vitest runs frontend + GAS VM tests).
+- Structure check: `cd frontend && npm run check:structure`.
+- Dependency & structure check: `cd frontend && npm run check:deps`.
+- Production build: `cd frontend && npm run build`.
+- E2E tests: `cd frontend && npm run test:e2e`.
+
+## Worktrees & Branches
+- Work in dedicated Git worktrees for isolated features or fixes (`../Daily-Habbit-Tracker-worktree-<feature>`).
+- Always compare PR diffs against the true pre-feature merge-base commit.

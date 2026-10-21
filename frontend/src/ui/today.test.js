@@ -359,9 +359,31 @@ describe('ui/today.js empty state & first-launch onboarding', () => {
     const chips = root.querySelectorAll('[data-starter-chip]');
 
     expect(input.classList.contains('min-h-[44px]')).toBe(true);
+    expect(input.classList.contains('min-w-[44px]')).toBe(true);
     expect(addBtn.classList.contains('min-h-[44px]')).toBe(true);
+    expect(addBtn.classList.contains('min-w-[44px]')).toBe(true);
     for (const chip of chips) {
       expect(chip.classList.contains('min-h-[44px]')).toBe(true);
+      expect(chip.classList.contains('min-w-[44px]')).toBe(true);
     }
+  });
+
+  it('prevents duplicate habit creation on rapid concurrent clicks', async () => {
+    const root = mockDoc.createElement('div');
+    mount(root);
+
+    await new Promise((r) => setTimeout(r, 20));
+
+    const input = mockDoc.getElementById('today-empty-add-input');
+    const addBtn = mockDoc.getElementById('today-empty-add-btn');
+
+    input.value = 'Fast Double Click';
+    // Trigger rapid clicks before promise settles
+    addBtn.click();
+    addBtn.click();
+
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(repoModule.addHabit).toHaveBeenCalledTimes(1);
   });
 });

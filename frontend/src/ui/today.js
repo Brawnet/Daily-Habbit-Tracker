@@ -212,7 +212,7 @@ export function mount(el) {
       inputEl.type = 'text';
       inputEl.id = 'today-empty-add-input';
       inputEl.className =
-        'w-full min-h-[44px] px-3.5 py-2.5 text-base rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition-colors shadow-xs';
+        'w-full min-h-[44px] min-w-[44px] px-3.5 py-2.5 text-base rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition-colors shadow-xs';
       inputEl.style.fontSize = '16px';
       inputEl.placeholder = 'e.g. Drink 2L water, Morning walk...';
 
@@ -222,29 +222,34 @@ export function mount(el) {
       addBtn.className =
         'min-h-[44px] min-w-[44px] px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-sm font-semibold rounded-xl shadow-xs transition-colors flex items-center justify-center cursor-pointer shrink-0';
       addBtn.textContent = 'Add Habit';
-      addBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        handleAddHabit();
-      });
 
+      let isSubmitting = false;
       async function handleAddHabit(habitName) {
+        if (isSubmitting) return;
         const nameToAdd = habitName || inputEl.value;
         const trimmed = (nameToAdd || '').trim();
         if (!trimmed) {
           inputEl.focus?.();
           return;
         }
+        isSubmitting = true;
+        addBtn.disabled = true;
         try {
-          addBtn.disabled = true;
           await addHabit(trimmed);
           inputEl.value = '';
           showToast(`Habit "${trimmed}" created!`);
         } catch (err) {
           showToast('Failed to create habit: ' + (err?.message || 'Error'));
         } finally {
+          isSubmitting = false;
           addBtn.disabled = false;
         }
       }
+
+      addBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        handleAddHabit();
+      });
 
       formEl.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -292,17 +297,6 @@ export function mount(el) {
       startersWrap.appendChild(chipsContainer);
       emptyCard.appendChild(startersWrap);
 
-      // Secondary Link to Settings
-      const manageLink = document.createElement('button');
-      manageLink.type = 'button';
-      manageLink.id = 'manage-habits-btn';
-      manageLink.className =
-        'min-h-[44px] px-3 text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 underline cursor-pointer';
-      manageLink.textContent = 'Advanced options in Settings';
-      manageLink.addEventListener('click', () => {
-        navigate('settings');
-      });
-      emptyCard.appendChild(manageLink);
 
       habitsListContainerEl.appendChild(emptyCard);
     } else {

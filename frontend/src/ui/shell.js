@@ -39,6 +39,8 @@ function getCurrentDayString() {
   }
 }
 
+const UNCONFIGURED_SYNC_LABEL = 'Offline / Local';
+
 /**
  * Updates header sync indicator UI
  * @param {import('../shared/contracts.js').SyncStatus} status
@@ -55,7 +57,7 @@ function updateSyncIndicator(status) {
   switch (state) {
     case 'not-configured':
       syncDotElement.classList.add('bg-zinc-400', 'dark:bg-zinc-600');
-      syncTextElement.textContent = 'Offline / Local';
+      syncTextElement.textContent = UNCONFIGURED_SYNC_LABEL;
       break;
     case 'idle':
       syncDotElement.classList.add('bg-emerald-500');
@@ -357,8 +359,8 @@ export function mountShell(rootEl) {
 
   syncTextElement = document.createElement('span');
   syncTextElement.id = 'sync-text';
-  syncTextElement.className = 'truncate max-w-[90px] sm:max-w-none';
-  syncTextElement.textContent = 'Offline / Local';
+  syncTextElement.className = 'hidden min-[380px]:inline truncate max-w-[120px]';
+  syncTextElement.textContent = UNCONFIGURED_SYNC_LABEL;
 
   syncBadgeElement = document.createElement('span');
   syncBadgeElement.id = 'sync-badge';

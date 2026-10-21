@@ -1041,15 +1041,6 @@ function setup() {
     }
   }
   if (!folder) {
-    const defaultFolderId = '1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC';
-    try {
-      folder = DriveApp.getFolderById(defaultFolderId);
-      folderId = defaultFolderId;
-    } catch (e) {
-      folder = null;
-    }
-  }
-  if (!folder) {
     const folders = DriveApp.getFoldersByName('Habbit Diary');
     if (folders.hasNext()) {
       folder = folders.next();
@@ -1058,8 +1049,8 @@ function setup() {
       folder = DriveApp.createFolder('Habbit Diary');
       folderId = folder.getId();
     }
+    props.setProperty('DIARY_FOLDER_ID', folderId);
   }
-  props.setProperty('DIARY_FOLDER_ID', folderId);
 
   // PUSH_SHARED_SECRET
   let secret = props.getProperty('PUSH_SHARED_SECRET');
@@ -1102,54 +1093,83 @@ function setup() {
 }
 
 function syncDiaryEntries(ss, props, options) {
-  const includeToday = options && options.includeToday !== undefined ? options.includeToday : true;
-  const folderId = props.getProperty('DIARY_FOLDER_ID') || '1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC';
-  if (!folderId) {
-    if (typeof Logger !== 'undefined') Logger.log('DIARY_FOLDER_ID not set');
-    return;
-  }
-  let folder = null;
+  const lock = LockService.getScriptLock();
+  let hasLock = false;
   try {
-    folder = DriveApp.getFolderById(folderId);
+    hasLock = lock.waitLock(10000);
   } catch (err) {
-    if (typeof Logger !== 'undefined') Logger.log('Failed to access DIARY_FOLDER_ID: ' + err.message);
+    hasLock = false;
+  }
+  if (!hasLock) {
+    if (typeof Logger !== 'undefined') {
+      Logger.log('syncDiaryEntries: could not obtain script lock; skipping run');
+    }
     return;
   }
-  if (!folder) return;
 
-  const sheet = ss.getSheetByName('Journal_Entries');
-  if (!sheet) return;
-
-  const todayJakarta = getTodayJakarta();
-  const entries = readAllJournalEntries(sheet);
-  const toExport = entries.filter(e => {
-    if (!includeToday && e.day >= todayJakarta) return false;
-    const notPrinted = !e.printedToDiaryAt || String(e.printedToDiaryAt).trim() === '';
-    const hasContent = e.content && String(e.content).trim() !== '';
-    if (notPrinted) {
-      return hasContent;
+  try {
+    const includeToday = options && options.includeToday !== undefined ? options.includeToday : true;
+    const folderId = props.getProperty('DIARY_FOLDER_ID');
+    if (!folderId) {
+      if (typeof Logger !== 'undefined') Logger.log('DIARY_FOLDER_ID not set');
+      return;
     }
-    return Boolean(e.updatedAt && e.updatedAt > e.printedToDiaryAt);
-  });
-
-  toExport.sort((a, b) => a.day.localeCompare(b.day));
-
-  for (const entry of toExport) {
+    let folder = null;
     try {
-      const year = entry.day.slice(0, 4);
-      const doc = getOrCreateDiaryDoc(folder, year, props);
-      insertEntryIntoDoc(doc, entry);
-      doc.saveAndClose();
-
-      const serverNow = getMonotonicNow();
-      entry.printedToDiaryAt = serverNow;
-      entry.serverUpdatedAt = serverNow;
-      updateJournalEntryInSheet(sheet, entry);
+      folder = DriveApp.getFolderById(folderId);
     } catch (err) {
-      if (typeof Logger !== 'undefined') {
-        Logger.log('Error exporting Journal Entry ' + entry.day + ': ' + err.message);
+      if (typeof Logger !== 'undefined') Logger.log('Failed to access DIARY_FOLDER_ID: ' + err.message);
+      return;
+    }
+    if (!folder) return;
+
+    const sheet = ss.getSheetByName('Journal_Entries');
+    if (!sheet) return;
+
+    const todayJakarta = getTodayJakarta();
+    const entries = readAllJournalEntries(sheet);
+    const toExport = entries.filter(e => {
+      if (!includeToday && e.day >= todayJakarta) return false;
+      const notPrinted = !e.printedToDiaryAt || String(e.printedToDiaryAt).trim() === '';
+      const hasContent = e.content && String(e.content).trim() !== '';
+      if (notPrinted) {
+        return hasContent;
+      }
+      return Boolean(e.serverUpdatedAt && e.serverUpdatedAt > e.printedToDiaryAt);
+    });
+
+    toExport.sort((a, b) => a.day.localeCompare(b.day));
+
+    // Group entries by year to batch Doc open/save operations
+    const entriesByYear = new Map();
+    for (const entry of toExport) {
+      const year = entry.day.slice(0, 4);
+      if (!entriesByYear.has(year)) entriesByYear.set(year, []);
+      entriesByYear.get(year).push(entry);
+    }
+
+    for (const [year, entriesForYear] of entriesByYear) {
+      try {
+        const doc = getOrCreateDiaryDoc(folder, year, props);
+        for (const entry of entriesForYear) {
+          insertEntryIntoDoc(doc, entry);
+        }
+        doc.saveAndClose();
+
+        const serverNow = getMonotonicNow();
+        for (const entry of entriesForYear) {
+          entry.printedToDiaryAt = serverNow;
+          entry.serverUpdatedAt = serverNow;
+          updateJournalEntryInSheet(sheet, entry);
+        }
+      } catch (err) {
+        if (typeof Logger !== 'undefined') {
+          Logger.log('Error exporting Journal Entries for year ' + year + ': ' + err.message);
+        }
       }
     }
+  } finally {
+    lock.releaseLock();
   }
 }
 

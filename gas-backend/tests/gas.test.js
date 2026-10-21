@@ -145,36 +145,12 @@ function createGasEnv(initialProps = {}) {
         getNumChildren: () => children.length,
         getChild: (i) => children[i],
         appendParagraph: (text) => {
-          let heading = 'Normal';
-          const p = {
-            getType: () => 'PARAGRAPH',
-            asParagraph: () => p,
-            getText: () => text,
-            getHeading: () => heading,
-            setHeading: (h) => { heading = h; },
-            removeFromParent: () => {
-              const idx = children.indexOf(p);
-              if (idx !== -1) children.splice(idx, 1);
-              return p;
-            }
-          };
+          const p = createMockParagraph(text, children);
           children.push(p);
           return p;
         },
         insertParagraph: (idx, text) => {
-          let heading = 'Normal';
-          const p = {
-            getType: () => 'PARAGRAPH',
-            asParagraph: () => p,
-            getText: () => text,
-            getHeading: () => heading,
-            setHeading: (h) => { heading = h; },
-            removeFromParent: () => {
-              const idx = children.indexOf(p);
-              if (idx !== -1) children.splice(idx, 1);
-              return p;
-            }
-          };
+          const p = createMockParagraph(text, children);
           children.splice(idx, 0, p);
           return p;
         },
@@ -184,6 +160,22 @@ function createGasEnv(initialProps = {}) {
           return child;
         }
       };
+      function createMockParagraph(text, container) {
+        let heading = 'Normal';
+        const p = {
+          getType: () => 'PARAGRAPH',
+          asParagraph: () => p,
+          getText: () => text,
+          getHeading: () => heading,
+          setHeading: (h) => { heading = h; },
+          removeFromParent: () => {
+            const idx = container.indexOf(p);
+            if (idx !== -1) container.splice(idx, 1);
+            return p;
+          }
+        };
+        return p;
+      }
       const doc = {
         getId: () => id,
         getName: () => name,
@@ -1054,6 +1046,54 @@ describe('GAS Backend Actions', () => {
       expect(body.getChild(2).getText()).toBe('');
       expect(body.getNumChildren()).toBe(3);
     });
+
+    it('handles body text with markdown headings without breaking date boundary in-place replacement', () => {
+      const doc = env.context.DocumentApp.create('Habbit – Diary 2026');
+      env.exports.insertEntryIntoDoc(doc, {
+        day: '2026-10-21',
+        content: '## Personal Heading\nRegular line\n### Another Heading'
+      });
+
+      // Update in place
+      env.exports.insertEntryIntoDoc(doc, {
+        day: '2026-10-21',
+        content: '## Updated Heading\nUpdated line'
+      });
+
+      const body = doc.getBody();
+      const headings = [];
+      for (let i = 0; i < body.getNumChildren(); i++) {
+        if (body.getChild(i).getHeading() === 'HEADING_2') {
+          headings.push(body.getChild(i).getText());
+        }
+      }
+      expect(headings).toEqual(['Wednesday, 21 October 2026']);
+      expect(body.getChild(1).getText()).toBe('## Updated Heading');
+      expect(body.getChild(2).getText()).toBe('Updated line');
+    });
+
+    it('batches exports by year, opening and saving each yearly Doc only once', () => {
+      const jSheet = env.ss.getSheetByName('Journal_Entries');
+      const rows = jSheet.getDataRange().getValues();
+      rows.push(['2026-10-18', 'Oct 18 entry', '2026-10-18T10:00:00Z', '', '2026-10-18T10:00:00Z']);
+      rows.push(['2026-10-19', 'Oct 19 entry', '2026-10-19T10:00:00Z', '', '2026-10-19T10:00:00Z']);
+      jSheet.getRange(1, 1, rows.length, 5).setValues(rows);
+
+      env.exports.printDiary();
+
+      const docs = Array.from(env.docs.values());
+      expect(docs.length).toBe(1); // Exactly one Doc for 2026
+      const doc = docs[0];
+      expect(doc.getName()).toBe('Habbit – Diary 2026');
+      const headings = [];
+      const body = doc.getBody();
+      for (let i = 0; i < body.getNumChildren(); i++) {
+        if (body.getChild(i).getHeading() === 'HEADING_2') {
+          headings.push(body.getChild(i).getText());
+        }
+      }
+      expect(headings).toEqual(['Sunday, 18 October 2026', 'Monday, 19 October 2026']);
+    });
   });
 
   describe('checkReminder()', () => {
@@ -1131,9 +1171,9 @@ describe('GAS Backend Actions', () => {
 
       // User updates today's entry later
       rowsAfter[1][1] = 'First draft today + evening thoughts';
-      rowsAfter[1][2] = `${todayJakarta}T20:00:00Z`; // updatedAt newer than firstPrintedAt
+      rowsAfter[1][2] = `${todayJakarta}T20:00:00Z`;
+      rowsAfter[1][4] = `${todayJakarta}T20:00:00Z`; // serverUpdatedAt
       jSheet.getRange(1, 1, rowsAfter.length, 5).setValues(rowsAfter);
-
       env.exports.checkReminder();
 
       // Verify Doc was updated in-place
@@ -1164,6 +1204,28 @@ describe('GAS Backend Actions', () => {
       } finally {
         env.context.DocumentApp.create = originalCreate;
       }
+    });
+
+    it('is immune to client clock skew and does not repeatedly re-export when serverUpdatedAt has not changed', () => {
+      const todayJakarta = env.exports.getTodayJakarta();
+      const jSheet = env.ss.getSheetByName('Journal_Entries');
+      const rows = jSheet.getDataRange().getValues();
+      // Fast client clock: updatedAt is 3 hours in the future, serverUpdatedAt is current
+      rows.push([todayJakarta, 'Clock skew entry', `${todayJakarta}T23:00:00Z`, '', `${todayJakarta}T10:00:00Z`]);
+      jSheet.getRange(1, 1, rows.length, 5).setValues(rows);
+
+      env.exports.checkReminder();
+
+      const rowsAfterFirst = jSheet.getDataRange().getValues();
+      const initialPrintedAt = rowsAfterFirst[1][3];
+      expect(initialPrintedAt).not.toBe('');
+
+      // Run checkReminder again without any new server edits
+      env.exports.checkReminder();
+
+      const rowsAfterSecond = jSheet.getDataRange().getValues();
+      // printedToDiaryAt should NOT be updated again because serverUpdatedAt has not changed
+      expect(rowsAfterSecond[1][3]).toBe(initialPrintedAt);
     });
   });
 });

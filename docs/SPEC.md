@@ -135,7 +135,7 @@ Buat sheet + header + format teks bila belum ada; buat folder Drive `Habbit Diar
 
 Auto-sync jurnal ke Google Drive Doc dijalankan setiap 10 menit di dalam siklus background `checkReminder()` serta di-catch up harian pada `printDiary()` (~02:00 Jakarta).
 
-Ambil Journal Entry yang belum dicetak (`!printedToDiaryAt`) atau telah diedit setelah pencetakan (`updatedAt > printedToDiaryAt`). Per entry: buka/buat doc `Habbit – Diary <YYYY>` di folder `DIARY_FOLDER_ID` (default `1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC`):
+Ambil Journal Entry yang belum dicetak (`!printedToDiaryAt`) atau telah diedit setelah pencetakan (`serverUpdatedAt > printedToDiaryAt`). Entri dikelompokkan per tahun (`YYYY`) untuk membuka dan menyimpan setiap Google Doc sekali per siklus di folder `DIARY_FOLDER_ID`:
 - Bila heading tanggal sudah ada di Doc:
   - Jika content diisi: update isi paragraf secara in-place di bawah heading tanggal tersebut tanpa membuat heading duplikat.
   - Jika content kosong/dihapus: hapus heading tanggal dan paragraf pemisahnya dari Doc.

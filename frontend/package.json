@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run",
+    "check:structure": "node scripts/check-structure.js",
+    "test": "npm run check:structure && vitest run",
     "generate-pwa-assets": "pwa-assets-generator"
   },
   "dependencies": {

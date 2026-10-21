@@ -615,6 +615,46 @@ describe('Pure Functions', () => {
       expect(result[0].serverUpdatedAt).toBe(now);
     });
   });
+
+  describe('Pure Function Isolation Guardrail (SPEC §6)', () => {
+    it('ensures pure functions do not reference ambient GAS globals directly', () => {
+      const fs = require('node:fs');
+      const path = require('node:path');
+      const codePath = path.resolve(__dirname, '../Code.gs');
+      const code = fs.readFileSync(codePath, 'utf8');
+
+      const pureFunctions = [
+        'formatDiaryHeading',
+        'parseDiaryHeading',
+        'findChronologicalInsertIndex',
+        'decideReminder',
+        'mergeRecordsLWW'
+      ];
+
+      const bannedAmbientSymbols = [
+        'SpreadsheetApp',
+        'DocumentApp',
+        'DriveApp',
+        'PropertiesService',
+        'LockService',
+        'UrlFetchApp',
+        'CacheService',
+        'Logger'
+      ];
+
+      for (const fnName of pureFunctions) {
+        const fnRegex = new RegExp(`function\\s+${fnName}\\s*\\([^)]*\\)\\s*\\{([\\s\\S]*?)(?:\\nfunction|\\nif\\s*\\(typeof\\s+module|$)`);
+        const match = code.match(fnRegex);
+        expect(match, `Function ${fnName} should exist in Code.gs`).toBeTruthy();
+        const body = match[1];
+
+        for (const symbol of bannedAmbientSymbols) {
+          const symbolRegex = new RegExp(`\\b${symbol}\\b`);
+          expect(body).not.toMatch(symbolRegex);
+        }
+      }
+    });
+  });
 });
 
 describe('GAS Backend Actions', () => {

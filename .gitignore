@@ -72,3 +72,8 @@ $RECYCLE.BIN/
 *.njsproj
 *.sln
 *.sw?
+
+# Local workspace scratch
+.kiro/
+Bug screenshoot/
+Photos/

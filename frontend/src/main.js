@@ -7,6 +7,7 @@ import { mount as mountSettings } from './ui/settings.js';
 import { startAutoSync } from './data/sync.js';
 import { initUpdateHandler } from './pwa/update.js';
 import './pwa/install.js';
+import { initViewportDebug } from './debug-viewport.js'; // [DEBUG-vp01]
 
 // Icons for the 3 main tabs
 const todayIcon = `
@@ -81,6 +82,8 @@ if (app) {
 
   navigate(initialTab);
 }
-
+// [DEBUG-vp01]
+// [DEBUG-vp01] Initialize iOS standalone viewport debug measurement overlay
+initViewportDebug(); // [DEBUG-vp01]
 // Listen for service worker updates
 initUpdateHandler();

@@ -33,6 +33,7 @@ export function mount(el) {
   let debounceTimer = null;
   let saveSeq = 0;
   let hasUserTyped = false;
+  let isAddHabitExpanded = false;
 
   el.innerHTML = '';
 
@@ -115,6 +116,28 @@ export function mount(el) {
 
   container.appendChild(journalSectionEl);
   el.appendChild(container);
+
+  // Shared habit creation helper with unified validation, loading guard, and toast notifications
+  async function executeAddHabit({ name, setSubmitting, onSuccess, onError }) {
+    const trimmed = (name || '').trim();
+    if (!trimmed) {
+      onError?.();
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await addHabit(trimmed);
+      if (!isMounted) return;
+      showToast(`Habit "${trimmed}" created!`);
+      onSuccess?.(trimmed);
+    } catch (err) {
+      if (!isMounted) return;
+      showToast('Failed to create habit: ' + (err?.message || 'Error'));
+      onError?.(err);
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   // --- Habits Rendering Logic ---
   async function renderHabits() {
@@ -226,23 +249,19 @@ export function mount(el) {
       async function handleAddHabit(habitName) {
         if (isSubmitting) return;
         const nameToAdd = habitName || inputEl.value;
-        const trimmed = (nameToAdd || '').trim();
-        if (!trimmed) {
-          inputEl.focus?.();
-          return;
-        }
-        isSubmitting = true;
-        addBtn.disabled = true;
-        try {
-          await addHabit(trimmed);
-          inputEl.value = '';
-          showToast(`Habit "${trimmed}" created!`);
-        } catch (err) {
-          showToast('Failed to create habit: ' + (err?.message || 'Error'));
-        } finally {
-          isSubmitting = false;
-          addBtn.disabled = false;
-        }
+        await executeAddHabit({
+          name: nameToAdd,
+          setSubmitting: (submitting) => {
+            isSubmitting = submitting;
+            addBtn.disabled = submitting;
+          },
+          onSuccess: () => {
+            inputEl.value = '';
+          },
+          onError: () => {
+            inputEl.focus?.();
+          },
+        });
       }
       const onSubmit = (e) => {
         e?.preventDefault?.();
@@ -398,7 +417,148 @@ export function mount(el) {
       }
 
       habitsListContainerEl.appendChild(listEl);
+
+      renderAddHabitControl(habitsListContainerEl);
+      renderManageSettingsLink(habitsListContainerEl);
     }
+  }
+
+  function renderAddHabitControl(containerEl) {
+    const addControlWrap = document.createElement('div');
+    addControlWrap.id = 'today-add-habit-control';
+    addControlWrap.className = 'flex flex-col gap-2 pt-1';
+
+    if (!isAddHabitExpanded) {
+      const triggerBtn = document.createElement('button');
+      triggerBtn.type = 'button';
+      triggerBtn.id = 'today-add-habit-trigger';
+      triggerBtn.setAttribute('aria-expanded', 'false');
+      triggerBtn.setAttribute('aria-controls', 'today-add-habit-control');
+      triggerBtn.setAttribute('aria-label', '+ Add Habit');
+      triggerBtn.className =
+        'min-h-[44px] min-w-[44px] w-full px-4 py-2.5 rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 hover:border-indigo-500 dark:hover:border-indigo-400 bg-white/50 dark:bg-zinc-800/40 text-zinc-600 dark:text-zinc-300 text-sm font-medium hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500';
+      triggerBtn.textContent = '+ Add Habit';
+
+      triggerBtn.addEventListener('click', () => {
+        isAddHabitExpanded = true;
+        renderHabits();
+      });
+      addControlWrap.appendChild(triggerBtn);
+    } else {
+      const formEl = document.createElement('form');
+      formEl.id = 'today-add-habit-form';
+      formEl.className =
+        'flex flex-col gap-2.5 p-3 bg-white dark:bg-zinc-800/90 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-xs';
+      formEl.setAttribute('role', 'form');
+      formEl.setAttribute('aria-label', 'Add new habit');
+
+      const inputEl = document.createElement('input');
+      inputEl.type = 'text';
+      inputEl.id = 'today-add-habit-input';
+      inputEl.className =
+        'w-full min-h-[44px] min-w-[44px] px-3.5 py-2.5 text-base rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition-colors shadow-xs';
+      inputEl.style.fontSize = '16px';
+      inputEl.placeholder = 'e.g. Read 10 mins, Morning walk...';
+      inputEl.setAttribute('aria-label', 'New habit name');
+
+      const actionsWrap = document.createElement('div');
+      actionsWrap.className = 'flex items-center gap-2 justify-end';
+
+      function collapseAddControl() {
+        isAddHabitExpanded = false;
+        renderHabits();
+        const trigger = containerEl.querySelector('#today-add-habit-trigger');
+        trigger?.focus?.();
+      }
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.id = 'today-add-habit-cancel';
+      cancelBtn.setAttribute('aria-label', 'Cancel adding habit');
+      cancelBtn.className =
+        'min-h-[44px] min-w-[44px] px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 rounded-xl transition-colors cursor-pointer';
+      cancelBtn.textContent = 'Cancel';
+      cancelBtn.addEventListener('click', collapseAddControl);
+
+      const submitBtn = document.createElement('button');
+      submitBtn.type = 'submit';
+      submitBtn.id = 'today-add-habit-submit';
+      submitBtn.setAttribute('aria-label', 'Add habit');
+      submitBtn.className =
+        'min-h-[44px] min-w-[44px] px-5 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-sm font-semibold rounded-xl shadow-xs transition-colors flex items-center justify-center cursor-pointer';
+      submitBtn.textContent = 'Add';
+
+      let isSubmitting = false;
+      async function handleSubmit(e) {
+        if (e && typeof e.preventDefault === 'function') {
+          e.preventDefault();
+        }
+        if (isSubmitting) return;
+        await executeAddHabit({
+          name: inputEl.value,
+          setSubmitting: (submitting) => {
+            isSubmitting = submitting;
+            submitBtn.disabled = submitting;
+            cancelBtn.disabled = submitting;
+          },
+          onSuccess: () => {
+            collapseAddControl();
+          },
+          onError: () => {
+            inputEl.focus?.();
+          },
+        });
+      }
+
+      formEl.addEventListener('submit', handleSubmit);
+      submitBtn.addEventListener('click', handleSubmit);
+      formEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          if (typeof e.preventDefault === 'function') e.preventDefault();
+          collapseAddControl();
+        }
+      });
+      inputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          if (typeof e.preventDefault === 'function') e.preventDefault();
+          handleSubmit(e);
+        } else if (e.key === 'Escape') {
+          if (typeof e.preventDefault === 'function') e.preventDefault();
+          collapseAddControl();
+        }
+      });
+
+      actionsWrap.appendChild(cancelBtn);
+      actionsWrap.appendChild(submitBtn);
+      formEl.appendChild(inputEl);
+      formEl.appendChild(actionsWrap);
+      addControlWrap.appendChild(formEl);
+
+      setTimeout(() => {
+        inputEl.focus?.();
+      }, 0);
+    }
+
+    containerEl.appendChild(addControlWrap);
+  }
+
+  function renderManageSettingsLink(containerEl) {
+    const manageWrap = document.createElement('div');
+    manageWrap.className = 'flex justify-center pt-1';
+
+    const manageLink = document.createElement('button');
+    manageLink.type = 'button';
+    manageLink.id = 'today-manage-habits-link';
+    manageLink.setAttribute('role', 'link');
+    manageLink.setAttribute('aria-label', 'Manage and reorder habits in Settings');
+    manageLink.className =
+      'min-h-[44px] min-w-[44px] px-4 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300 transition-colors cursor-pointer inline-flex items-center gap-1.5 focus:outline-none focus:underline';
+    manageLink.textContent = 'Manage & reorder in Settings →';
+    manageLink.addEventListener('click', () => {
+      navigate('settings');
+    });
+    manageWrap.appendChild(manageLink);
+    containerEl.appendChild(manageWrap);
   }
 
   // --- Journal Autosave Logic ---

@@ -76,11 +76,10 @@ export class MockElement {
   }
 
   get textContent() {
-    if (this._textContent) return this._textContent;
     if (this.children.length > 0) {
-      return this.children.map((c) => c.textContent).join(' ');
+      return this.children.map((c) => c.textContent).join('');
     }
-    return '';
+    return this._textContent;
   }
   set textContent(val) {
     this._textContent = String(val ?? '');
@@ -91,6 +90,17 @@ export class MockElement {
   }
   set innerHTML(val) {
     this._innerHTML = String(val ?? '');
+    const unregister = (el) => {
+      if (el.doc && el._id) {
+        el.doc.elementsById.delete(el._id);
+      }
+      for (const child of el.children) {
+        unregister(child);
+      }
+    };
+    for (const child of this.children) {
+      unregister(child);
+    }
     this.children = [];
   }
 

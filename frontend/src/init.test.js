@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ACTIONS, ERRORS, STORES } from './shared/contracts.js';
+import { ACTIONS, ERRORS, STORES, ACTIVITY_STATUS, ACTIVITY_TYPES } from './shared/contracts.js';
 
 describe('Contracts initialization', () => {
   it('exposes defined constants', () => {
@@ -7,6 +7,11 @@ describe('Contracts initialization', () => {
     expect(ERRORS.LOCKED).toBe('LOCKED');
     expect(STORES.HABITS).toBe('habits');
     expect(STORES.ACTIVITIES).toBe('activities');
+    expect(ACTIVITY_STATUS.BACKLOG).toBe('Backlog');
+    expect(ACTIVITY_STATUS.IN_PROGRESS).toBe('In Progress');
+    expect(ACTIVITY_STATUS.COMPLETED).toBe('Completed');
+    expect(ACTIVITY_TYPES).toContain('Book');
+    expect(ACTIVITY_TYPES).toContain('Course');
   });
 });
 

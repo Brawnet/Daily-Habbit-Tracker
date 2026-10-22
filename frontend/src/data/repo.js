@@ -1,5 +1,5 @@
 import { getDb } from './db.js';
-import { STORES } from '../shared/contracts.js';
+import { STORES, ACTIVITY_STATUS } from '../shared/contracts.js';
 import { scheduleSync } from './sync.js';
 import { isCheckInEditable, isJournalEditable, today } from '../domain/day.js';
 
@@ -418,24 +418,35 @@ export async function getActivity(id) {
 }
 
 /**
+ * Sanitizes and validates activity fields.
+ *
+ * @param {{ title?: string, author?: string, type?: string, status?: string, totalPages?: number, summary?: string }} [input]
+ * @returns {{ title: string, author: string, type: string, status: string, totalPages: number, summary: string }}
+ */
+export function normalizeActivityInput(input = {}) {
+  const title = String(input.title ?? '').trim();
+  if (!title) {
+    throw new Error('Activity title cannot be empty');
+  }
+
+  return {
+    title,
+    author: String(input.author ?? '').trim(),
+    type: String(input.type ?? 'Book').trim(),
+    status: String(input.status ?? ACTIVITY_STATUS.BACKLOG).trim(),
+    totalPages: Math.max(0, parseInt(input.totalPages, 10) || 0),
+    summary: String(input.summary ?? '').trim(),
+  };
+}
+
+/**
  * Creates and commits a new activity record.
  *
  * @param {{ title: string, author?: string, type?: string, status?: string, totalPages?: number, summary?: string }} params
  * @returns {Promise<import('../shared/contracts.js').Activity>}
  */
-export async function addActivity({
-  title,
-  author = '',
-  type = 'Book',
-  status = 'Backlog',
-  totalPages = 0,
-  summary = '',
-}) {
-  const trimmedTitle = (title || '').trim();
-  if (!trimmedTitle) {
-    throw new Error('Activity title cannot be empty');
-  }
-
+export async function addActivity(params = {}) {
+  const normalized = normalizeActivityInput(params);
   const id =
     typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
@@ -445,12 +456,7 @@ export async function addActivity({
   /** @type {import('../shared/contracts.js').Activity} */
   const record = {
     id,
-    title: trimmedTitle,
-    author: (author || '').trim(),
-    type: (type || 'Book').trim(),
-    status: (status || 'Backlog').trim(),
-    totalPages: Math.max(0, parseInt(totalPages, 10) || 0),
-    summary: (summary || '').trim(),
+    ...normalized,
     archived: false,
     createdAt: now,
     updatedAt: now,
@@ -474,27 +480,17 @@ export async function updateActivity(id, updates = {}) {
     throw new Error(`Activity not found: ${id}`);
   }
 
+  const merged = { ...existing, ...updates };
+  const normalized = normalizeActivityInput(merged);
   const now = new Date().toISOString();
+
   const updated = {
     ...existing,
-    ...updates,
+    ...normalized,
     id,
-    title: updates.title !== undefined ? String(updates.title).trim() : existing.title,
-    author: updates.author !== undefined ? String(updates.author).trim() : existing.author,
-    type: updates.type !== undefined ? String(updates.type).trim() : existing.type,
-    status: updates.status !== undefined ? String(updates.status).trim() : existing.status,
-    totalPages:
-      updates.totalPages !== undefined
-        ? Math.max(0, parseInt(updates.totalPages, 10) || 0)
-        : existing.totalPages,
-    summary: updates.summary !== undefined ? String(updates.summary).trim() : existing.summary,
     archived: updates.archived !== undefined ? Boolean(updates.archived) : existing.archived,
     updatedAt: now,
   };
-
-  if (!updated.title) {
-    throw new Error('Activity title cannot be empty');
-  }
 
   await commitSingleMutation(STORES.ACTIVITIES, updated, 'activities', id);
   return updated;

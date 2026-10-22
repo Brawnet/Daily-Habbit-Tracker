@@ -68,6 +68,14 @@ describe('ui/activities.js UI view', () => {
         for (const l of listeners) l();
         return activitiesList[idx];
       }),
+      normalizeActivityInput: vi.fn((input = {}) => ({
+        title: String(input.title ?? '').trim(),
+        author: String(input.author ?? '').trim(),
+        type: String(input.type ?? 'Book').trim(),
+        status: String(input.status ?? 'Backlog').trim(),
+        totalPages: Math.max(0, parseInt(input.totalPages, 10) || 0),
+        summary: String(input.summary ?? '').trim(),
+      })),
       onChange: vi.fn((l) => {
         listeners.add(l);
         return () => listeners.delete(l);

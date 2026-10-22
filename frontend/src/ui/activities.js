@@ -5,22 +5,30 @@
 
 import {
   listActivities,
-  getActivity,
   addActivity,
   updateActivity,
   setActivityArchived,
+  normalizeActivityInput,
   onChange,
 } from '../data/repo.js';
+import { ACTIVITY_STATUS, ACTIVITY_TYPES } from '../shared/contracts.js';
 import { showToast } from './shell.js';
 
 const STATUS_CLASSES = {
-  'In Progress': 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300',
-  'Completed': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
-  'Backlog': 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
+  [ACTIVITY_STATUS.IN_PROGRESS]: 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300',
+  [ACTIVITY_STATUS.COMPLETED]: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
+  [ACTIVITY_STATUS.BACKLOG]: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
 };
-const STATUS_OPTIONS = ['Backlog', 'In Progress', 'Completed'];
-const TYPE_OPTIONS = ['Book', 'Course', 'Article', 'Other'];
+const STATUS_OPTIONS = Object.values(ACTIVITY_STATUS);
+const TYPE_OPTIONS = ACTIVITY_TYPES;
 
+function getFilterPillClass(isActive) {
+  const base =
+    'filter-pill flex items-center justify-center min-h-[44px] min-w-[44px] px-3.5 py-2.5 rounded-full text-xs font-medium cursor-pointer transition select-none';
+  return isActive
+    ? `${base} bg-indigo-600 text-white`
+    : `${base} bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700`;
+}
 /**
  * Mounts the Activities tab into rootEl.
  *
@@ -88,11 +96,7 @@ export function mount(rootEl) {
     const pill = document.createElement('button');
     pill.id = f.id;
     pill.type = 'button';
-    pill.className = `filter-pill flex items-center justify-center min-h-[44px] min-w-[44px] px-3.5 py-2.5 rounded-full text-xs font-medium cursor-pointer transition select-none ${
-      activeFilter === f.value
-        ? 'bg-indigo-600 text-white'
-        : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
-    }`;
+    pill.className = getFilterPillClass(activeFilter === f.value);
     pill.textContent = f.label;
     pill.addEventListener('click', () => {
       activeFilter = f.value;
@@ -106,13 +110,7 @@ export function mount(rootEl) {
 
   function updateFilterPillStyles() {
     for (const item of pillButtons) {
-      if (item.value === activeFilter) {
-        item.pill.className =
-          'filter-pill flex items-center justify-center min-h-[44px] min-w-[44px] px-3.5 py-2.5 rounded-full text-xs font-medium cursor-pointer transition select-none bg-indigo-600 text-white';
-      } else {
-        item.pill.className =
-          'filter-pill flex items-center justify-center min-h-[44px] min-w-[44px] px-3.5 py-2.5 rounded-full text-xs font-medium cursor-pointer transition select-none bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700';
-      }
+      item.pill.className = getFilterPillClass(item.value === activeFilter);
     }
   }
 
@@ -534,21 +532,20 @@ export function mount(rootEl) {
     const pagesInput = rootEl.querySelector('#activity-input-pages');
     const summaryInput = rootEl.querySelector('#activity-input-summary');
 
-    const title = (titleInput?.value || '').trim();
-    if (!title) {
-      showToast('Please enter an activity title');
+    let payload;
+    try {
+      payload = normalizeActivityInput({
+        title: titleInput?.value,
+        author: authorInput?.value,
+        type: typeSelect?.value,
+        status: statusSelect?.value,
+        totalPages: pagesInput?.value,
+        summary: summaryInput?.value,
+      });
+    } catch (err) {
+      showToast(err.message || 'Please enter an activity title');
       return;
     }
-
-    const payload = {
-      title,
-      author: (authorInput?.value || '').trim(),
-      type: (typeSelect?.value || 'Book').trim(),
-      status: (statusSelect?.value || 'Backlog').trim(),
-      totalPages: Math.max(0, parseInt(pagesInput?.value, 10) || 0),
-      summary: (summaryInput?.value || '').trim(),
-    };
-
     try {
       if (editingActivityId) {
         await updateActivity(editingActivityId, payload);

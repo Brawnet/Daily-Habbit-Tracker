@@ -35,6 +35,19 @@ export const STORES = Object.freeze({
   ACTIVITIES: 'activities',
 });
 
+export const ACTIVITY_STATUS = Object.freeze({
+  BACKLOG: 'Backlog',
+  IN_PROGRESS: 'In Progress',
+  COMPLETED: 'Completed',
+});
+
+export const ACTIVITY_TYPES = Object.freeze([
+  'Book',
+  'Course',
+  'Article',
+  'Other',
+]);
+
 export class ApiError extends Error {
   /**
    * @param {string} code

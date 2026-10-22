@@ -625,7 +625,7 @@ function syncActivities(sheet, incomingActivities, nowMonotonic) {
 
     if (existingIndex !== undefined) {
       const existingUpdatedAt = String(data[existingIndex][9] || '');
-      if (!act.updatedAt || act.updatedAt > existingUpdatedAt) {
+      if (!existingUpdatedAt || (act.updatedAt && act.updatedAt > existingUpdatedAt)) {
         data[existingIndex][1] = act.title !== undefined ? act.title : data[existingIndex][1];
         data[existingIndex][2] = act.author !== undefined ? act.author : data[existingIndex][2];
         data[existingIndex][3] = act.type !== undefined ? act.type : data[existingIndex][3];

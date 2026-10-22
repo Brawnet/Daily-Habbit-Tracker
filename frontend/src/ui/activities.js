@@ -13,20 +13,11 @@ import {
 } from '../data/repo.js';
 import { showToast } from './shell.js';
 
-/**
- * Escapes characters for HTML text insertion
- * @param {string} str
- * @returns {string}
- */
-function escapeHtml(str) {
-  return String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
+const STATUS_CLASSES = {
+  'In Progress': 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300',
+  'Completed': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
+  'Backlog': 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
+};
 const STATUS_OPTIONS = ['Backlog', 'In Progress', 'Completed'];
 const TYPE_OPTIONS = ['Book', 'Course', 'Article', 'Other'];
 
@@ -40,7 +31,6 @@ export function mount(rootEl) {
   if (!rootEl) return () => {};
 
   let activeFilter = 'All'; // 'All' | 'Backlog' | 'In Progress' | 'Completed' | 'Archived'
-  let isModalOpen = false;
   let editingActivityId = null;
 
   rootEl.innerHTML = '';
@@ -221,14 +211,9 @@ export function mount(rootEl) {
       card.dataset.activityId = act.id;
 
       // Status badge color
-      let statusClass = 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200';
-      if (act.status === 'In Progress') {
-        statusClass = 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300';
-      } else if (act.status === 'Completed') {
-        statusClass = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300';
-      } else if (act.status === 'Backlog') {
-        statusClass = 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300';
-      }
+      const statusClass =
+        STATUS_CLASSES[act.status] ||
+        'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200';
 
       // Card Header
       const cardHeader = document.createElement('div');
@@ -533,13 +518,11 @@ export function mount(rootEl) {
     modal.appendChild(modalBox);
     modalWrapper.appendChild(modal);
 
-    isModalOpen = true;
   }
 
   function closeModal() {
     modalWrapper.innerHTML = '';
     modalWrapper.style.display = 'none';
-    isModalOpen = false;
     editingActivityId = null;
   }
 

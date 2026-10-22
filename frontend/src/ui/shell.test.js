@@ -226,13 +226,17 @@ describe('ui/shell.js', () => {
 
     registerTab('today', { title: 'Today', icon: '<span>today-ico</span>', mount: mountToday });
     registerTab('history', { title: 'History', icon: '<span>hist-ico</span>', mount: mountHistory });
-    registerTab('activities', { title: 'Activities', icon: '<span>act-ico</span>', mount: mountActivities });
     registerTab('settings', { title: 'Settings', icon: '<span>set-ico</span>', mount: mountSettings });
+    registerTab('activities', { title: 'Activities', icon: '<span>act-ico</span>', mount: mountActivities });
 
     mountShell(root);
 
     const bottomNav = mockDoc.getElementById('bottom-nav');
     expect(bottomNav).not.toBeNull();
+
+    const buttons = bottomNav.querySelectorAll('button[data-tab]');
+    expect(buttons.length).toBe(4);
+    expect(buttons[3].dataset.tab).toBe('activities');
 
     const actBtn = mockDoc.getElementById('tab-btn-activities');
     expect(actBtn).not.toBeNull();

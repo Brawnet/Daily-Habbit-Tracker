@@ -22,6 +22,9 @@ import {
   onChange,
 } from '../data/repo.js';
 import {
+  CHEVRON_LEFT_SVG,
+  LIST_BULLET_SVG,
+  LIST_NUMBER_SVG,
   DEFAULT_JOURNAL_PROMPTS,
   loadJournalPrompts,
   saveJournalPrompts,
@@ -29,6 +32,7 @@ import {
   decompilePromptJournal,
   renderPromptCardsJournal,
   openCustomizePromptsModal,
+  hasNonEmptyJournalAnswers,
 } from './journal-prompts.js';
 import { today } from '../domain/day.js';
 import { showToast } from './shell.js';
@@ -123,11 +127,6 @@ export const BOOKS_SUMMARY_LOGO_SVG = `
 </svg>
 `.trim();
 
-export const CHEVRON_LEFT_SVG = `
-<svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  <path d="M15 19l-7-7 7-7" />
-</svg>
-`.trim();
 
 const PENCIL_WRITE_SVG = `
 <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -147,17 +146,6 @@ const PLUS_SVG = `
 </svg>
 `.trim();
 
-export const LIST_BULLET_SVG = `
-<svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  <path d="M4 6h.01M4 12h.01M4 18h.01M8 6h12M8 12h12M8 18h12" />
-</svg>
-`.trim();
-
-export const LIST_NUMBER_SVG = `
-<svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  <path d="M4 6h1v4m-1 0h2m-2 4h2a1 1 0 011 1v1a1 1 0 01-1 1h-2v2h3M10 6h10M10 12h10M10 18h10" />
-</svg>
-`.trim();
 
 /**
  * Mounts the Activities tab into rootEl.
@@ -194,7 +182,7 @@ export function mount(rootEl) {
   let journalStatus = 'Saved';
   let chapterStatus = 'Saved';
   let cachedPrompts = JSON.parse(JSON.stringify(DEFAULT_JOURNAL_PROMPTS));
-  loadJournalPrompts(getSetting)
+  loadJournalPrompts(getSetting, setSetting)
     .then((p) => {
       if (Array.isArray(p) && p.length > 0) {
         cachedPrompts = p;
@@ -1255,11 +1243,12 @@ export function mount(rootEl) {
       cachedPrompts = newPrompts;
       prompts = newPrompts;
       saveJournalPrompts(setSetting, newPrompts);
-      const compiled = compilePromptJournal(newPrompts, answers, currentNotes);
-      journalDraft = compiled;
-      saveJournalEntry(today(), compiled).catch(() => {});
+      if (hasNonEmptyJournalAnswers(answers, currentNotes) || (journalDraft && journalDraft.trim())) {
+        const compiled = compilePromptJournal(newPrompts, answers, currentNotes);
+        journalDraft = compiled;
+        saveJournalEntry(today(), compiled).catch(() => {});
+      }
     }
-
     function handleOpenCustomizeModal() {
       openCustomizePromptsModal({
         prompts,

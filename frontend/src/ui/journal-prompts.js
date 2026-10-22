@@ -11,26 +11,14 @@ export const CHEVRON_LEFT_SVG = `
 </svg>
 `.trim();
 
-export const JOURNALING_LOGO_SVG = `
-<svg class="w-full h-full" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-  <g transform="rotate(-7.5 46 51)" stroke-width="3.2">
-    <rect x="26" y="22" width="44" height="53" rx="8" />
-    <path d="M 27 28 C 17 26 17 33 27 32" />
-    <path d="M 27 36 C 17 34 17 41 27 40" />
-    <path d="M 27 44 C 17 42 17 49 27 48" />
-    <line x1="37" y1="33" x2="60" y2="33" />
-  </g>
-</svg>
-`.trim();
-
 export const LIST_BULLET_SVG = `
-<svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+<svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <path d="M4 6h.01M4 12h.01M4 18h.01M8 6h12M8 12h12M8 18h12" />
 </svg>
 `.trim();
 
 export const LIST_NUMBER_SVG = `
-<svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+<svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <path d="M4 6h1v4m-1 0h2m-2 4h2a1 1 0 011 1v1a1 1 0 01-1 1h-2v2h3M10 6h10M10 12h10M10 18h10" />
 </svg>
 `.trim();
@@ -59,11 +47,12 @@ export const DEFAULT_JOURNAL_PROMPTS = [
 export const SETTINGS_KEY = 'journalPrompts';
 
 /**
- * Loads current prompts from Settings (or defaults).
+ * Loads current prompts from Settings, or seeds and returns defaults.
  * @param {Function} getSettingFn
+ * @param {Function} [setSettingFn]
  * @returns {Promise<Array<{ id: string, prompt: string, order: number, archived: boolean }>>}
  */
-export async function loadJournalPrompts(getSettingFn) {
+export async function loadJournalPrompts(getSettingFn, setSettingFn) {
   try {
     if (typeof getSettingFn === 'function') {
       const raw = await getSettingFn(SETTINGS_KEY);
@@ -75,7 +64,12 @@ export async function loadJournalPrompts(getSettingFn) {
       }
     }
   } catch {}
-  return JSON.parse(JSON.stringify(DEFAULT_JOURNAL_PROMPTS));
+
+  const defaults = JSON.parse(JSON.stringify(DEFAULT_JOURNAL_PROMPTS));
+  if (typeof setSettingFn === 'function') {
+    saveJournalPrompts(setSettingFn, defaults).catch(() => {});
+  }
+  return defaults;
 }
 
 /**
@@ -95,13 +89,12 @@ export async function saveJournalPrompts(setSettingFn, prompts) {
 
 /**
  * Compiles prompt answers into backward-compatible HTML.
- * Omits blank/skipped prompts.
+ * Omits blank/skipped prompts, but preserves answered archived prompts.
  */
 export function compilePromptJournal(prompts, answers, additionalNotes = '') {
   let out = '';
   const sorted = [...prompts].sort((a, b) => a.order - b.order);
   for (const p of sorted) {
-    if (p.archived) continue;
     const rawAns = answers[p.id];
     const ans = (typeof rawAns === 'string' ? rawAns : '').trim();
     const textOnly = ans.replace(/<[^>]*>/g, '').trim();
@@ -133,22 +126,52 @@ export function decompilePromptJournal(htmlContent, prompts) {
     return { answers, additionalNotes };
   }
 
-  // Regex parser: robust in both Node.js (without DOM parser) and browser
-  const promptBlockRegex = /<div\s+[^>]*class="[^"]*journal-prompt-block[^"]*"[^>]*data-prompt-id="([^"]+)"[^>]*>[\s\S]*?<div\s+[^>]*class="[^"]*journal-prompt-answer[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
+  // 1. DOMParser if available in full browser DOM environment
+  if (typeof DOMParser !== 'undefined') {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlContent, 'text/html');
+      const blocks = doc.querySelectorAll('.journal-prompt-block');
+      if (blocks.length > 0) {
+        for (const block of blocks) {
+          const id = block.getAttribute('data-prompt-id');
+          const ansEl = block.querySelector('.journal-prompt-answer');
+          if (id && ansEl) {
+            answers[id] = ansEl.innerHTML.trim();
+          }
+        }
+        const notesEl = doc.querySelector('.journal-notes-block .journal-notes-answer');
+        if (notesEl) {
+          additionalNotes = notesEl.innerHTML.trim();
+        }
+        return { answers, additionalNotes };
+      }
+    } catch {}
+  }
+
+  // 2. Robust fallback for Node.js test environment
+  const promptBlockRegex = /<div\s+[^>]*class="[^"]*journal-prompt-block[^"]*"[^>]*data-prompt-id="([^"]+)"[^>]*>([\s\S]*?)<\/div>\s*(?=<div\s+[^>]*class="[^"]*journal-(?:prompt|notes)-block"|$)/gi;
   let match;
   let foundAny = false;
   while ((match = promptBlockRegex.exec(htmlContent)) !== null) {
     foundAny = true;
     const promptId = match[1];
-    const answerContent = match[2].trim();
-    answers[promptId] = answerContent;
+    const innerBlock = match[2];
+    const ansMatch = /<div\s+[^>]*class="[^"]*journal-prompt-answer[^"]*"[^>]*>([\s\S]*?)<\/div>\s*$/i.exec(innerBlock.trim());
+    if (ansMatch) {
+      answers[promptId] = ansMatch[1].trim();
+    }
   }
 
-  const notesBlockRegex = /<div\s+[^>]*class="[^"]*journal-notes-block[^"]*"[^>]*>[\s\S]*?<div\s+[^>]*class="[^"]*journal-notes-answer[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/i;
+  const notesBlockRegex = /<div\s+[^>]*class="[^"]*journal-notes-block[^"]*"[^>]*>([\s\S]*?)<\/div>\s*$/i;
   const notesMatch = notesBlockRegex.exec(htmlContent);
   if (notesMatch) {
-    additionalNotes = notesMatch[1].trim();
     foundAny = true;
+    const innerNotes = notesMatch[1];
+    const ansMatch = /<div\s+[^>]*class="[^"]*journal-notes-answer[^"]*"[^>]*>([\s\S]*?)<\/div>\s*$/i.exec(innerNotes.trim());
+    if (ansMatch) {
+      additionalNotes = ansMatch[1].trim();
+    }
   }
 
   if (foundAny) {
@@ -211,7 +234,7 @@ export function renderPromptCardsJournal({
   backBtn.type = 'button';
   backBtn.id = 'btn-back-from-journal-to-activities';
   backBtn.className =
-    'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 active:scale-95 transition-all cursor-pointer';
+    'min-h-[44px] min-w-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 active:scale-95 transition-all cursor-pointer';
   backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>Back to Activities</span>`;
   backBtn.addEventListener('click', onBack);
 
@@ -233,9 +256,9 @@ export function renderPromptCardsJournal({
   customizeBtn.type = 'button';
   customizeBtn.id = 'btn-customize-prompts';
   customizeBtn.className =
-    'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 active:scale-95 transition cursor-pointer';
+    'min-h-[44px] min-w-[44px] inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 active:scale-95 transition cursor-pointer';
   customizeBtn.innerHTML = `
-    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
       <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
     </svg>
     <span>Customize Prompts</span>
@@ -250,24 +273,7 @@ export function renderPromptCardsJournal({
   topBar.appendChild(rightActions);
   container.appendChild(topBar);
 
-  // 2. Banner
-  const banner = document.createElement('div');
-  banner.className =
-    'flex items-center justify-between p-4 rounded-2xl bg-linear-to-r from-indigo-50/80 via-white to-purple-50/80 dark:from-zinc-900 dark:via-zinc-900/80 dark:to-zinc-800/80 border border-indigo-100/80 dark:border-zinc-800 shadow-xs';
-  banner.innerHTML = `
-    <div class="flex items-center gap-3">
-      <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center p-2 shadow-xs shrink-0">
-        ${JOURNALING_LOGO_SVG}
-      </div>
-      <div>
-        <h2 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Daily Guided Reflection</h2>
-        <p class="text-xs text-zinc-500 dark:text-zinc-400">Answer prompts to capture today's growth</p>
-      </div>
-    </div>
-  `;
-  container.appendChild(banner);
-
-  // 3. Question Prompt Cards
+  // 2. Question Prompt Cards
   const activePrompts = [...prompts]
     .filter((p) => !p.archived)
     .sort((a, b) => a.order - b.order);
@@ -297,7 +303,7 @@ export function renderPromptCardsJournal({
     promptTitleWrap.appendChild(numBadge);
     promptTitleWrap.appendChild(questionTitle);
 
-    // Card Toolbar (bullets / numbers)
+    // Card Toolbar (bullets / numbers) meeting touch target min-h-[44px]
     const toolbar = document.createElement('div');
     toolbar.className = 'flex items-center gap-1.5';
 
@@ -306,7 +312,7 @@ export function renderPromptCardsJournal({
     bulletBtn.id = idx === 0 ? 'btn-journal-bullet' : `btn-journal-bullet-${idx}`;
     bulletBtn.title = 'Bullet list';
     bulletBtn.className =
-      'min-h-[36px] px-2.5 py-1 rounded-lg text-xs font-medium border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer inline-flex items-center gap-1 active:scale-95';
+      'min-h-[44px] min-w-[44px] px-3 py-2 rounded-xl text-xs font-medium border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer inline-flex items-center gap-1 active:scale-95';
     bulletBtn.innerHTML = `${LIST_BULLET_SVG} <span class="hidden sm:inline">Bullet</span>`;
 
     const numberBtn = document.createElement('button');
@@ -314,7 +320,7 @@ export function renderPromptCardsJournal({
     numberBtn.id = idx === 0 ? 'btn-journal-number' : `btn-journal-number-${idx}`;
     numberBtn.title = 'Numbered list';
     numberBtn.className =
-      'min-h-[36px] px-2.5 py-1 rounded-lg text-xs font-medium border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer inline-flex items-center gap-1 active:scale-95';
+      'min-h-[44px] min-w-[44px] px-3 py-2 rounded-xl text-xs font-medium border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer inline-flex items-center gap-1 active:scale-95';
     numberBtn.innerHTML = `${LIST_NUMBER_SVG} <span class="hidden sm:inline">Numbered</span>`;
 
     toolbar.appendChild(bulletBtn);
@@ -323,7 +329,7 @@ export function renderPromptCardsJournal({
     cardHeader.appendChild(toolbar);
     card.appendChild(cardHeader);
 
-    // Editor Area
+    // Editor Area with font-size >= 16px (text-base) on mobile to prevent iOS Safari auto-zoom
     const editor = document.createElement('div');
     editor.id = idx === 0 ? 'editor-journal-content' : `editor-journal-content-${idx}`;
     editor.setAttribute('contenteditable', 'true');
@@ -331,7 +337,7 @@ export function renderPromptCardsJournal({
     editor.setAttribute('aria-multiline', 'true');
     editor.setAttribute('aria-label', p.prompt);
     editor.className =
-      'rich-editor w-full min-h-[96px] p-3 text-sm rounded-xl border border-zinc-200 dark:border-zinc-700/80 bg-zinc-50/50 dark:bg-zinc-800/60 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-zinc-800 transition leading-relaxed outline-none [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-6 [&_ol]:my-1.5 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-6 [&_ul]:my-1.5 [&_p]:my-1';
+      'rich-editor w-full min-h-[96px] p-3 text-base sm:text-sm rounded-xl border border-zinc-200 dark:border-zinc-700/80 bg-zinc-50/50 dark:bg-zinc-800/60 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-zinc-800 transition leading-relaxed outline-none [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-6 [&_ol]:my-1.5 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-6 [&_ul]:my-1.5 [&_p]:my-1';
     editor.innerHTML = answers[p.id] || '';
 
     // Connect editor events
@@ -365,7 +371,7 @@ export function renderPromptCardsJournal({
     container.appendChild(card);
   });
 
-  // 4. Additional Notes Card
+  // 3. Additional Notes Card
   const notesCard = document.createElement('div');
   notesCard.id = 'journal-notes-card';
   notesCard.className =
@@ -389,7 +395,7 @@ export function renderPromptCardsJournal({
   notesEditor.setAttribute('aria-multiline', 'true');
   notesEditor.setAttribute('aria-label', 'Additional Notes');
   notesEditor.className =
-    'rich-editor w-full min-h-[90px] p-3 text-sm rounded-xl border border-zinc-200 dark:border-zinc-700/80 bg-zinc-50/50 dark:bg-zinc-800/60 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-zinc-800 transition leading-relaxed outline-none [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-6 [&_ol]:my-1.5 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-6 [&_ul]:my-1.5 [&_p]:my-1';
+    'rich-editor w-full min-h-[90px] p-3 text-base sm:text-sm rounded-xl border border-zinc-200 dark:border-zinc-700/80 bg-zinc-50/50 dark:bg-zinc-800/60 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-zinc-800 transition leading-relaxed outline-none [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-6 [&_ol]:my-1.5 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-6 [&_ul]:my-1.5 [&_p]:my-1';
   notesEditor.innerHTML = additionalNotes || '';
 
   notesEditor.addEventListener('input', () => {
@@ -432,7 +438,7 @@ export function openCustomizePromptsModal({ prompts, onSave, onClose }) {
   closeBtn.type = 'button';
   closeBtn.id = 'btn-close-customize-modal';
   closeBtn.className =
-    'w-8 h-8 rounded-full flex items-center justify-center text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer';
+    'w-11 h-11 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer';
   closeBtn.innerHTML = '✕';
   closeBtn.addEventListener('click', () => {
     overlay.remove();
@@ -464,13 +470,13 @@ export function openCustomizePromptsModal({ prompts, onSave, onClose }) {
       input.type = 'text';
       input.value = p.prompt;
       input.className =
-        'prompt-title-input flex-1 text-xs px-2.5 py-1.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500';
+        'prompt-title-input flex-1 text-base sm:text-sm px-3 py-2 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500';
       input.addEventListener('change', () => {
         p.prompt = input.value.trim() || p.prompt;
         onSave(prompts);
       });
 
-      // Actions: Up, Down, Delete
+      // Actions: Up, Down, Archive (meeting 44px touch target)
       const actions = document.createElement('div');
       actions.className = 'flex items-center gap-1 shrink-0';
 
@@ -479,7 +485,7 @@ export function openCustomizePromptsModal({ prompts, onSave, onClose }) {
       upBtn.disabled = idx === 0;
       upBtn.title = 'Move up';
       upBtn.className =
-        'btn-move-up w-7 h-7 flex items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-30 cursor-pointer';
+        'btn-move-up w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-30 cursor-pointer';
       upBtn.innerHTML = '▲';
       upBtn.addEventListener('click', () => {
         const prev = active[idx - 1];
@@ -495,7 +501,7 @@ export function openCustomizePromptsModal({ prompts, onSave, onClose }) {
       downBtn.disabled = idx === active.length - 1;
       downBtn.title = 'Move down';
       downBtn.className =
-        'btn-move-down w-7 h-7 flex items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-30 cursor-pointer';
+        'btn-move-down w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-30 cursor-pointer';
       downBtn.innerHTML = '▼';
       downBtn.addEventListener('click', () => {
         const next = active[idx + 1];
@@ -506,17 +512,17 @@ export function openCustomizePromptsModal({ prompts, onSave, onClose }) {
         renderList();
       });
 
-      const deleteBtn = document.createElement('button');
-      deleteBtn.type = 'button';
-      deleteBtn.title = 'Delete question';
-      deleteBtn.className =
-        'btn-delete-prompt w-7 h-7 flex items-center justify-center rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/60 cursor-pointer';
-      deleteBtn.innerHTML = `
+      const archiveBtn = document.createElement('button');
+      archiveBtn.type = 'button';
+      archiveBtn.title = 'Archive question';
+      archiveBtn.className =
+        'btn-archive-prompt btn-delete-prompt w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-950/60 cursor-pointer';
+      archiveBtn.innerHTML = `
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
         </svg>
       `;
-      deleteBtn.addEventListener('click', () => {
+      archiveBtn.addEventListener('click', () => {
         p.archived = true;
         onSave(prompts);
         renderList();
@@ -524,7 +530,7 @@ export function openCustomizePromptsModal({ prompts, onSave, onClose }) {
 
       actions.appendChild(upBtn);
       actions.appendChild(downBtn);
-      actions.appendChild(deleteBtn);
+      actions.appendChild(archiveBtn);
 
       row.appendChild(orderBadge);
       row.appendChild(input);
@@ -548,13 +554,13 @@ export function openCustomizePromptsModal({ prompts, onSave, onClose }) {
     addInput.type = 'text';
     addInput.placeholder = 'e.g. What are you grateful for today?';
     addInput.className =
-      'flex-1 text-xs px-3 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500';
+      'flex-1 text-base sm:text-sm px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500';
 
     const addSubmitBtn = document.createElement('button');
     addSubmitBtn.type = 'button';
     addSubmitBtn.id = 'btn-submit-add-prompt';
     addSubmitBtn.className =
-      'min-h-[38px] px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition cursor-pointer shrink-0';
+      'min-h-[44px] px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition cursor-pointer shrink-0';
     addSubmitBtn.textContent = '+ Add Question';
     addSubmitBtn.addEventListener('click', () => {
       const val = (addInput.value || '').trim();

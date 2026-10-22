@@ -128,5 +128,7 @@ if (
   navigator.storage &&
   typeof navigator.storage.persist === 'function'
 ) {
-  navigator.storage.persist().catch(() => {});
+  try {
+    navigator.storage.persist().catch(() => {});
+  } catch {}
 }

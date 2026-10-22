@@ -585,9 +585,9 @@ describe('pwa/update.js', () => {
     });
 
     updateModule = await import('../pwa/update.js');
-    const reg = await updateModule.initUpdateHandler('/sw.js');
+    const reg = await updateModule.initUpdateHandler('/sw.js', { force: true });
 
-    expect(navigator.serviceWorker.register).toHaveBeenCalledWith('/sw.js', { type: 'module' });
+    expect(navigator.serviceWorker.register).toHaveBeenCalledWith('/sw.js', { scope: '/' });
     expect(reg).toBe(mockReg);
 
     // Trigger updatefound

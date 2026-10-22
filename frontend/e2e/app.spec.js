@@ -154,6 +154,26 @@ test.describe('Habbit App E2E', () => {
     await expect(page.locator('text=Credentials saved')).toBeVisible();
   });
 
+  async function verifyNavBounds(page, expectedViewportHeight) {
+    const bottomNav = page.locator('#bottom-nav');
+    await expect(bottomNav).toBeVisible();
+
+    const navBox = await bottomNav.boundingBox();
+    expect(navBox).not.toBeNull();
+    expect(navBox.y + navBox.height).toBeLessThanOrEqual(expectedViewportHeight + 1);
+    expect(navBox.y).toBeGreaterThan(expectedViewportHeight - 120);
+
+    for (const tabName of ['today', 'history', 'activities', 'settings']) {
+      const tabBtn = page.locator(`button[data-tab="${tabName}"]`);
+      await expect(tabBtn).toBeVisible();
+      const tabBox = await tabBtn.boundingBox();
+      expect(tabBox).not.toBeNull();
+      expect(tabBox.height).toBeGreaterThanOrEqual(44);
+      expect(tabBox.width).toBeGreaterThanOrEqual(44);
+      expect(tabBox.y + tabBox.height).toBeLessThanOrEqual(expectedViewportHeight + 1);
+    }
+  }
+
   test('verifies bottom navigation bar visibility and bounds on iPhone viewports', async ({ page }) => {
     const viewports = [
       { name: 'iPhone 11 / XR', width: 414, height: 896 },
@@ -163,25 +183,7 @@ test.describe('Habbit App E2E', () => {
     for (const vp of viewports) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await page.waitForTimeout(200);
-
-      const bottomNav = page.locator('#bottom-nav');
-      await expect(bottomNav).toBeVisible();
-
-      const navBox = await bottomNav.boundingBox();
-      expect(navBox).not.toBeNull();
-      // Navigation bar must sit at the bottom edge within viewport bounds
-      expect(navBox.y + navBox.height).toBeLessThanOrEqual(vp.height + 1);
-      expect(navBox.y).toBeGreaterThan(vp.height - 120);
-
-      // All 3 navigation tabs must be visible, clickable, and meet touch target sizes
-      for (const tabName of ['today', 'history', 'settings']) {
-        const tabBtn = page.locator(`button[data-tab="${tabName}"]`);
-        await expect(tabBtn).toBeVisible();
-        const tabBox = await tabBtn.boundingBox();
-        expect(tabBox).not.toBeNull();
-        expect(tabBox.height).toBeGreaterThanOrEqual(44);
-        expect(tabBox.y + tabBox.height).toBeLessThanOrEqual(vp.height + 1);
-      }
+      await verifyNavBounds(page, vp.height);
     }
   });
 
@@ -201,11 +203,40 @@ test.describe('Habbit App E2E', () => {
       return document.documentElement.style.getPropertyValue('--app-height');
     });
     expect(appHeightProp).toMatch(/^\d+px$|^100vh$/);
+    await verifyNavBounds(page, vp.height);
+  });
 
-    const bottomNav = page.locator('#bottom-nav');
-    await expect(bottomNav).toBeVisible();
-    const navBox = await bottomNav.boundingBox();
-    expect(navBox).not.toBeNull();
-    expect(navBox.y + navBox.height).toBeLessThanOrEqual(vp.height + 1);
+  test('verifies Android mobile viewports and standalone layout bounds', async ({ page }) => {
+    const vp = { name: 'Pixel 7 (Android)', width: 412, height: 915 };
+    await page.setViewportSize(vp);
+    await page.waitForTimeout(200);
+    await verifyNavBounds(page, vp.height);
+
+    // Simulate Android standalone PWA launch
+    await page.addInitScript(() => {
+      const origMatchMedia = window.matchMedia;
+      window.matchMedia = (query) => {
+        if (query.includes('display-mode: standalone')) {
+          return {
+            matches: true,
+            media: query,
+            onchange: null,
+            addListener: () => {},
+            removeListener: () => {},
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            dispatchEvent: () => false,
+          };
+        }
+        return origMatchMedia ? origMatchMedia(query) : { matches: false };
+      };
+    });
+
+    await page.reload();
+    const appHeightProp = await page.evaluate(() => {
+      return document.documentElement.style.getPropertyValue('--app-height');
+    });
+    expect(appHeightProp).toMatch(/^100vh$/);
+    await verifyNavBounds(page, vp.height);
   });
 });

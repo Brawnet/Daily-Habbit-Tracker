@@ -15,13 +15,13 @@ test.describe('Habbit App E2E', () => {
     await page.reload();
   });
 
-  test('bottom navigation switches between Today, History, Activities, and Settings tabs', async ({ page }) => {
+  test('bottom navigation switches between Today, Activities, History, and Settings tabs', async ({ page }) => {
     await expect(page.locator('#today-date')).toBeVisible();
 
     // Navigate to Activities
     await page.click('button[data-tab="activities"]');
     await expect(page).toHaveURL(/tab=activities/);
-    await expect(page.locator('#activities-empty-state')).toBeVisible();
+    await expect(page.locator('#activities-choice-hub')).toBeVisible();
 
     // Navigate to Settings
     await page.click('button[data-tab="settings"]');
@@ -38,35 +38,48 @@ test.describe('Habbit App E2E', () => {
     await expect(page.locator('#today-date')).toBeVisible();
   });
 
-  test('creates an activity, edits it, and persists across reload', async ({ page }) => {
+  test('creates a book summary in activities, writes a chapter, and persists across reload', async ({ page }) => {
     // Navigate to Activities tab
     await page.click('button[data-tab="activities"]');
     await expect(page).toHaveURL(/tab=activities/);
-    await expect(page.locator('#activities-empty-state')).toBeVisible();
+    await expect(page.locator('#activities-choice-hub')).toBeVisible();
 
-    // Click + New Activity
-    await page.click('#btn-new-activity');
-    await expect(page.locator('#activity-modal')).toBeVisible();
+    // Open Books Summary choice
+    await page.click('#choice-books-summary');
+    await expect(page.locator('#btn-toggle-add-book')).toBeVisible();
 
-    // Fill activity form
-    await page.fill('#activity-input-title', 'Designing Data-Intensive Applications');
-    await page.fill('#activity-input-author', 'Martin Kleppmann');
-    await page.selectOption('#activity-input-type', 'Book');
-    await page.selectOption('#activity-input-status', 'In Progress');
-    await page.fill('#activity-input-pages', '616');
-    await page.fill('#activity-input-summary', 'Reliability, scalability, and maintainability.');
-    await page.click('#activity-btn-save');
+    // Add New Book
+    await page.click('#btn-toggle-add-book');
+    await expect(page.locator('#form-add-book')).toBeVisible();
 
-    // Verify modal closes and activity card is rendered
-    await expect(page.locator('#activity-modal')).not.toBeVisible();
-    const card = page.locator('.activity-card', { hasText: 'Designing Data-Intensive Applications' });
-    await expect(card).toBeVisible();
-    await expect(card).toContainText('Martin Kleppmann');
-    await expect(card).toContainText('In Progress');
+    await page.fill('#input-new-book-title', 'Designing Data-Intensive Applications');
+    await page.fill('#input-new-book-author', 'Martin Kleppmann');
+    await page.click('#btn-save-new-book');
+
+    // Verify book action menu view opens
+    await expect(page.locator('#book-action-menu-view')).toBeVisible();
+    await expect(page.locator('#book-menu-title')).toContainText('Designing Data-Intensive Applications');
+
+    // Continue Summary (chapter editor)
+    await page.click('#btn-choice-continue-summary');
+    await expect(page.locator('#editor-chapter-content')).toBeVisible();
+
+    await page.fill('#input-chapter-title', 'Chapter 1: Reliable Systems');
+    await page.locator('#editor-chapter-content').fill('Reliability, scalability, and maintainability.');
+    await page.click('#btn-save-chapter');
+
+    // Wait for save feedback
+    await expect(page.locator('#btn-save-existing-chapter')).toBeVisible({ timeout: 3000 });
 
     // Reload page to test offline IndexedDB persistence
     await page.reload();
-    await expect(page.locator('.activity-card', { hasText: 'Designing Data-Intensive Applications' })).toBeVisible();
+    await page.click('button[data-tab="activities"]');
+    await page.click('#choice-books-summary');
+
+    const bookCard = page.locator('.book-item-card', { hasText: 'Designing Data-Intensive Applications' });
+    await expect(bookCard).toBeVisible();
+    await expect(bookCard).toContainText('Martin Kleppmann');
+    await expect(bookCard).toContainText('1 chapter');
   });
 
   test('creates a habit, completes check-in, and persists across page reload', async ({ page }) => {
@@ -123,20 +136,28 @@ test.describe('Habbit App E2E', () => {
     await expect(page.locator('li', { hasText: 'Membaca Buku' })).toBeVisible();
   });
 
-  test('writes daily journal reflection, autosaves, and displays in History tab', async ({ page }) => {
-    const journalInput = page.locator('#today-journal-input');
-    await expect(journalInput).toBeVisible();
+  test('writes daily journal reflection in activities, autosaves, and displays in History tab', async ({ page }) => {
+    // Navigate to Activities tab
+    await page.click('button[data-tab="activities"]');
+    await expect(page.locator('#activities-choice-hub')).toBeVisible();
+
+    // Open Journals choice
+    await page.click('#choice-journals');
+    const journalEditor = page.locator('#editor-journal-content');
+    await expect(journalEditor).toBeVisible();
 
     // Type reflection text
     const testReflection = 'Refleksi hari ini: berhasil menyelesaikan target dengan fokus.';
-    await journalInput.fill(testReflection);
+    await journalEditor.fill(testReflection);
 
     // Debounce save (800ms) and expect status indicator to be 'Saved'
     await expect(page.locator('#journal-status')).toHaveText('Saved', { timeout: 3000 });
 
     // Reload page to ensure content was saved in IndexedDB
     await page.reload();
-    await expect(page.locator('#today-journal-input')).toHaveValue(testReflection);
+    await page.click('button[data-tab="activities"]');
+    await page.click('#choice-journals');
+    await expect(page.locator('#editor-journal-content')).toContainText(testReflection);
 
     // Switch to History tab and verify journal entry is listed
     await page.click('button[data-tab="history"]');
@@ -174,7 +195,7 @@ test.describe('Habbit App E2E', () => {
       expect(navBox.y).toBeGreaterThan(vp.height - 120);
 
       // All 3 navigation tabs must be visible, clickable, and meet touch target sizes
-      for (const tabName of ['today', 'history', 'settings']) {
+      for (const tabName of ['today', 'activities', 'history', 'settings']) {
         const tabBtn = page.locator(`button[data-tab="${tabName}"]`);
         await expect(tabBtn).toBeVisible();
         const tabBox = await tabBtn.boundingBox();

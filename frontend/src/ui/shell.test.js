@@ -190,7 +190,7 @@ describe('ui/shell.js', () => {
 
     expect(mockDoc.documentElement.style.setProperty).toHaveBeenCalledWith(
       '--app-height',
-      expect.stringMatching(/^\d+px$/)
+      '896px'
     );
   });
 

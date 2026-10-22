@@ -148,4 +148,28 @@ test.describe('Habbit App E2E', () => {
       }
     }
   });
+
+  test('verifies iOS standalone PWA layout sets --app-height and fits bottom-nav', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'standalone', {
+        value: true,
+        configurable: true,
+      });
+    });
+
+    const vp = { width: 414, height: 896 };
+    await page.setViewportSize(vp);
+    await page.goto('/');
+
+    const appHeightProp = await page.evaluate(() => {
+      return document.documentElement.style.getPropertyValue('--app-height');
+    });
+    expect(appHeightProp).toMatch(/^\d+px$|^100vh$/);
+
+    const bottomNav = page.locator('#bottom-nav');
+    await expect(bottomNav).toBeVisible();
+    const navBox = await bottomNav.boundingBox();
+    expect(navBox).not.toBeNull();
+    expect(navBox.y + navBox.height).toBeLessThanOrEqual(vp.height + 1);
+  });
 });

@@ -40,21 +40,22 @@ registerTab('today', {
   mount: mountToday,
 });
 
+registerTab('activities', {
+  title: 'Activities',
+  icon: activitiesIcon,
+  mount: mountActivities,
+});
+
 registerTab('history', {
   title: 'History',
   icon: historyIcon,
   mount: mountHistory,
 });
+
 registerTab('settings', {
   title: 'Settings',
   icon: settingsIcon,
   mount: mountSettings,
-});
-
-registerTab('activities', {
-  title: 'Activities',
-  icon: activitiesIcon,
-  mount: mountActivities,
 });
 
 // Start background auto sync if available

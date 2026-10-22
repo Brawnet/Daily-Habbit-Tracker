@@ -237,6 +237,46 @@ describe('ui/shell.js', () => {
     expect(mountToday).toHaveBeenCalledTimes(2);
   });
 
+  it('mounts 4th tab Activities in navigation shell with icon and responsive routing', () => {
+    const root = mockDoc.createElement('div');
+    const mountToday = vi.fn();
+    const mountHistory = vi.fn();
+    const mountActivities = vi.fn((el) => {
+      el.textContent = 'Activities View';
+    });
+    const mountSettings = vi.fn();
+
+    registerTab('today', { title: 'Today', icon: '<span>today-ico</span>', mount: mountToday });
+    registerTab('history', { title: 'History', icon: '<span>hist-ico</span>', mount: mountHistory });
+    registerTab('settings', { title: 'Settings', icon: '<span>set-ico</span>', mount: mountSettings });
+    registerTab('activities', { title: 'Activities', icon: '<span>act-ico</span>', mount: mountActivities });
+
+    mountShell(root);
+
+    const bottomNav = mockDoc.getElementById('bottom-nav');
+    expect(bottomNav).not.toBeNull();
+
+    const buttons = bottomNav.querySelectorAll('button[data-tab]');
+    expect(buttons.length).toBe(4);
+    expect(buttons[3].dataset.tab).toBe('activities');
+
+    const actBtn = mockDoc.getElementById('tab-btn-activities');
+    expect(actBtn).not.toBeNull();
+    expect(actBtn.dataset.tab).toBe('activities');
+    expect(actBtn.textContent).toContain('Activities');
+    const iconSpan = actBtn.querySelector('.tab-icon');
+    expect(iconSpan.innerHTML).toContain('act-ico');
+
+    // Route to activities
+    navigate('activities');
+    expect(mountActivities).toHaveBeenCalledTimes(1);
+    expect(actBtn.getAttribute('aria-selected')).toBe('true');
+    expect(mockWin.location.search).toBe('?tab=activities');
+
+    const tabContent = mockDoc.getElementById('tab-content');
+    expect(tabContent.textContent).toBe('Activities View');
+  });
+
   it('updates sync status indicator and pending badge live', () => {
     const root = mockDoc.createElement('div');
     mountShell(root);

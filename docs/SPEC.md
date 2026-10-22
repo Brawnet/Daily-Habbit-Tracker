@@ -37,7 +37,7 @@ Nama aplikasi: **Habbit** (dengan dua "b", disengaja). UI berbahasa **Inggris**.
     /domain/              ← fungsi murni: day, streak, stats, search
     /data/                ← config, db, repo, outbox, merge, api, sync
     /pwa/                 ← install, push, update
-    /ui/                  ← shell, today, history, settings
+    /ui/                  ← shell, today, history, settings, activities
   index.html  vite.config.js  vitest.config.js  pwa-assets.config.js  package.json
 /gas-backend
   Code.gs  appsscript.json
@@ -65,7 +65,7 @@ Semua timestamp ISO-8601 UTC string. `updatedAt` diisi Device saat mutasi; `serv
 /** @typedef {{ id: string /*`${habitId}:${day}`*/, habitId: string, day: string, deleted: boolean, updatedAt: string }} CheckIn */
 /** @typedef {{ day: string, content: string, updatedAt: string, printedToDiaryAt: string /*'' bila belum; milik server, read-only di klien*/ }} JournalEntry */
 /** @typedef {{ key: 'reminderTime', value: string /*'HH:MM'*/, updatedAt: string }} Setting */
-```
+/** @typedef {{ id: string /*uuid*/, title: string, author: string, type: string, status: 'Backlog' | 'In Progress' | 'Completed', totalPages: number, summary: string, archived: boolean, createdAt: string, updatedAt: string }} Activity */
 
 Google Sheets (dibuat `setup()`; seluruh sheet diformat teks `@` agar tanggal tidak dikonversi; boolean ditulis/dibaca sebagai string `TRUE`/`FALSE`):
 
@@ -76,8 +76,9 @@ Google Sheets (dibuat `setup()`; seluruh sheet diformat teks `@` agar tanggal ti
 | `Journal_Entries` | day, content, updatedAt, printedToDiaryAt, serverUpdatedAt |
 | `Settings` | key, value, updatedAt, serverUpdatedAt |
 | `Push_Subscriptions` | deviceId, endpoint, p256dh, auth, createdAt |
+| `Activities` | id, title, author, type, status, totalPages, summary, archived, createdAt, updatedAt, serverUpdatedAt |
 
-IndexedDB `habbit` (via `idb`): stores `habits` (keyPath `id`), `checkIns` (`id`, index `habitId`), `journalEntries` (`day`), `settings` (`key`), `outbox` (`key` = `${type}:${recordKey}`, nilai = snapshot record terbaru, ter-coalesce), `meta` (`key`: `cursor`, `lastSyncedAt`).
+IndexedDB `habbit` (via `idb`): stores `habits` (keyPath `id`), `checkIns` (`id`, index `habitId`), `journalEntries` (`day`), `settings` (`key`), `activities` (`id`), `outbox` (`key` = `${type}:${recordKey}`, nilai = snapshot record terbaru, ter-coalesce), `meta` (`key`: `cursor`, `lastSyncedAt`).
 
 localStorage: `habbit.gasUrl`, `habbit.pin`, `habbit.deviceId` (uuid, dibuat sekali).
 
@@ -104,7 +105,7 @@ Server: `JSON.parse(e.postData.contents)`. Selalu HTTP 200 (Apps Script tak bisa
 | action | payload | respons |
 |---|---|---|
 | `ping` | — | `{ ok, serverTime, timeZone }` |
-| `sync` | `{ since: string\|null, changes: { habits, checkIns, journalEntries, settings } }` | `{ ok, cursor, changes: {…sama}, rejected: [{ type, key, reason }] }` |
+| `sync` | `{ since: string\|null, changes: { habits, checkIns, journalEntries, settings, activities } }` | `{ ok, cursor, changes: {…sama}, rejected: [{ type, key, reason }] }` |
 | `subscribePush` | `{ subscription: PushSubscriptionJSON }` | `{ ok }` (upsert per `deviceId`) |
 | `unsubscribePush` | — | `{ ok }` |
 | `testPush` | — | `{ ok, results }` (kirim ke Device pemanggil saja) |
@@ -178,11 +179,12 @@ Keluar bila: `nowHHMM < reminderTime`, atau `LAST_REMINDER_DAY === todayJakarta`
 - Pemicu: startup, `visibilitychange` → visible, `online`, `scheduleSync`, tombol Sync now. Tanpa config → app tetap berfungsi penuh secara lokal, status "Not configured".
 - Status: `not-configured | idle | syncing | offline | error`, + jumlah pending, ditampilkan kecil di header.
 
-## 10. UI (3 tab, bottom nav: Today · History · Settings; route `?tab=`)
+## 10. UI (4 tab, bottom nav: Today · History · Settings · Activities; route `?tab=`)
 
 - **Today**: tanggal panjang; progres `3/5 done`; daftar Habit aktif (urut `sortOrder`) dengan tombol Check-in + Streak (`🔥 5`); textarea Journal Entry autosave (debounce 800 ms) dengan status "Saved"; empty state → link ke Manage Habits.
 - **History**: kartu per Habit aktif: heatmap 12 minggu (kolom = minggu, baris Senin–Minggu), Streak saat ini, Streak terpanjang, completion 30 hari (penyebut = Day dalam 30 hari terakhir sejak `createdAt` Habit). Sel hari ini & kemarin bisa di-tap untuk toggle Check-in; lainnya read-only. Bagian "Archived" ter-collapse. Di bawah: kotak search + daftar Journal Entry terbaru dulu (tanggal pendek + cuplikan 2 baris, highlight hasil search); tap → tampilan baca penuh (read-only; bila hari ini → tombol "Edit in Today").
 - **Settings**: *Sync* (URL Web App, PIN `type=password`, Test connection → `ping`, Sync now, last synced, status) · *Manage Habits* (tambah, rename inline, ▲▼, archive/unarchive) · *Reminder* (input jam, Enable notifications, Send test notification, status) · *Install App* (§8) · versi aplikasi.
+- **Activities**: empty state dengan tombol buat baru; daftar Activity dengan filter status (*All*, *Backlog*, *In Progress*, *Completed*, *Archived*); kartu Activity menampilkan judul, author, badge tipe & status, jumlah halaman, dan ringkasan eksekutif; aksi Edit dan Archive; modal form dengan input terstandar (16px, target sentuh ≥44px).
 
 ## 11. Tes (Vitest) — wajib hijau
 

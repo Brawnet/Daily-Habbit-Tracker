@@ -870,6 +870,51 @@ describe('GAS Backend Actions', () => {
       const rowsAfter = jSheet.getDataRange().getValues();
       expect(rowsAfter[1][1]).toBe('Morning thought and evening reflection');
     });
+
+    it('syncs activities to Activities sheet and returns in changes', () => {
+      const syncPayload = {
+        pin: PIN,
+        deviceId: 'dev-1',
+        action: 'sync',
+        since: null,
+        changes: {
+          activities: [
+            {
+              id: 'act-1',
+              title: 'Pragmatic Programmer',
+              author: 'Andy Hunt',
+              type: 'Book',
+              status: 'In Progress',
+              totalPages: 352,
+              summary: 'Journey to mastery',
+              archived: false,
+              createdAt: '2026-10-20T10:00:00Z',
+              updatedAt: '2026-10-20T10:00:00Z'
+            }
+          ]
+        }
+      };
+
+      const res = JSON.parse(env.exports.doPost({ postData: { contents: JSON.stringify(syncPayload) } }).getContent());
+      expect(res.ok).toBe(true);
+      expect(res.changes.activities).toBeDefined();
+      expect(res.changes.activities.length).toBe(1);
+      expect(res.changes.activities[0].title).toBe('Pragmatic Programmer');
+      expect(res.changes.activities[0].author).toBe('Andy Hunt');
+      expect(res.changes.activities[0].type).toBe('Book');
+      expect(res.changes.activities[0].status).toBe('In Progress');
+      expect(res.changes.activities[0].totalPages).toBe(352);
+      expect(res.changes.activities[0].summary).toBe('Journey to mastery');
+      expect(res.changes.activities[0].archived).toBe(false);
+
+      // Verify written to Activities sheet
+      const actSheet = env.ss.getSheetByName('Activities');
+      expect(actSheet).toBeDefined();
+      const rows = actSheet.getDataRange().getValues();
+      expect(rows.length).toBe(2); // Header + 1 row
+      expect(rows[1][0]).toBe('act-1');
+      expect(rows[1][1]).toBe('Pragmatic Programmer');
+    });
   });
 
   describe('Push Subscription Management', () => {
@@ -984,7 +1029,7 @@ describe('GAS Backend Actions', () => {
 
       // Sheets not duplicated
       const sheets = env.ss.getSheets();
-      expect(sheets.length).toBe(5);
+      expect(sheets.length).toBe(6);
     });
   });
 

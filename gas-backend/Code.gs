@@ -11,7 +11,8 @@ const SCHEMA = {
   Check_Ins: ['id', 'habitId', 'day', 'deleted', 'updatedAt', 'serverUpdatedAt'],
   Journal_Entries: ['day', 'content', 'updatedAt', 'printedToDiaryAt', 'serverUpdatedAt'],
   Settings: ['key', 'value', 'updatedAt', 'serverUpdatedAt'],
-  Push_Subscriptions: ['deviceId', 'endpoint', 'p256dh', 'auth', 'createdAt']
+  Push_Subscriptions: ['deviceId', 'endpoint', 'p256dh', 'auth', 'createdAt'],
+  Activities: ['id', 'title', 'author', 'type', 'status', 'totalPages', 'summary', 'archived', 'createdAt', 'updatedAt', 'serverUpdatedAt']
 };
 
 // ==========================================
@@ -210,7 +211,7 @@ function mergeRecordsLWW(existingRecords, incomingRecords, nowMonotonic, todayJa
     const merged = {};
     const updated = {};
     const rejected = [];
-    const stores = ['habits', 'checkIns', 'journalEntries', 'settings'];
+    const stores = ['habits', 'checkIns', 'journalEntries', 'settings', 'activities'];
     for (const store of stores) {
       const exList = (existingRecords && existingRecords[store]) || [];
       const inList = (incomingRecords && incomingRecords[store]) || [];
@@ -406,6 +407,29 @@ function readAllSettings(sheet) {
   return list;
 }
 
+function readAllActivities(sheet) {
+  const data = sheet.getDataRange().getValues();
+  const list = [];
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (!row[0]) continue;
+    list.push({
+      id: String(row[0]),
+      title: String(row[1] || ''),
+      author: String(row[2] || ''),
+      type: String(row[3] || ''),
+      status: String(row[4] || ''),
+      totalPages: Number(row[5]) || 0,
+      summary: String(row[6] || ''),
+      archived: row[7] === 'TRUE' || row[7] === true,
+      createdAt: String(row[8] || ''),
+      updatedAt: String(row[9] || ''),
+      serverUpdatedAt: String(row[10] || '')
+    });
+  }
+  return list;
+}
+
 function readAllPushSubscriptions(sheet) {
   const data = sheet.getDataRange().getValues();
   const list = [];
@@ -586,16 +610,67 @@ function syncSettings(sheet, incomingSettings, nowMonotonic) {
   sheet.getRange(1, 1, data.length, headers.length).setNumberFormat('@');
 }
 
+function syncActivities(sheet, incomingActivities, nowMonotonic) {
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0] || SCHEMA.Activities;
+  const rowMap = new Map();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0]) rowMap.set(String(data[i][0]), i);
+  }
+
+  for (const act of incomingActivities) {
+    const id = String(act.id);
+    if (!id) continue;
+    const existingIndex = rowMap.get(id);
+
+    if (existingIndex !== undefined) {
+      const existingUpdatedAt = String(data[existingIndex][9] || '');
+      if (!existingUpdatedAt || (act.updatedAt && act.updatedAt > existingUpdatedAt)) {
+        data[existingIndex][1] = act.title !== undefined ? act.title : data[existingIndex][1];
+        data[existingIndex][2] = act.author !== undefined ? act.author : data[existingIndex][2];
+        data[existingIndex][3] = act.type !== undefined ? act.type : data[existingIndex][3];
+        data[existingIndex][4] = act.status !== undefined ? act.status : data[existingIndex][4];
+        data[existingIndex][5] = act.totalPages !== undefined ? act.totalPages : data[existingIndex][5];
+        data[existingIndex][6] = act.summary !== undefined ? act.summary : data[existingIndex][6];
+        data[existingIndex][7] = act.archived ? 'TRUE' : 'FALSE';
+        data[existingIndex][8] = act.createdAt !== undefined ? act.createdAt : data[existingIndex][8];
+        data[existingIndex][9] = act.updatedAt;
+        data[existingIndex][10] = nowMonotonic;
+      }
+    } else {
+      const newRow = [
+        id,
+        act.title || '',
+        act.author || '',
+        act.type || '',
+        act.status || '',
+        act.totalPages !== undefined ? act.totalPages : 0,
+        act.summary || '',
+        act.archived ? 'TRUE' : 'FALSE',
+        act.createdAt || '',
+        act.updatedAt || '',
+        nowMonotonic
+      ];
+      data.push(newRow);
+      rowMap.set(id, data.length - 1);
+    }
+  }
+  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
+  sheet.getRange(1, 1, data.length, headers.length).setNumberFormat('@');
+}
+
 function collectChanges(ss, since) {
   const habitsSheet = ss.getSheetByName('Habits');
   const checkInsSheet = ss.getSheetByName('Check_Ins');
   const journalSheet = ss.getSheetByName('Journal_Entries');
   const settingsSheet = ss.getSheetByName('Settings');
+  const activitiesSheet = ss.getSheetByName('Activities');
 
   const habits = habitsSheet ? readAllHabits(habitsSheet) : [];
   const checkIns = checkInsSheet ? readAllCheckIns(checkInsSheet) : [];
   const journalEntries = journalSheet ? readAllJournalEntries(journalSheet) : [];
   const settings = settingsSheet ? readAllSettings(settingsSheet) : [];
+  const activities = activitiesSheet ? readAllActivities(activitiesSheet) : [];
 
   const filterSince = (rec) => !since || (rec.serverUpdatedAt && rec.serverUpdatedAt > since);
 
@@ -603,10 +678,10 @@ function collectChanges(ss, since) {
     habits: habits.filter(filterSince),
     checkIns: checkIns.filter(filterSince),
     journalEntries: journalEntries.filter(filterSince),
-    settings: settings.filter(filterSince)
+    settings: settings.filter(filterSince),
+    activities: activities.filter(filterSince)
   };
 }
-
 // ==========================================
 // Push Subscription Helpers
 // ==========================================
@@ -962,17 +1037,19 @@ function doPost(e) {
         const incomingCheckIns = incoming.checkIns || [];
         const incomingJournal = incoming.journalEntries || [];
         const incomingSettings = incoming.settings || [];
+        const incomingActivities = incoming.activities || [];
 
         const habitsSheet = getOrCreateSheet(ss, 'Habits', SCHEMA.Habits);
         const checkInsSheet = getOrCreateSheet(ss, 'Check_Ins', SCHEMA.Check_Ins);
         const journalSheet = getOrCreateSheet(ss, 'Journal_Entries', SCHEMA.Journal_Entries);
         const settingsSheet = getOrCreateSheet(ss, 'Settings', SCHEMA.Settings);
+        const activitiesSheet = getOrCreateSheet(ss, 'Activities', SCHEMA.Activities);
 
         syncHabits(habitsSheet, incomingHabits, serverNow);
         syncCheckIns(checkInsSheet, incomingCheckIns, serverNow);
         const rejected = syncJournalEntries(journalSheet, incomingJournal, serverNow);
         syncSettings(settingsSheet, incomingSettings, serverNow);
-
+        syncActivities(activitiesSheet, incomingActivities, serverNow);
         const changes = collectChanges(ss, payload.since);
 
         return createJsonResponse({
@@ -1314,6 +1391,8 @@ if (typeof module !== 'undefined' && module.exports) {
     syncCheckIns,
     syncJournalEntries,
     syncSettings,
+    syncActivities,
+    readAllActivities,
     collectChanges,
     handleSubscribePush,
     handleUnsubscribePush,

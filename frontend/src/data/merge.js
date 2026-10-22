@@ -17,6 +17,10 @@ export const TYPE_CONFIG = Object.freeze({
     storeName: STORES.SETTINGS,
     getKey: (r) => r.key,
   },
+  activities: {
+    storeName: STORES.ACTIVITIES,
+    getKey: (r) => r.id,
+  },
 });
 
 /**
@@ -105,8 +109,8 @@ export async function applyIncomingChanges(db, { changes = {}, rejected = [] } =
     checkIns: new Set(),
     journalEntries: new Set(),
     settings: new Set(),
+    activities: new Set(),
   };
-
   for (const item of rejected) {
     if (item.reason === 'LOCKED' && lockedKeysByType[item.type]) {
       lockedKeysByType[item.type].add(item.key);
@@ -119,11 +123,11 @@ export async function applyIncomingChanges(db, { changes = {}, rejected = [] } =
       STORES.CHECK_INS,
       STORES.JOURNAL_ENTRIES,
       STORES.SETTINGS,
+      STORES.ACTIVITIES,
       STORES.OUTBOX,
     ],
     'readwrite'
   );
-
   let applied = 0;
   let locked = 0;
 

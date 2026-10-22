@@ -169,6 +169,7 @@ test.describe('Habbit App E2E', () => {
       const tabBox = await tabBtn.boundingBox();
       expect(tabBox).not.toBeNull();
       expect(tabBox.height).toBeGreaterThanOrEqual(44);
+      expect(tabBox.width).toBeGreaterThanOrEqual(44);
       expect(tabBox.y + tabBox.height).toBeLessThanOrEqual(expectedViewportHeight + 1);
     }
   }

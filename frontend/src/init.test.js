@@ -74,9 +74,10 @@ describe('PWA & mobile network exposure contract', () => {
   });
 
   it('disables automatic registerSW injection in VitePWA to consolidate single registration handler', async () => {
-    const viteConfig = (await import('../vite.config.js')).default;
-    const pwaPlugin = viteConfig.plugins?.find((p) => Array.isArray(p) ? p.some(x => x.name === 'vite-plugin-pwa') : p?.name === 'vite-plugin-pwa');
-    expect(viteConfig).toBeDefined();
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const viteSource = readFileSync(resolve(__dirname, '../vite.config.js'), 'utf8');
+    expect(viteSource).toMatch(/injectRegister:\s*null/);
   });
 });
 

@@ -16,6 +16,11 @@ import {
   getSetting,
   setSetting,
   onChange,
+  listActivities,
+  getActivity,
+  addActivity,
+  updateActivity,
+  setActivityArchived,
 } from './repo.js';
 import {
   getOutboxEntries,
@@ -211,6 +216,97 @@ describe('Data Layer - Local CRUD & Outbox Coalescing', () => {
     const settingEntry = outbox.find((o) => o.key === 'settings:reminderTime');
     expect(settingEntry).toBeDefined();
     expect(settingEntry.record.value).toBe('20:30');
+  });
+
+  it('performs activity CRUD and persists outbox mutations', async () => {
+    let notified = 0;
+    const unsub = onChange(() => {
+      notified++;
+    });
+
+    // 1. Add activity with Title, Author, Type, default Status, Total Pages, Summary
+    const act1 = await addActivity({
+      title: 'Designing Data-Intensive Applications',
+      author: 'Martin Kleppmann',
+      type: 'Book',
+      status: 'In Progress',
+      totalPages: 616,
+      summary: 'Deep dive into distributed systems reliability, scalability, and maintainability.',
+    });
+
+    expect(act1.id).toBeDefined();
+    expect(act1.title).toBe('Designing Data-Intensive Applications');
+    expect(act1.author).toBe('Martin Kleppmann');
+    expect(act1.type).toBe('Book');
+    expect(act1.status).toBe('In Progress');
+    expect(act1.totalPages).toBe(616);
+    expect(act1.summary).toBe('Deep dive into distributed systems reliability, scalability, and maintainability.');
+    expect(act1.archived).toBe(false);
+    expect(act1.createdAt).toBeDefined();
+    expect(act1.updatedAt).toBeDefined();
+    expect(notified).toBe(1);
+
+    // Verify stored in IndexedDB
+    const fetched = await getActivity(act1.id);
+    expect(fetched).toEqual(act1);
+
+    // Verify in outbox
+    let outbox = await getOutboxEntries();
+    const actOutbox = outbox.find((o) => o.key === `activities:${act1.id}`);
+    expect(actOutbox).toBeDefined();
+    expect(actOutbox.type).toBe('activities');
+    expect(actOutbox.record.title).toBe('Designing Data-Intensive Applications');
+
+    // 2. Add another activity with default status ('Backlog')
+    const act2 = await addActivity({
+      title: 'Building Microservices',
+      author: 'Sam Newman',
+      type: 'Book',
+      totalPages: 300,
+    });
+    expect(act2.status).toBe('Backlog');
+    expect(act2.summary).toBe('');
+
+    // 3. List activities and test status filtering
+    const allActive = await listActivities();
+    expect(allActive.length).toBe(2);
+
+    const inProgressList = await listActivities({ status: 'In Progress' });
+    expect(inProgressList.length).toBe(1);
+    expect(inProgressList[0].id).toBe(act1.id);
+
+    const backlogList = await listActivities({ status: 'Backlog' });
+    expect(backlogList.length).toBe(1);
+    expect(backlogList[0].id).toBe(act2.id);
+
+    // 4. Update activity
+    const updated = await updateActivity(act1.id, {
+      status: 'Completed',
+      summary: 'Finished reading all 12 chapters.',
+    });
+    expect(updated.status).toBe('Completed');
+    expect(updated.summary).toBe('Finished reading all 12 chapters.');
+    expect(updated.title).toBe('Designing Data-Intensive Applications');
+
+    // Outbox should coalesce
+    outbox = await getOutboxEntries();
+    const act1OutboxAfter = outbox.find((o) => o.key === `activities:${act1.id}`);
+    expect(act1OutboxAfter.record.status).toBe('Completed');
+
+    // 5. Archive activity
+    await setActivityArchived(act1.id, true);
+    const activeOnly = await listActivities();
+    expect(activeOnly.map((a) => a.id)).toEqual([act2.id]);
+
+    const withArchived = await listActivities({ includeArchived: true });
+    expect(withArchived.length).toBe(2);
+
+    // Unarchive
+    await setActivityArchived(act1.id, false);
+    const restored = await listActivities();
+    expect(restored.length).toBe(2);
+
+    unsub();
   });
 });
 
@@ -495,6 +591,67 @@ describe('Data Layer - API & Sync Flow', () => {
     const db = await getDb();
     const cursorRecord = await db.get(STORES.META, 'cursor');
     expect(cursorRecord.value).toBe(serverNow);
+  });
+
+  it('serializes activities in outbox to changes.activities during syncNow and applies incoming', async () => {
+    const act = await addActivity({
+      title: 'Refactoring',
+      author: 'Martin Fowler',
+      type: 'Book',
+      status: 'In Progress',
+      totalPages: 448,
+      summary: 'Improving the design of existing code.',
+    });
+    expect(await countOutbox()).toBe(1);
+
+    let sentBody = null;
+    const serverNow = '2026-10-20T14:00:00Z';
+    globalThis.fetch = vi.fn().mockImplementation(async (url, init) => {
+      sentBody = JSON.parse(init.body);
+      return {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          cursor: serverNow,
+          changes: {
+            habits: [],
+            checkIns: [],
+            journalEntries: [],
+            settings: [],
+            activities: [
+              {
+                id: 'act-server-1',
+                title: 'Clean Architecture',
+                author: 'Robert C. Martin',
+                type: 'Book',
+                status: 'Backlog',
+                totalPages: 350,
+                summary: 'Software structure and design.',
+                archived: false,
+                createdAt: '2026-10-20T10:00:00Z',
+                updatedAt: '2026-10-20T10:00:00Z',
+              },
+            ],
+          },
+          rejected: [],
+        }),
+      };
+    });
+
+    await syncNow();
+
+    // Verify outbox sent changes.activities
+    expect(sentBody.changes.activities).toBeDefined();
+    expect(sentBody.changes.activities.length).toBe(1);
+    expect(sentBody.changes.activities[0].title).toBe('Refactoring');
+
+    // Outbox should be cleared
+    expect(await countOutbox()).toBe(0);
+
+    // Incoming activity should be stored in IndexedDB
+    const incomingAct = await getActivity('act-server-1');
+    expect(incomingAct).toBeDefined();
+    expect(incomingAct.title).toBe('Clean Architecture');
   });
 
   it('handles offline state during syncNow', async () => {

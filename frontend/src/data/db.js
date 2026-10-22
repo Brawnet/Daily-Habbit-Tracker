@@ -2,7 +2,7 @@ import { openDB } from 'idb';
 import { STORES } from '../shared/contracts.js';
 
 export const DB_NAME = 'habbit';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 let dbPromise = null;
 
@@ -31,6 +31,9 @@ export function getDb() {
         }
         if (!db.objectStoreNames.contains(STORES.META)) {
           db.createObjectStore(STORES.META, { keyPath: 'key' });
+        }
+        if (!db.objectStoreNames.contains(STORES.ACTIVITIES)) {
+          db.createObjectStore(STORES.ACTIVITIES, { keyPath: 'id' });
         }
       },
     });

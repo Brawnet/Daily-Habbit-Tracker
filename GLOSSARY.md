@@ -36,6 +36,12 @@ _Avoid_: Note, post, diary entry, Entri Jurnal
 Salinan rapi berbentuk dokumen dari Journal Entry yang hanya untuk dibaca manusia, bukan sumber data aplikasi.
 _Avoid_: Main journal, journal database, Buku Harian
 
+### Aktivitas
+
+**Activity**:
+Aktivitas pembelajaran atau bacaan terstruktur (buku, kursus, artikel) yang memiliki status penyelesaian, total halaman, dan ringkasan; berdiri sendiri dan bukan pengganti Habit harian.
+_Avoid_: Task, Item, materi, reading item
+
 ### Pemakaian
 
 **Device**:

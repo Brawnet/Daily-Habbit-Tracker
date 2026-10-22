@@ -379,3 +379,134 @@ export async function setSetting(key, value) {
 
   await commitSingleMutation(STORES.SETTINGS, record, 'settings', key);
 }
+
+/**
+ * Lists activities with optional status filtering and archived inclusion.
+ *
+ * @param {{ includeArchived?: boolean, status?: string }} [options]
+ * @returns {Promise<Array<import('../shared/contracts.js').Activity>>}
+ */
+export async function listActivities({ includeArchived = false, status } = {}) {
+  const db = await getDb();
+  let activities = await db.getAll(STORES.ACTIVITIES);
+
+  if (!includeArchived) {
+    activities = activities.filter((a) => !a.archived);
+  }
+  if (status && status !== 'All') {
+    activities = activities.filter((a) => a.status === status);
+  }
+
+  return activities.sort((a, b) => {
+    const aTime = a.createdAt || a.updatedAt || '';
+    const bTime = b.createdAt || b.updatedAt || '';
+    return bTime.localeCompare(aTime);
+  });
+}
+
+/**
+ * Gets a single activity by id.
+ *
+ * @param {string} id
+ * @returns {Promise<import('../shared/contracts.js').Activity | null>}
+ */
+export async function getActivity(id) {
+  if (!id) return null;
+  const db = await getDb();
+  const record = await db.get(STORES.ACTIVITIES, id);
+  return record || null;
+}
+
+/**
+ * Creates and commits a new activity record.
+ *
+ * @param {{ title: string, author?: string, type?: string, status?: string, totalPages?: number, summary?: string }} params
+ * @returns {Promise<import('../shared/contracts.js').Activity>}
+ */
+export async function addActivity({
+  title,
+  author = '',
+  type = 'Book',
+  status = 'Backlog',
+  totalPages = 0,
+  summary = '',
+}) {
+  const trimmedTitle = (title || '').trim();
+  if (!trimmedTitle) {
+    throw new Error('Activity title cannot be empty');
+  }
+
+  const id =
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : 'act-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
+
+  const now = new Date().toISOString();
+  /** @type {import('../shared/contracts.js').Activity} */
+  const record = {
+    id,
+    title: trimmedTitle,
+    author: (author || '').trim(),
+    type: (type || 'Book').trim(),
+    status: (status || 'Backlog').trim(),
+    totalPages: Math.max(0, parseInt(totalPages, 10) || 0),
+    summary: (summary || '').trim(),
+    archived: false,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await commitSingleMutation(STORES.ACTIVITIES, record, 'activities', id);
+  return record;
+}
+
+/**
+ * Updates an existing activity.
+ *
+ * @param {string} id
+ * @param {Partial<import('../shared/contracts.js').Activity>} updates
+ * @returns {Promise<import('../shared/contracts.js').Activity>}
+ */
+export async function updateActivity(id, updates = {}) {
+  const db = await getDb();
+  const existing = await db.get(STORES.ACTIVITIES, id);
+  if (!existing) {
+    throw new Error(`Activity not found: ${id}`);
+  }
+
+  const now = new Date().toISOString();
+  const updated = {
+    ...existing,
+    ...updates,
+    id,
+    title: updates.title !== undefined ? String(updates.title).trim() : existing.title,
+    author: updates.author !== undefined ? String(updates.author).trim() : existing.author,
+    type: updates.type !== undefined ? String(updates.type).trim() : existing.type,
+    status: updates.status !== undefined ? String(updates.status).trim() : existing.status,
+    totalPages:
+      updates.totalPages !== undefined
+        ? Math.max(0, parseInt(updates.totalPages, 10) || 0)
+        : existing.totalPages,
+    summary: updates.summary !== undefined ? String(updates.summary).trim() : existing.summary,
+    archived: updates.archived !== undefined ? Boolean(updates.archived) : existing.archived,
+    updatedAt: now,
+  };
+
+  if (!updated.title) {
+    throw new Error('Activity title cannot be empty');
+  }
+
+  await commitSingleMutation(STORES.ACTIVITIES, updated, 'activities', id);
+  return updated;
+}
+
+/**
+ * Sets archived status for an activity.
+ *
+ * @param {string} id
+ * @param {boolean} [archived=true]
+ * @returns {Promise<import('../shared/contracts.js').Activity>}
+ */
+export async function setActivityArchived(id, archived = true) {
+  return updateActivity(id, { archived: Boolean(archived) });
+}

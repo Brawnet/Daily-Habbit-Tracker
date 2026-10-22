@@ -5,6 +5,7 @@
  * @typedef {{ id: string, habitId: string, day: string, deleted: boolean, updatedAt: string }} CheckIn
  * @typedef {{ day: string, content: string, updatedAt: string, printedToDiaryAt: string }} JournalEntry
  * @typedef {{ key: 'reminderTime', value: string, updatedAt: string }} Setting
+ * @typedef {{ id: string, title: string, author: string, type: string, status: 'Backlog' | 'In Progress' | 'Completed' | string, totalPages: number, summary: string, archived: boolean, createdAt: string, updatedAt: string }} Activity
  * @typedef {{ state: 'not-configured' | 'idle' | 'syncing' | 'offline' | 'error', pending: number, lastSyncedAt: string | null, error: string | null }} SyncStatus
  */
 
@@ -31,6 +32,7 @@ export const STORES = Object.freeze({
   SETTINGS: 'settings',
   OUTBOX: 'outbox',
   META: 'meta',
+  ACTIVITIES: 'activities',
 });
 
 export class ApiError extends Error {

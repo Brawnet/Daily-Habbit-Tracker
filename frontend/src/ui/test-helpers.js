@@ -76,7 +76,11 @@ export class MockElement {
   }
 
   get textContent() {
-    return this._textContent;
+    if (this._textContent) return this._textContent;
+    if (this.children.length > 0) {
+      return this.children.map((c) => c.textContent).join(' ');
+    }
+    return '';
   }
   set textContent(val) {
     this._textContent = String(val ?? '');
@@ -167,6 +171,17 @@ export class MockElement {
   }
 
   querySelectorAll(selector) {
+    if (selector.includes(',')) {
+      const parts = selector.split(',').map((s) => s.trim());
+      const set = new Set();
+      for (const p of parts) {
+        for (const el of this.querySelectorAll(p)) {
+          set.add(el);
+        }
+      }
+      return Array.from(set);
+    }
+
     const results = [];
     const check = (el) => {
       let match = true;
@@ -179,10 +194,15 @@ export class MockElement {
       } else if (selector.includes('[data-action=')) {
         const action = selector.match(/\[data-action="?([^"\]]+)"?\]/)?.[1];
         if (el.dataset.action !== action) match = false;
+      } else if (selector.includes('[data-id=')) {
+        const id = selector.match(/\[data-id="?([^"\]]+)"?\]/)?.[1];
+        if (el.dataset.id !== id && el.getAttribute('data-id') !== id) match = false;
       } else if (selector.includes('[data-starter-chip]')) {
         if (!('starterChip' in el.dataset)) match = false;
       } else if (selector.includes('[data-tab]')) {
         if (!('tab' in el.dataset)) match = false;
+      } else if (/^[a-zA-Z0-9_-]+$/.test(selector)) {
+        if (el.tagName.toLowerCase() !== selector.toLowerCase()) match = false;
       }
       if (match && el !== this) results.push(el);
 

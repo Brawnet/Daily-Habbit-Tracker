@@ -15,8 +15,13 @@ test.describe('Habbit App E2E', () => {
     await page.reload();
   });
 
-  test('bottom navigation switches between Today, History, and Settings tabs', async ({ page }) => {
+  test('bottom navigation switches between Today, History, Activities, and Settings tabs', async ({ page }) => {
     await expect(page.locator('#today-date')).toBeVisible();
+
+    // Navigate to Activities
+    await page.click('button[data-tab="activities"]');
+    await expect(page).toHaveURL(/tab=activities/);
+    await expect(page.locator('#activities-empty-state')).toBeVisible();
 
     // Navigate to Settings
     await page.click('button[data-tab="settings"]');
@@ -31,6 +36,37 @@ test.describe('Habbit App E2E', () => {
     await page.click('button[data-tab="today"]');
     await expect(page).toHaveURL(/tab=today/);
     await expect(page.locator('#today-date')).toBeVisible();
+  });
+
+  test('creates an activity, edits it, and persists across reload', async ({ page }) => {
+    // Navigate to Activities tab
+    await page.click('button[data-tab="activities"]');
+    await expect(page).toHaveURL(/tab=activities/);
+    await expect(page.locator('#activities-empty-state')).toBeVisible();
+
+    // Click + New Activity
+    await page.click('#btn-new-activity');
+    await expect(page.locator('#activity-modal')).toBeVisible();
+
+    // Fill activity form
+    await page.fill('#activity-input-title', 'Designing Data-Intensive Applications');
+    await page.fill('#activity-input-author', 'Martin Kleppmann');
+    await page.selectOption('#activity-input-type', 'Book');
+    await page.selectOption('#activity-input-status', 'In Progress');
+    await page.fill('#activity-input-pages', '616');
+    await page.fill('#activity-input-summary', 'Reliability, scalability, and maintainability.');
+    await page.click('#activity-btn-save');
+
+    // Verify modal closes and activity card is rendered
+    await expect(page.locator('#activity-modal')).not.toBeVisible();
+    const card = page.locator('.activity-card', { hasText: 'Designing Data-Intensive Applications' });
+    await expect(card).toBeVisible();
+    await expect(card).toContainText('Martin Kleppmann');
+    await expect(card).toContainText('In Progress');
+
+    // Reload page to test offline IndexedDB persistence
+    await page.reload();
+    await expect(page.locator('.activity-card', { hasText: 'Designing Data-Intensive Applications' })).toBeVisible();
   });
 
   test('creates a habit, completes check-in, and persists across page reload', async ({ page }) => {

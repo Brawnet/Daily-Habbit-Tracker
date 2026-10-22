@@ -120,6 +120,7 @@ async function runSync({ throwOnError = false } = {}) {
     checkIns: [],
     journalEntries: [],
     settings: [],
+    activities: [],
   };
   const sentItems = [];
   for (const entry of outboxEntries) {

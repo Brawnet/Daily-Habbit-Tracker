@@ -6,6 +6,7 @@ describe('Contracts initialization', () => {
     expect(ACTIONS.PING).toBe('ping');
     expect(ERRORS.LOCKED).toBe('LOCKED');
     expect(STORES.HABITS).toBe('habits');
+    expect(STORES.ACTIVITIES).toBe('activities');
   });
 });
 

@@ -38,9 +38,11 @@ function getFilterPillClass(isActive) {
 export function mount(rootEl) {
   if (!rootEl) return () => {};
 
+  let isMounted = true;
+  let renderToken = 0;
+  let isSubmitting = false;
   let activeFilter = 'All'; // 'All' | 'Backlog' | 'In Progress' | 'Completed' | 'Archived'
   let editingActivityId = null;
-
   rootEl.innerHTML = '';
 
   // Main container
@@ -130,8 +132,7 @@ export function mount(rootEl) {
 
   // --- Functions ---
   async function renderActivitiesList() {
-    listContainer.innerHTML = '';
-
+    const token = ++renderToken;
     const isArchivedView = activeFilter === 'Archived';
     let activities = [];
     try {
@@ -148,6 +149,10 @@ export function mount(rootEl) {
       console.error('Error listing activities:', err);
       activities = [];
     }
+
+    if (!isMounted || token !== renderToken) return;
+
+    listContainer.innerHTML = '';
 
     if (activities.length === 0) {
       // Empty state
@@ -525,6 +530,8 @@ export function mount(rootEl) {
   }
 
   async function saveActivityFromModal() {
+    if (isSubmitting) return;
+
     const titleInput = rootEl.querySelector('#activity-input-title');
     const authorInput = rootEl.querySelector('#activity-input-author');
     const typeSelect = rootEl.querySelector('#activity-input-type');
@@ -546,6 +553,7 @@ export function mount(rootEl) {
       showToast(err.message || 'Please enter an activity title');
       return;
     }
+    isSubmitting = true;
     try {
       if (editingActivityId) {
         await updateActivity(editingActivityId, payload);
@@ -559,6 +567,8 @@ export function mount(rootEl) {
     } catch (err) {
       console.error('Error saving activity:', err);
       showToast(err.message || 'Failed to save activity');
+    } finally {
+      isSubmitting = false;
     }
   }
 
@@ -571,6 +581,7 @@ export function mount(rootEl) {
   renderActivitiesList();
 
   return () => {
+    isMounted = false;
     unsubscribeRepo();
     modalWrapper.innerHTML = '';
   };

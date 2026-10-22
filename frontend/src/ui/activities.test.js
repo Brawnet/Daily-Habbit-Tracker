@@ -159,6 +159,29 @@ describe('ui/activities.js UI view', () => {
 
     expect(shellModule.showToast).toHaveBeenCalledWith('Activity created');
 
+    const cards = root.querySelectorAll('.activity-card');
+    expect(cards.length).toBe(1);
+    expect(cards[0].textContent).toContain('Designing Data-Intensive Applications');
+
+    cleanup();
+  });
+
+  it('prevents duplicate card rendering on concurrent renders and repo change notifications', async () => {
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 10));
+
+    await repoModule.addActivity({
+      title: 'Race Condition Test Book',
+      type: 'Book',
+      status: 'In Progress',
+    });
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    const cards = root.querySelectorAll('.activity-card');
+    expect(cards.length).toBe(1);
+    expect(cards[0].textContent).toContain('Race Condition Test Book');
     cleanup();
   });
 

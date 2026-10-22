@@ -5,6 +5,7 @@
 
 import { getSyncStatus, onSyncStatus, syncNow } from '../data/sync.js';
 import { today, msUntilNextDay } from '../domain/day.js';
+import { computeAppHeight } from '../domain/viewport.js';
 
 /**
  * @typedef {{ title: string, icon: string, mount: (el: HTMLElement) => (() => void) | void }} TabDescriptor
@@ -26,6 +27,104 @@ let syncDotElement = null;
 let syncTextElement = null;
 let syncBadgeElement = null;
 let syncButtonElement = null;
+
+let appHeightListenersAttached = false;
+
+function readSafeTop() {
+  try {
+    if (typeof document === 'undefined' || !document.body || !document.createElement) return 0;
+    let probe = document.getElementById('safe-area-probe');
+    if (!probe) {
+      probe = document.createElement('div');
+      probe.id = 'safe-area-probe';
+      probe.style.cssText =
+        'position:fixed;top:0;left:-9999px;height:0;width:0;padding-top:env(safe-area-inset-top,0px);pointer-events:none;visibility:hidden;';
+      document.body.appendChild(probe);
+    }
+    if (typeof window !== 'undefined' && window.getComputedStyle) {
+      const cs = window.getComputedStyle(probe);
+      return parseFloat(cs?.paddingTop) || 0;
+    }
+  } catch {}
+  return 0;
+}
+
+/**
+ * Dynamically synchronizes --app-height based on standalone mode, orientation,
+ * and safe area insets to guarantee the entire viewport (including bottom-nav) fits.
+ */
+export function syncAppHeight() {
+  try {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+    const isStandalone =
+      (typeof navigator !== 'undefined' && navigator.standalone === true) ||
+      (typeof window !== 'undefined' &&
+        window.matchMedia &&
+        window.matchMedia('(display-mode: standalone)').matches);
+
+    if (!isStandalone) {
+      return;
+    }
+
+    const winH = window.innerHeight || 0;
+    const winW = window.innerWidth || 0;
+    const vvH = window.visualViewport ? window.visualViewport.height : winH;
+    const screenH = (window.screen && window.screen.height) || winH;
+    const safeTop = readSafeTop();
+    const isPortrait = winH >= winW;
+
+    const appHeight = computeAppHeight({
+      innerHeight: winH,
+      visualViewportHeight: vvH,
+      screenHeight: screenH,
+      safeTop,
+      isStandalone: true,
+      isPortrait,
+    });
+
+    if (appHeight && document.documentElement && document.documentElement.style) {
+      document.documentElement.style.setProperty('--app-height', appHeight);
+    }
+  } catch {}
+}
+
+function attachAppHeightListeners() {
+  if (appHeightListenersAttached) return;
+  appHeightListenersAttached = true;
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', syncAppHeight, { passive: true });
+    window.addEventListener(
+      'orientationchange',
+      () => {
+        syncAppHeight();
+        setTimeout(syncAppHeight, 150);
+        setTimeout(syncAppHeight, 500);
+      },
+      { passive: true }
+    );
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', syncAppHeight, { passive: true });
+    }
+  }
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') syncAppHeight();
+    });
+    document.addEventListener(
+      'focusout',
+      (e) => {
+        const tag = e.target?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA') {
+          setTimeout(syncAppHeight, 300);
+        }
+      },
+      { passive: true }
+    );
+  }
+}
 
 function getCurrentDayString() {
   try {
@@ -333,15 +432,12 @@ export function mountShell(rootEl) {
   rootElement = rootEl;
   rootEl.innerHTML = '';
 
-  if (
-    typeof navigator !== 'undefined' &&
-    (navigator.standalone ||
-      (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(display-mode: standalone)').matches))
-  ) {
-    try {
-      document.documentElement.style.setProperty('--app-height', '100vh');
-    } catch {}
-  }
+  // Initial and reactive standalone viewport height synchronization
+  syncAppHeight();
+  attachAppHeightListeners();
+  [50, 150, 500, 1200].forEach((delay) => {
+    setTimeout(syncAppHeight, delay);
+  });
 
   const shellLayout = document.createElement('div');
   shellLayout.className = 'shell-layout flex flex-col bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 antialiased select-none';

@@ -4,7 +4,7 @@ Pada aplikasi iOS Home Screen PWA (`display-mode: standalone`) dengan meta tag `
 
 Karena itu, root dan shell layout (`html, body, #app, .shell-layout`) tetap dipertahankan dalam **normal document flow** menggunakan custom property `--app-height`:
 1. Di mode browser (Safari tab), `--app-height` bernilai `100dvh` (menyesuaikan dinamis dengan bilah URL Safari).
-2. Di mode standalone PWA, `--app-height` di-override menjadi `100vh` (baik via script inline bootstrap di `index.html` berbasis `navigator.standalone` maupun via `@media (display-mode: standalone)`). Di iOS WebKit standalone, `100vh` merepresentasikan tinggi fisik layar penuh secara tepat (896pt pada iPhone 11) tanpa pemotongan status bar.
+2. Di mode standalone PWA, `--app-height` di-bootstrap awal menjadi `100vh` (baik via script inline bootstrap di `index.html` berbasis `navigator.standalone` maupun via `@media (display-mode: standalone)`). Selain bootstrap awal tersebut, runtime JavaScript (`shell.js` via `computeAppHeight()`) melakukan sinkronisasi dinamis ukuran piksel aktual (`${screenH}px`) dengan penjadwalan berulang (0ms, 50ms, 150ms, 500ms, 1200ms) untuk mengantisipasi fase transisi/settling WebKit iOS saat cold launch (di mana `window.innerHeight` sempat bernilai 848pt pada 0-50ms sebelum meluas ke 896pt penuh pada ~80ms), serta secara reaktif saat `resize`, `orientationchange`, `visibilitychange`, dan `focusout`.
 
 ```css
 :root {

@@ -5,7 +5,7 @@ Engineering conventions and review guidelines for the Habbit codebase.
 ## 1. PWA & Mobile CSS Rules
 
 - **Full-Screen Shell & Viewport Height Strategy**: Use CSS custom property `--app-height: 100dvh` in normal document flow (`html, body, #app, .shell-layout`).
-  - *iOS Standalone Resolution*: On iOS Safari, `100dvh` in standalone mode incorrectly subtracts the status bar (e.g. 848pt vs 896pt on iPhone 11), creating a ~48pt dark strip below `#bottom-nav`. Do NOT use `position: fixed` on the root shell (which creates an 848pt clipping box on WebKit). Instead, maintain normal document flow and override `--app-height: 100vh` in standalone mode via the inline `navigator.standalone` bootstrap in `index.html` and `@media (display-mode: standalone)` in CSS. In standalone mode on iOS, `100vh` equals the exact physical screen height (896pt) without status bar subtraction.
+  - *iOS Standalone Resolution*: On iOS Safari, `100dvh` in standalone mode incorrectly subtracts the status bar (e.g. 848pt vs 896pt on iPhone 11), creating a ~48pt dark strip below `#bottom-nav`. Do NOT use `position: fixed` on the root shell (which creates an 848pt clipping box on WebKit). Instead, maintain normal document flow and override `--app-height: 100vh` in standalone mode via the inline `navigator.standalone` bootstrap in `index.html` and `@media (display-mode: standalone)` in CSS. Additionally, runtime JavaScript synchronizes `--app-height` in exact pixels via `computeAppHeight()` with staggered settling intervals (0ms, 50ms, 150ms, 500ms, 1200ms) to compensate for WebKit cold-launch settling delays, plus reactive triggers on `resize`, `orientationchange`, `visibilitychange`, and input `focusout`.
   ```css
   :root {
     --app-height: 100dvh;

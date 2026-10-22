@@ -117,4 +117,35 @@ test.describe('Habbit App E2E', () => {
     // Confirmation toast appears
     await expect(page.locator('text=Credentials saved')).toBeVisible();
   });
+
+  test('verifies bottom navigation bar visibility and bounds on iPhone viewports', async ({ page }) => {
+    const viewports = [
+      { name: 'iPhone 11 / XR', width: 414, height: 896 },
+      { name: 'iPhone 15 Pro', width: 393, height: 852 },
+    ];
+
+    for (const vp of viewports) {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await page.waitForTimeout(200);
+
+      const bottomNav = page.locator('#bottom-nav');
+      await expect(bottomNav).toBeVisible();
+
+      const navBox = await bottomNav.boundingBox();
+      expect(navBox).not.toBeNull();
+      // Navigation bar must sit at the bottom edge within viewport bounds
+      expect(navBox.y + navBox.height).toBeLessThanOrEqual(vp.height + 1);
+      expect(navBox.y).toBeGreaterThan(vp.height - 120);
+
+      // All 3 navigation tabs must be visible, clickable, and meet touch target sizes
+      for (const tabName of ['today', 'history', 'settings']) {
+        const tabBtn = page.locator(`button[data-tab="${tabName}"]`);
+        await expect(tabBtn).toBeVisible();
+        const tabBox = await tabBtn.boundingBox();
+        expect(tabBox).not.toBeNull();
+        expect(tabBox.height).toBeGreaterThanOrEqual(44);
+        expect(tabBox.y + tabBox.height).toBeLessThanOrEqual(vp.height + 1);
+      }
+    }
+  });
 });

@@ -21,7 +21,7 @@ import {
 } from '../data/repo.js';
 import { today } from '../domain/day.js';
 import { showToast } from './shell.js';
-
+import { isBlank, htmlToText, htmlToMarkdownText } from '../domain/text.js';
 export const JOURNALING_LOGO_SVG = `
 <svg class="w-full h-full" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
   <defs>
@@ -944,7 +944,7 @@ export function mount(rootEl) {
       saveChBtn.addEventListener('click', async () => {
         const title = (titleInput.value || newChapterTitle || '').trim() || `Chapter ${chapters.length + 1}`;
         const content = contentEditor.innerHTML || contentEditor.textContent || newChapterContent || '';
-        if (!content.replace(/<[^>]*>/g, ' ').trim()) {
+        if (isBlank(content)) {
           showToast('Please enter chapter notes before saving');
           return;
         }
@@ -953,7 +953,7 @@ export function mount(rootEl) {
           const created = await saveBookChapter({
             bookId: book.id,
             title,
-            content,
+            content: htmlToMarkdownText(content),
           });
           selectedChapterId = created.id;
           newChapterTitle = '';
@@ -982,7 +982,7 @@ export function mount(rootEl) {
             id: currentChapter.id,
             bookId: currentChapter.bookId,
             title: currentChapter.title,
-            content: currentChapter.content,
+            content: htmlToMarkdownText(currentChapter.content),
           });
           showToast('Chapter updated');
           statusSpan.textContent = 'Saved';
@@ -1026,13 +1026,12 @@ export function mount(rootEl) {
         currentChapter.content = html;
         scheduleChapterAutosave();
       }
-      const textOnly = html.replace(/<[^>]*>/g, ' ').trim();
+      const textOnly = htmlToText(html);
       wordCountEl.textContent = `${textOnly ? textOnly.split(/\s+/).filter(Boolean).length : 0} words`;
     });
 
-    const initText = contentValue.replace(/<[^>]*>/g, ' ').trim();
+    const initText = htmlToText(contentValue);
     wordCountEl.textContent = `${initText ? initText.split(/\s+/).filter(Boolean).length : 0} words`;
-
     bulletBtn.addEventListener('click', (e) => {
       e.preventDefault();
       insertBullet();
@@ -1052,7 +1051,7 @@ export function mount(rootEl) {
             id: currentChapter.id,
             bookId: currentChapter.bookId,
             title: currentChapter.title,
-            content: currentChapter.content,
+            content: htmlToMarkdownText(currentChapter.content),
           });
           statusSpan.textContent = 'Saved';
         } catch {
@@ -1115,7 +1114,7 @@ export function mount(rootEl) {
       'flex flex-col gap-6 p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm leading-relaxed';
 
     const totalWords = chapters.reduce((acc, c) => {
-      const clean = (c.content || '').replace(/<[^>]*>/g, ' ').trim();
+      const clean = htmlToText(c.content);
       return acc + (clean ? clean.split(/\s+/).filter(Boolean).length : 0);
     }, 0);
 
@@ -1300,14 +1299,14 @@ export function mount(rootEl) {
       journalDraft,
       (html) => {
         journalDraft = html;
-        const textOnly = html.replace(/<[^>]*>/g, ' ').trim();
+        const textOnly = htmlToText(html);
         jWordCount.textContent = `${textOnly ? textOnly.split(/\s+/).filter(Boolean).length : 0} words`;
 
         statusBadge.textContent = 'Saving...';
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(async () => {
           try {
-            await saveJournalEntry(today(), journalDraft);
+            await saveJournalEntry(today(), htmlToMarkdownText(journalDraft));
             statusBadge.textContent = 'Saved';
           } catch {
             statusBadge.textContent = 'Error';
@@ -1316,9 +1315,8 @@ export function mount(rootEl) {
       }
     );
 
-    const initWords = journalDraft.replace(/<[^>]*>/g, ' ').trim();
+    const initWords = htmlToText(journalDraft);
     jWordCount.textContent = `${initWords ? initWords.split(/\s+/).filter(Boolean).length : 0} words`;
-
     bulletBtn.addEventListener('click', (e) => {
       e.preventDefault();
       jBullet();
@@ -1423,6 +1421,14 @@ function attachRichListEditor(editorEl, initialContent, onUpdate) {
 
   editorEl.addEventListener('input', () => {
     onUpdate(editorEl.innerHTML);
+  });
+
+  editorEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      setTimeout(() => {
+        onUpdate(editorEl.innerHTML);
+      }, 0);
+    }
   });
 
   return { insertBullet, insertNumber };

@@ -13,6 +13,7 @@ import {
 import { currentStreak, longestStreak } from './streak.js';
 import { completionRate, heatmapWeeks } from './stats.js';
 import { searchEntries } from './search.js';
+import { isBlank, htmlToText, htmlToMarkdownText } from './text.js';
 
 describe('domain/day', () => {
   describe('toDay and today', () => {
@@ -481,5 +482,56 @@ describe('domain/search', () => {
     expect(searchEntries([], 'test')).toEqual([]);
     expect(searchEntries(null, 'test')).toEqual([]);
     expect(searchEntries(undefined, 'test')).toEqual([]);
+  });
+});
+
+describe('domain/text', () => {
+  describe('isBlank', () => {
+    it('returns true for null, undefined, empty string, or whitespace', () => {
+      expect(isBlank(null)).toBe(true);
+      expect(isBlank(undefined)).toBe(true);
+      expect(isBlank('')).toBe(true);
+      expect(isBlank('   ')).toBe(true);
+    });
+
+    it('returns true for empty HTML tags without visible text', () => {
+      expect(isBlank('<p></p>')).toBe(true);
+      expect(isBlank('<p><br></p>')).toBe(true);
+      expect(isBlank('<ul><li>  </li></ul>')).toBe(true);
+    });
+
+    it('returns false when visible text exists', () => {
+      expect(isBlank('Hello')).toBe(false);
+      expect(isBlank('<p>Hello</p>')).toBe(false);
+      expect(isBlank('<ul><li>Item</li></ul>')).toBe(false);
+    });
+  });
+
+  describe('htmlToText', () => {
+    it('strips HTML tags and normalizes whitespace', () => {
+      expect(htmlToText('<p>Hello   world</p>')).toBe('Hello world');
+      expect(htmlToText('Line 1<br/>Line 2')).toBe('Line 1\nLine 2');
+    });
+  });
+
+  describe('htmlToMarkdownText', () => {
+    it('converts unordered lists to bullet points', () => {
+      const html = '<ul><li>First item</li><li>Second item</li></ul>';
+      expect(htmlToMarkdownText(html)).toBe('• First item\n• Second item');
+    });
+
+    it('converts ordered lists to numbered items', () => {
+      const html = '<ol><li>Step one</li><li>Step two</li></ol>';
+      expect(htmlToMarkdownText(html)).toBe('1. Step one\n2. Step two');
+    });
+
+    it('handles paragraphs with blank line separation', () => {
+      const html = '<p>Intro paragraph</p><p>Second paragraph</p>';
+      expect(htmlToMarkdownText(html)).toBe('Intro paragraph\n\nSecond paragraph');
+    });
+
+    it('preserves clean plain text', () => {
+      expect(htmlToMarkdownText('Just plain text')).toBe('Just plain text');
+    });
   });
 });

@@ -1,7 +1,8 @@
 import { getDb } from './db.js';
-import { STORES, ACTIVITY_STATUS } from '../shared/contracts.js';
+import { STORES, ACTIVITY_STATUS, LINKED_ACTIVITIES } from '../shared/contracts.js';
 import { scheduleSync } from './sync.js';
 import { isCheckInEditable, isJournalEditable, today } from '../domain/day.js';
+import { isBlank } from '../domain/text.js';
 
 const changeListeners = new Set();
 
@@ -53,6 +54,18 @@ async function commitSingleMutation(storeName, record, outboxType, recordKey) {
   await tx.done;
   notifyChange();
   scheduleSync(3000);
+}
+
+/**
+ * Atomically commits a local-only record mutation to its target store without queuing to outbox.
+ *
+ * @param {string} storeName
+ * @param {any} record
+ */
+async function commitLocalMutation(storeName, record) {
+  const db = await getDb();
+  await db.put(storeName, record);
+  notifyChange();
 }
 
 /**
@@ -136,7 +149,7 @@ export async function addHabit(name, { linkedActivity = null } = {}) {
  * @param {string} name
  * @returns {Promise<import('../shared/contracts.js').Habit>}
  */
-export async function renameHabit(id, name) {
+export async function renameHabit(id, name, linkedActivity) {
   const trimmed = (name || '').trim();
   if (!trimmed) {
     throw new Error('Habit name cannot be empty');
@@ -155,6 +168,9 @@ export async function renameHabit(id, name) {
     name: trimmed,
     updatedAt: now,
   };
+  if (linkedActivity !== undefined) {
+    updated.linkedActivity = linkedActivity || null;
+  }
 
   await commitSingleMutation(STORES.HABITS, updated, 'habits', id);
   return updated;
@@ -336,9 +352,9 @@ export async function saveJournalEntry(day, content) {
   };
 
   await commitSingleMutation(STORES.JOURNAL_ENTRIES, record, 'journalEntries', day);
-  if (day === currentDay && record.content.replace(/<[^>]*>/g, ' ').trim() !== '') {
+  if (day === currentDay && !isBlank(record.content)) {
     try {
-      await triggerActivityCheckIn('journal');
+      await triggerActivityCheckIn(LINKED_ACTIVITIES.JOURNAL);
     } catch (err) {
       console.warn('Journal auto-checkin failed:', err);
     }
@@ -557,7 +573,7 @@ export async function addBook({ title, author = '' }) {
     updatedAt: now,
   };
 
-  await commitSingleMutation(STORES.BOOKS, book, 'books', id);
+  await commitLocalMutation(STORES.BOOKS, book);
   return book;
 }
 
@@ -619,12 +635,12 @@ export async function saveBookChapter({ id, bookId, title = '', content = '' }) 
     updatedAt: now,
   };
 
-  await commitSingleMutation(STORES.BOOK_CHAPTERS, chapter, 'bookChapters', chapterId);
+  await commitLocalMutation(STORES.BOOK_CHAPTERS, chapter);
 
   // Auto-check in linked habit for today if content is present
-  if (chapter.content.replace(/<[^>]*>/g, ' ').trim() !== '') {
+  if (!isBlank(chapter.content)) {
     try {
-      await triggerActivityCheckIn('book_summary');
+      await triggerActivityCheckIn(LINKED_ACTIVITIES.BOOK_SUMMARY);
     } catch (err) {
       console.warn('Auto-checkin failed:', err);
     }

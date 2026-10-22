@@ -906,5 +906,19 @@ describe('Data Layer - API & Sync Flow', () => {
     await triggerActivityCheckIn('book_summary');
     checkIns = await getCheckInDays(habit.id);
     expect(checkIns.has('2026-10-20')).toBe(true);
+
+    // 5. Updating habit rename and linkedActivity
+    const updatedHabit = await renameHabit(habit.id, 'Read 30 Mins', 'journal');
+    expect(updatedHabit.name).toBe('Read 30 Mins');
+    expect(updatedHabit.linkedActivity).toBe('journal');
+
+    // Unlink activity
+    const unlinkedHabit = await renameHabit(habit.id, 'Read 30 Mins', null);
+    expect(unlinkedHabit.linkedActivity).toBeNull();
+
+    // 6. Verify local books and bookChapters do NOT pollute the sync outbox
+    const outbox = await getOutboxEntries();
+    const bookOutbox = outbox.filter((o) => o.type === 'books' || o.type === 'bookChapters');
+    expect(bookOutbox.length).toBe(0);
   });
 });

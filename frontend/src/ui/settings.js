@@ -19,6 +19,7 @@ import {
 import { getInstallState, promptInstall, onInstallStateChange } from '../pwa/install.js';
 import { getPushState, enablePush, sendTestPush } from '../pwa/push.js';
 import { showToast } from './shell.js';
+import { LINKED_ACTIVITIES } from '../shared/contracts.js';
 
 /**
  * Escapes characters for HTML text insertion
@@ -172,6 +173,7 @@ export function mount(el) {
             placeholder="New habit name..."
             aria-label="New habit name"
             class="flex-1 min-h-[44px] px-3 py-2 text-base rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
           <select
             id="select-habit-linked-activity"
             class="min-h-[44px] px-3 py-2 text-base rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -483,23 +485,61 @@ export function mount(el) {
             </svg>
           `;
 
+          if (habit.linkedActivity) {
+            const badge = document.createElement('span');
+            badge.className =
+              'text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 shrink-0';
+            badge.textContent = habit.linkedActivity === LINKED_ACTIVITIES.BOOK_SUMMARY ? '📖 Book' : '✍️ Journal';
+            nameWrapper.appendChild(badge);
+          }
           nameWrapper.appendChild(nameSpan);
           nameWrapper.appendChild(editBtn);
 
           const startRename = () => {
             editingHabitId = habit.id;
             const form = document.createElement('form');
-            form.className = 'rename-form flex-1 flex items-center gap-1 min-w-0';
+            form.className = 'rename-form flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 min-w-0';
 
             const input = document.createElement('input');
             input.type = 'text';
             input.maxLength = 60;
             input.value = habit.name;
             input.className =
-              'rename-input input-rename w-full min-h-[44px] px-3 py-1.5 text-base rounded-lg border-2 border-indigo-500 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none';
+              'rename-input input-rename flex-1 min-h-[44px] px-3 py-1.5 text-base rounded-lg border-2 border-indigo-500 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none';
             input.setAttribute('aria-label', `New name for ${habit.name}`);
 
+            const select = document.createElement('select');
+            select.className =
+              'select-edit-linked-activity min-h-[44px] px-2.5 py-1.5 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500';
+            select.setAttribute('aria-label', `Linked activity for ${habit.name}`);
+
+            const optNone = document.createElement('option');
+            optNone.value = '';
+            optNone.textContent = 'No Link';
+            optNone.selected = !habit.linkedActivity;
+            select.appendChild(optNone);
+
+            const optBook = document.createElement('option');
+            optBook.value = 'book_summary';
+            optBook.textContent = 'Book Summary 📖';
+            optBook.selected = habit.linkedActivity === 'book_summary';
+            select.appendChild(optBook);
+
+            const optJournal = document.createElement('option');
+            optJournal.value = 'journal';
+            optJournal.textContent = 'Daily Journal ✍️';
+            optJournal.selected = habit.linkedActivity === 'journal';
+            select.appendChild(optJournal);
+
+            const saveBtn = document.createElement('button');
+            saveBtn.type = 'submit';
+            saveBtn.className =
+              'px-3 py-1.5 min-h-[44px] text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg cursor-pointer transition shrink-0';
+            saveBtn.textContent = 'Save';
+
             form.appendChild(input);
+            form.appendChild(select);
+            form.appendChild(saveBtn);
             nameWrapper.replaceWith(form);
             input.focus();
             if (typeof input.select === 'function') input.select();
@@ -510,12 +550,13 @@ export function mount(el) {
               finished = true;
               editingHabitId = null;
               const newName = input.value.trim();
-              if (newName && newName !== habit.name) {
+              const newLinked = select.value || null;
+              if (newName && (newName !== habit.name || newLinked !== (habit.linkedActivity || null))) {
                 try {
-                  await renameHabit(habit.id, newName);
-                  showToast('Habit renamed');
+                  await renameHabit(habit.id, newName, newLinked);
+                  showToast('Habit updated');
                 } catch (err) {
-                  showToast(err.message || 'Failed to rename habit');
+                  showToast(err.message || 'Failed to update habit');
                 }
               }
               await renderHabits();

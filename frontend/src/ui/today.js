@@ -14,6 +14,7 @@ import {
   onChange,
 } from '../data/repo.js';
 import { navigate, showToast } from './shell.js';
+import { LINKED_ACTIVITIES } from '../shared/contracts.js';
 
 /**
  * Mounts the Today tab into the provided element.
@@ -365,7 +366,7 @@ export function mount(el) {
           actBadge.type = 'button';
           actBadge.className =
             'habit-activity-link min-h-[44px] min-w-[44px] inline-flex items-center text-xs px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-medium hover:underline cursor-pointer ml-2 shrink-0';
-          actBadge.textContent = habit.linkedActivity === 'book_summary' ? '📖 Book Summary' : '✍️ Journal';
+          actBadge.textContent = habit.linkedActivity === LINKED_ACTIVITIES.BOOK_SUMMARY ? '📖 Book Summary' : '✍️ Journal';
           actBadge.addEventListener('click', (e) => {
             e.stopPropagation();
             navigate('activities');

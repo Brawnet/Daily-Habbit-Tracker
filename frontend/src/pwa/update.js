@@ -15,9 +15,8 @@ export async function initUpdateHandler(swUrl = '/sw.js') {
   if (typeof window === 'undefined' || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
     return null;
   }
-
   try {
-    const reg = await navigator.serviceWorker.register(swUrl, { type: 'module' });
+    const reg = await navigator.serviceWorker.register(swUrl, { scope: '/' });
 
     /**
      * @param {ServiceWorker} [worker]

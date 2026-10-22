@@ -65,3 +65,22 @@ describe('PWA icon assets contract', () => {
     }
   });
 });
+
+describe('PWA & mobile network exposure contract', () => {
+  it('configures server.host and preview.host in vite.config.js for mobile LAN access', async () => {
+    const viteConfig = (await import('../vite.config.js')).default;
+    expect(viteConfig.server?.host).toBe(true);
+    expect(viteConfig.preview?.host).toBe(true);
+  });
+});
+
+describe('Service Worker mobile compatibility contract', () => {
+  it('does not register service worker as module type to ensure Android/Samsung Internet compatibility', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const updateSource = readFileSync(resolve(__dirname, './pwa/update.js'), 'utf8');
+
+    expect(updateSource).not.toContain("type: 'module'");
+    expect(updateSource).not.toContain('type: "module"');
+  });
+});

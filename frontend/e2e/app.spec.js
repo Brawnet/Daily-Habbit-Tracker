@@ -173,8 +173,8 @@ test.describe('Habbit App E2E', () => {
       expect(navBox.y + navBox.height).toBeLessThanOrEqual(vp.height + 1);
       expect(navBox.y).toBeGreaterThan(vp.height - 120);
 
-      // All 3 navigation tabs must be visible, clickable, and meet touch target sizes
-      for (const tabName of ['today', 'history', 'settings']) {
+      // All 4 navigation tabs must be visible, clickable, and meet touch target sizes
+      for (const tabName of ['today', 'history', 'activities', 'settings']) {
         const tabBtn = page.locator(`button[data-tab="${tabName}"]`);
         await expect(tabBtn).toBeVisible();
         const tabBox = await tabBtn.boundingBox();
@@ -207,5 +207,35 @@ test.describe('Habbit App E2E', () => {
     const navBox = await bottomNav.boundingBox();
     expect(navBox).not.toBeNull();
     expect(navBox.y + navBox.height).toBeLessThanOrEqual(vp.height + 1);
+  });
+
+  test('verifies Android mobile viewports and standalone layout bounds', async ({ page }) => {
+    const viewports = [
+      { name: 'Pixel 7 (Android)', width: 412, height: 915 },
+      { name: 'Samsung Galaxy S20 (Android)', width: 360, height: 800 },
+    ];
+
+    for (const vp of viewports) {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await page.waitForTimeout(200);
+
+      const bottomNav = page.locator('#bottom-nav');
+      await expect(bottomNav).toBeVisible();
+
+      const navBox = await bottomNav.boundingBox();
+      expect(navBox).not.toBeNull();
+      expect(navBox.y + navBox.height).toBeLessThanOrEqual(vp.height + 1);
+      expect(navBox.y).toBeGreaterThan(vp.height - 120);
+
+      // All 4 navigation tabs must be visible, clickable, and meet touch targets
+      for (const tabName of ['today', 'history', 'activities', 'settings']) {
+        const tabBtn = page.locator(`button[data-tab="${tabName}"]`);
+        await expect(tabBtn).toBeVisible();
+        const tabBox = await tabBtn.boundingBox();
+        expect(tabBox).not.toBeNull();
+        expect(tabBox.height).toBeGreaterThanOrEqual(44);
+        expect(tabBox.y + tabBox.height).toBeLessThanOrEqual(vp.height + 1);
+      }
+    }
   });
 });

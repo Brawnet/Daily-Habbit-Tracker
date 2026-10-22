@@ -23,29 +23,25 @@ export const LIST_NUMBER_SVG = `
 </svg>
 `.trim();
 
-export const DEFAULT_JOURNAL_PROMPTS = [
-  {
-    id: 'jp_day',
-    prompt: 'How was your day?',
-    order: 0,
-    archived: false,
-  },
-  {
-    id: 'jp_well',
-    prompt: 'What went well today?',
-    order: 1,
-    archived: false,
-  },
-  {
-    id: 'jp_improve',
-    prompt: 'What could be improved?',
-    order: 2,
-    archived: false,
-  },
-];
+export {
+  JOURNAL_SUBVIEW,
+  SETTINGS_KEY,
+  DEFAULT_JOURNAL_PROMPTS,
+  escapeHtml,
+  sanitizeJournalHtml,
+  compilePromptJournal,
+  parseStructuredJournalBlocks,
+  decompilePromptJournal,
+  computeWordCount,
+  hasNonEmptyJournalAnswers,
+} from '../domain/journal.js';
 
-export const SETTINGS_KEY = 'journalPrompts';
-
+import {
+  SETTINGS_KEY,
+  DEFAULT_JOURNAL_PROMPTS,
+  computeWordCount,
+  decompilePromptJournal,
+} from '../domain/journal.js';
 /**
  * Loads current prompts from Settings, or seeds and returns defaults.
  * @param {Function} getSettingFn
@@ -85,129 +81,6 @@ export async function saveJournalPrompts(setSettingFn, prompts) {
   } catch (err) {
     console.error('Failed to save journal prompts:', err);
   }
-}
-
-/**
- * Compiles prompt answers into backward-compatible HTML.
- * Omits blank/skipped prompts, but preserves answered archived prompts.
- */
-export function compilePromptJournal(prompts, answers, additionalNotes = '') {
-  let out = '';
-  const sorted = [...prompts].sort((a, b) => a.order - b.order);
-  for (const p of sorted) {
-    const rawAns = answers[p.id];
-    const ans = (typeof rawAns === 'string' ? rawAns : '').trim();
-    const textOnly = ans.replace(/<[^>]*>/g, '').trim();
-    if (!textOnly) continue;
-    out += `<div class="journal-prompt-block" data-prompt-id="${p.id}">\n`;
-    out += `  <h3 class="font-bold text-zinc-900 dark:text-zinc-100">${escapeHtml(p.prompt)}</h3>\n`;
-    out += `  <div class="journal-prompt-answer">${ans}</div>\n`;
-    out += `</div>\n\n`;
-  }
-  const cleanNotes = (typeof additionalNotes === 'string' ? additionalNotes : '').trim();
-  const notesText = cleanNotes.replace(/<[^>]*>/g, '').trim();
-  if (notesText) {
-    out += `<div class="journal-notes-block">\n`;
-    out += `  <h3 class="font-bold text-zinc-900 dark:text-zinc-100">Additional Notes</h3>\n`;
-    out += `  <div class="journal-notes-answer">${cleanNotes}</div>\n`;
-    out += `</div>\n`;
-  }
-  return out.trim();
-}
-
-/**
- * Decompiles existing HTML content into prompt answers and additional notes.
- */
-export function decompilePromptJournal(htmlContent, prompts) {
-  const answers = {};
-  let additionalNotes = '';
-
-  if (!htmlContent || typeof htmlContent !== 'string') {
-    return { answers, additionalNotes };
-  }
-
-  // 1. DOMParser if available in full browser DOM environment
-  if (typeof DOMParser !== 'undefined') {
-    try {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(htmlContent, 'text/html');
-      const blocks = doc.querySelectorAll('.journal-prompt-block');
-      if (blocks.length > 0) {
-        for (const block of blocks) {
-          const id = block.getAttribute('data-prompt-id');
-          const ansEl = block.querySelector('.journal-prompt-answer');
-          if (id && ansEl) {
-            answers[id] = ansEl.innerHTML.trim();
-          }
-        }
-        const notesEl = doc.querySelector('.journal-notes-block .journal-notes-answer');
-        if (notesEl) {
-          additionalNotes = notesEl.innerHTML.trim();
-        }
-        return { answers, additionalNotes };
-      }
-    } catch {}
-  }
-
-  // 2. Robust fallback for Node.js test environment
-  const promptBlockRegex = /<div\s+[^>]*class="[^"]*journal-prompt-block[^"]*"[^>]*data-prompt-id="([^"]+)"[^>]*>([\s\S]*?)<\/div>\s*(?=<div\s+[^>]*class="[^"]*journal-(?:prompt|notes)-block"|$)/gi;
-  let match;
-  let foundAny = false;
-  while ((match = promptBlockRegex.exec(htmlContent)) !== null) {
-    foundAny = true;
-    const promptId = match[1];
-    const innerBlock = match[2];
-    const ansMatch = /<div\s+[^>]*class="[^"]*journal-prompt-answer[^"]*"[^>]*>([\s\S]*?)<\/div>\s*$/i.exec(innerBlock.trim());
-    if (ansMatch) {
-      answers[promptId] = ansMatch[1].trim();
-    }
-  }
-
-  const notesBlockRegex = /<div\s+[^>]*class="[^"]*journal-notes-block[^"]*"[^>]*>([\s\S]*?)<\/div>\s*$/i;
-  const notesMatch = notesBlockRegex.exec(htmlContent);
-  if (notesMatch) {
-    foundAny = true;
-    const innerNotes = notesMatch[1];
-    const ansMatch = /<div\s+[^>]*class="[^"]*journal-notes-answer[^"]*"[^>]*>([\s\S]*?)<\/div>\s*$/i.exec(innerNotes.trim());
-    if (ansMatch) {
-      additionalNotes = ansMatch[1].trim();
-    }
-  }
-
-  if (foundAny) {
-    return { answers, additionalNotes };
-  }
-
-  // Fallback: If legacy freeform journal content exists, put into additional notes
-  additionalNotes = htmlContent;
-  return { answers, additionalNotes };
-}
-
-export function escapeHtml(str) {
-  return String(str || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-export function computeWordCount(answers, notes) {
-  let combined = '';
-  for (const key of Object.keys(answers || {})) {
-    combined += ' ' + (answers[key] || '');
-  }
-  combined += ' ' + (notes || '');
-  const textOnly = combined.replace(/<[^>]*>/g, ' ').trim();
-  return textOnly ? textOnly.split(/\s+/).filter(Boolean).length : 0;
-}
-
-export function hasNonEmptyJournalAnswers(answers, notes) {
-  for (const key of Object.keys(answers || {})) {
-    const val = (answers[key] || '').replace(/<[^>]*>/g, ' ').trim();
-    if (val) return true;
-  }
-  const cleanNotes = (notes || '').replace(/<[^>]*>/g, ' ').trim();
-  return Boolean(cleanNotes);
 }
 
 /**

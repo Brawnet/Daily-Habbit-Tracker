@@ -26,6 +26,7 @@ import {
   LIST_BULLET_SVG,
   LIST_NUMBER_SVG,
   DEFAULT_JOURNAL_PROMPTS,
+  JOURNAL_SUBVIEW,
   loadJournalPrompts,
   saveJournalPrompts,
   compilePromptJournal,
@@ -165,7 +166,7 @@ export function mount(rootEl) {
   try {
     if (typeof window !== 'undefined' && window.location) {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('subview') === 'journal' || params.get('view') === 'journal') {
+      if (params.get('subview') === JOURNAL_SUBVIEW || params.get('view') === JOURNAL_SUBVIEW) {
         currentView = 'journal';
       }
     }

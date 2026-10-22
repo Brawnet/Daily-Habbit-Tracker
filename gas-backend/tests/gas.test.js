@@ -162,12 +162,15 @@ function createGasEnv(initialProps = {}) {
       };
       function createMockParagraph(text, container) {
         let heading = 'Normal';
+        let bold = false;
         const p = {
           getType: () => 'PARAGRAPH',
           asParagraph: () => p,
           getText: () => text,
           getHeading: () => heading,
           setHeading: (h) => { heading = h; },
+          setBold: (b) => { bold = Boolean(b); },
+          isBold: () => bold,
           removeFromParent: () => {
             const idx = container.indexOf(p);
             if (idx !== -1) container.splice(idx, 1);
@@ -1180,6 +1183,53 @@ describe('GAS Backend Actions', () => {
       expect(headings).toEqual(['Wednesday, 21 October 2026']);
       expect(body.getChild(1).getText()).toBe('## Updated Heading');
       expect(body.getChild(2).getText()).toBe('Updated line');
+    });
+
+    it('prints prompt-based journal entries with bold headings and strips raw HTML wrapper tags', () => {
+      const doc = env.context.DocumentApp.create('Habbit – Diary 2026');
+      const compiledContent = [
+        '<div class="journal-prompt-block" data-prompt-id="jp_day">',
+        '  <h3 class="font-bold">How was your day?</h3>',
+        '  <div class="journal-prompt-answer">Felt very accomplished.</div>',
+        '</div>',
+        '',
+        '<div class="journal-notes-block">',
+        '  <h3 class="font-bold">Additional Notes</h3>',
+        '  <div class="journal-notes-answer">Quiet evening tea.</div>',
+        '</div>'
+      ].join('\n');
+
+      env.exports.insertEntryIntoDoc(doc, {
+        day: '2026-10-21',
+        content: compiledContent
+      });
+
+      const body = doc.getBody();
+      // Date heading
+      expect(body.getChild(0).getText()).toBe('Wednesday, 21 October 2026');
+      expect(body.getChild(0).getHeading()).toBe('HEADING_2');
+
+      // Question 1: bold heading
+      expect(body.getChild(1).getText()).toBe('How was your day?');
+      expect(body.getChild(1).isBold()).toBe(true);
+
+      // Answer 1: normal text
+      expect(body.getChild(2).getText()).toBe('Felt very accomplished.');
+      expect(body.getChild(2).isBold()).toBe(false);
+
+      // Separation blank line
+      expect(body.getChild(3).getText()).toBe('');
+
+      // Question 2: bold heading
+      expect(body.getChild(4).getText()).toBe('Additional Notes');
+      expect(body.getChild(4).isBold()).toBe(true);
+
+      // Answer 2: normal text
+      expect(body.getChild(5).getText()).toBe('Quiet evening tea.');
+      expect(body.getChild(5).isBold()).toBe(false);
+
+      // Blank line at end
+      expect(body.getChild(6).getText()).toBe('');
     });
 
     it('batches exports by year, opening and saving each yearly Doc only once', () => {

@@ -15,6 +15,7 @@ import {
 } from '../data/repo.js';
 import { navigate, showToast } from './shell.js';
 import { LINKED_ACTIVITIES } from '../shared/contracts.js';
+import { JOURNAL_SUBVIEW } from '../domain/journal.js';
 
 /**
  * Mounts the Today tab into the provided element.
@@ -364,7 +365,7 @@ export function mount(el) {
               try {
                 const url = new URL(window.location.href);
                 if (isJournal) {
-                  url.searchParams.set('subview', 'journal');
+                  url.searchParams.set('subview', JOURNAL_SUBVIEW);
                 } else {
                   url.searchParams.delete('subview');
                 }

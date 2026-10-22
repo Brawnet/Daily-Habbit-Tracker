@@ -15,6 +15,12 @@ export async function initUpdateHandler(swUrl = '/sw.js') {
   if (typeof window === 'undefined' || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
     return null;
   }
+
+  // In Vite dev mode, unbundled SW is not served by dev server; skip registration to prevent MIME SecurityError
+  if (typeof import.meta !== 'undefined' && import.meta.env?.DEV && !import.meta.env?.VITEST) {
+    return null;
+  }
+
   try {
     const reg = await navigator.serviceWorker.register(swUrl, { scope: '/' });
 

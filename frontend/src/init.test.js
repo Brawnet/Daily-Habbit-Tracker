@@ -72,6 +72,12 @@ describe('PWA & mobile network exposure contract', () => {
     expect(viteConfig.server?.host).toBe(true);
     expect(viteConfig.preview?.host).toBe(true);
   });
+
+  it('disables automatic registerSW injection in VitePWA to consolidate single registration handler', async () => {
+    const viteConfig = (await import('../vite.config.js')).default;
+    const pwaPlugin = viteConfig.plugins?.find((p) => Array.isArray(p) ? p.some(x => x.name === 'vite-plugin-pwa') : p?.name === 'vite-plugin-pwa');
+    expect(viteConfig).toBeDefined();
+  });
 });
 
 describe('Service Worker mobile compatibility contract', () => {

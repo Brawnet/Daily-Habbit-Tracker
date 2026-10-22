@@ -16,6 +16,7 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.js',
       registerType: 'autoUpdate',
+      injectRegister: null,
       manifest: {
         name: 'Habbit',
         short_name: 'Habbit',

@@ -36,6 +36,19 @@ export function getDb() {
           db.createObjectStore(STORES.ACTIVITIES, { keyPath: 'id' });
         }
       },
+      blocked() {
+        console.warn('IndexedDB upgrade blocked by older open tab');
+      },
+      blocking(currentVersion, blockedVersion, event) {
+        event.target?.close();
+      },
+      terminated() {
+        dbPromise = null;
+      },
+    });
+    dbPromise.catch((err) => {
+      console.warn('IndexedDB connection failed:', err);
+      dbPromise = null;
     });
   }
   return dbPromise;

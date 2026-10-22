@@ -172,6 +172,28 @@ describe('ui/shell.js', () => {
     expect(toastContainer.style.bottom).toBe('calc(max(12px, env(safe-area-inset-bottom, 12px)) + 64px)');
   });
 
+  it('synchronizes --app-height dynamically in standalone mode via syncAppHeight', async () => {
+    const { syncAppHeight } = await import('./shell.js');
+    setMockNavigator({
+      standalone: true,
+    });
+    mockDoc.documentElement = {
+      style: {
+        setProperty: vi.fn(),
+      },
+    };
+    mockWin.innerHeight = 848;
+    mockWin.innerWidth = 414;
+    mockWin.screen = { height: 896, width: 414 };
+
+    syncAppHeight();
+
+    expect(mockDoc.documentElement.style.setProperty).toHaveBeenCalledWith(
+      '--app-height',
+      '896px'
+    );
+  });
+
 
   it('registers tabs, mounts active tab and switches tabs with cleanup', () => {
     const root = mockDoc.createElement('div');

@@ -5,6 +5,7 @@
 
 import { getSyncStatus, onSyncStatus, syncNow } from '../data/sync.js';
 import { today, msUntilNextDay } from '../domain/day.js';
+import { computeAppHeight, isIOSStandalone } from './viewport.js';
 
 /**
  * @typedef {{ title: string, icon: string, mount: (el: HTMLElement) => (() => void) | void }} TabDescriptor
@@ -26,6 +27,54 @@ let syncDotElement = null;
 let syncTextElement = null;
 let syncBadgeElement = null;
 let syncButtonElement = null;
+
+let appHeightListenersAttached = false;
+
+/**
+ * Dynamically synchronizes --app-height based on iOS standalone mode and orientation
+ * to guarantee the entire viewport (including bottom-nav) fits full physical screen.
+ */
+export function syncAppHeight() {
+  try {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+    const isStandalone = isIOSStandalone(window, navigator);
+    if (!isStandalone) {
+      return;
+    }
+
+    const winH = window.innerHeight || 0;
+    const winW = window.innerWidth || 0;
+    const screenH = (window.screen && window.screen.height) || winH;
+    const screenW = (window.screen && window.screen.width) || winW;
+    const isPortrait = winH >= winW;
+
+    const appHeight = computeAppHeight({
+      innerHeight: winH,
+      screenHeight: screenH,
+      screenWidth: screenW,
+      isStandalone: true,
+      isPortrait,
+    });
+
+    if (appHeight && document.documentElement && document.documentElement.style) {
+      document.documentElement.style.setProperty('--app-height', appHeight);
+    }
+  } catch {}
+}
+
+function attachAppHeightListeners() {
+  if (appHeightListenersAttached) return;
+  appHeightListenersAttached = true;
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', syncAppHeight, { passive: true });
+    window.addEventListener('orientationchange', syncAppHeight, { passive: true });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', syncAppHeight, { passive: true });
+    }
+  }
+}
 
 function getCurrentDayString() {
   try {
@@ -333,15 +382,9 @@ export function mountShell(rootEl) {
   rootElement = rootEl;
   rootEl.innerHTML = '';
 
-  if (
-    typeof navigator !== 'undefined' &&
-    (navigator.standalone ||
-      (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(display-mode: standalone)').matches))
-  ) {
-    try {
-      document.documentElement.style.setProperty('--app-height', '100vh');
-    } catch {}
-  }
+  // Initial and reactive standalone viewport height synchronization
+  syncAppHeight();
+  attachAppHeightListeners();
 
   const shellLayout = document.createElement('div');
   shellLayout.className = 'shell-layout flex flex-col bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 antialiased select-none';

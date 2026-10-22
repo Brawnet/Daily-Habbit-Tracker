@@ -41,14 +41,15 @@ export function getDb() {
       },
       blocking(currentVersion, blockedVersion, event) {
         event.target?.close();
+        dbPromise = null;
       },
       terminated() {
         dbPromise = null;
       },
-    });
-    dbPromise.catch((err) => {
+    }).catch((err) => {
       console.warn('IndexedDB connection failed:', err);
       dbPromise = null;
+      throw err;
     });
   }
   return dbPromise;

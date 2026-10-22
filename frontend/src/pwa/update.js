@@ -11,13 +11,18 @@ import { showToast } from '../ui/shell.js';
  * @param {string} [swUrl='/sw.js']
  * @returns {Promise<ServiceWorkerRegistration | null>}
  */
-export async function initUpdateHandler(swUrl = '/sw.js') {
+export async function initUpdateHandler(swUrl = '/sw.js', { force = false } = {}) {
   if (typeof window === 'undefined' || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
     return null;
   }
 
+  // In Vite dev mode, unbundled SW is not served by dev server; skip registration unless explicitly forced
+  if (import.meta.env?.DEV && !force) {
+    return null;
+  }
+
   try {
-    const reg = await navigator.serviceWorker.register(swUrl, { type: 'module' });
+    const reg = await navigator.serviceWorker.register(swUrl, { scope: '/' });
 
     /**
      * @param {ServiceWorker} [worker]

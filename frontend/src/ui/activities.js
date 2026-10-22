@@ -112,6 +112,42 @@ export const BOOKS_SUMMARY_LOGO_SVG = `
 </svg>
 `.trim();
 
+const CHEVRON_LEFT_SVG = `
+<svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M15 19l-7-7 7-7" />
+</svg>
+`.trim();
+
+const PENCIL_WRITE_SVG = `
+<svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+</svg>
+`.trim();
+
+const BOOK_OPEN_SVG = `
+<svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+</svg>
+`.trim();
+
+const PLUS_SVG = `
+<svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M12 4v16m8-8H4" />
+</svg>
+`.trim();
+
+const LIST_BULLET_SVG = `
+<svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M4 6h.01M4 12h.01M4 18h.01M8 6h12M8 12h12M8 18h12" />
+</svg>
+`.trim();
+
+const LIST_NUMBER_SVG = `
+<svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M4 6h1v4m-1 0h2m-2 4h2a1 1 0 011 1v1a1 1 0 01-1 1h-2v2h3M10 6h10M10 12h10M10 18h10" />
+</svg>
+`.trim();
+
 /**
  * Mounts the Activities tab into rootEl.
  *
@@ -198,20 +234,25 @@ export function mount(rootEl) {
     wrap.className = 'flex flex-col gap-6';
 
     const header = document.createElement('header');
-    header.className = 'flex flex-col gap-1 text-center py-4';
+    header.className = 'flex flex-col items-center gap-2 text-center py-4';
+
+    const pill = document.createElement('span');
+    pill.className =
+      'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200/60 dark:border-zinc-700/60';
+    pill.textContent = 'Activities Hub';
 
     const h1 = document.createElement('h1');
     h1.className = 'text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50';
     h1.textContent = 'Choose Activity';
 
     const sub = document.createElement('p');
-    sub.className = 'text-sm text-zinc-500 dark:text-zinc-400';
-    sub.textContent = 'Select what you want to work on';
+    sub.className = 'text-sm text-zinc-500 dark:text-zinc-400 max-w-xs';
+    sub.textContent = 'Pick what you want to focus on and document today';
 
+    header.appendChild(pill);
     header.appendChild(h1);
     header.appendChild(sub);
     wrap.appendChild(header);
-
     const grid = document.createElement('div');
     grid.className = 'flex flex-col gap-3.5';
 
@@ -220,10 +261,10 @@ export function mount(rootEl) {
     btnBooks.type = 'button';
     btnBooks.id = 'choice-books-summary';
     btnBooks.className =
-      'flex items-center justify-between p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 hover:border-indigo-500 dark:hover:border-indigo-500 transition shadow-xs group cursor-pointer text-left';
+      'group flex items-center justify-between p-4 sm:p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md active:scale-[0.985] transition-all duration-150 cursor-pointer text-left w-full';
 
     const leftB = document.createElement('div');
-    leftB.className = 'flex items-center gap-3.5';
+    leftB.className = 'flex items-center gap-4';
 
     const iconB = document.createElement('div');
     iconB.className =
@@ -232,11 +273,11 @@ export function mount(rootEl) {
 
     const textB = document.createElement('div');
     const titleB = document.createElement('div');
-    titleB.className = 'font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-indigo-600 transition';
+    titleB.className = 'font-semibold text-base text-zinc-900 dark:text-zinc-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors';
     titleB.textContent = 'Books Summary';
 
     const descB = document.createElement('div');
-    descB.className = 'text-xs text-zinc-500';
+    descB.className = 'text-xs text-zinc-500 dark:text-zinc-400 leading-snug';
     descB.textContent = 'Document book chapters and key takeaways';
 
     textB.appendChild(titleB);
@@ -246,9 +287,8 @@ export function mount(rootEl) {
 
     const actionB = document.createElement('span');
     actionB.className =
-      'px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 shrink-0';
+      'inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 group-hover:bg-indigo-50 group-hover:text-indigo-600 dark:group-hover:bg-indigo-950/60 dark:group-hover:text-indigo-400 transition-colors shrink-0';
     actionB.textContent = 'Open Books →';
-
     btnBooks.appendChild(leftB);
     btnBooks.appendChild(actionB);
     btnBooks.addEventListener('click', () => {
@@ -263,10 +303,10 @@ export function mount(rootEl) {
     btnJournal.type = 'button';
     btnJournal.id = 'choice-journals';
     btnJournal.className =
-      'flex items-center justify-between p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 hover:border-indigo-500 dark:hover:border-indigo-500 transition shadow-xs group cursor-pointer text-left';
+      'group flex items-center justify-between p-4 sm:p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md active:scale-[0.985] transition-all duration-150 cursor-pointer text-left w-full';
 
     const leftJ = document.createElement('div');
-    leftJ.className = 'flex items-center gap-3.5';
+    leftJ.className = 'flex items-center gap-4';
 
     const iconJ = document.createElement('div');
     iconJ.className =
@@ -275,11 +315,11 @@ export function mount(rootEl) {
 
     const textJ = document.createElement('div');
     const titleJ = document.createElement('div');
-    titleJ.className = 'font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-indigo-600 transition';
+    titleJ.className = 'font-semibold text-base text-zinc-900 dark:text-zinc-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors';
     titleJ.textContent = 'Journals';
 
     const descJ = document.createElement('div');
-    descJ.className = 'text-xs text-zinc-500';
+    descJ.className = 'text-xs text-zinc-500 dark:text-zinc-400 leading-snug';
     descJ.textContent = 'Daily personal reflections and memories';
 
     textJ.appendChild(titleJ);
@@ -289,9 +329,8 @@ export function mount(rootEl) {
 
     const actionJ = document.createElement('span');
     actionJ.className =
-      'px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 shrink-0';
+      'inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 group-hover:bg-indigo-50 group-hover:text-indigo-600 dark:group-hover:bg-indigo-950/60 dark:group-hover:text-indigo-400 transition-colors shrink-0';
     actionJ.textContent = 'Write Journal →';
-
     btnJournal.appendChild(leftJ);
     btnJournal.appendChild(actionJ);
     btnJournal.addEventListener('click', () => {
@@ -318,8 +357,9 @@ export function mount(rootEl) {
     const backBtn = document.createElement('button');
     backBtn.type = 'button';
     backBtn.id = 'btn-back-to-activities';
-    backBtn.className = 'text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer';
-    backBtn.textContent = '← Back to Activities';
+    backBtn.className =
+      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 active:scale-95 transition-all cursor-pointer';
+    backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>Back to Activities</span>`;
     backBtn.addEventListener('click', () => {
       currentView = 'home';
       render();
@@ -329,14 +369,12 @@ export function mount(rootEl) {
     addBtn.type = 'button';
     addBtn.id = 'btn-toggle-add-book';
     addBtn.className =
-      'px-3 py-1.5 rounded-full text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer transition shadow-2xs';
-    addBtn.textContent = isAddingBook ? '✕ Close' : '+ Add New Book';
+      'min-h-[44px] inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white cursor-pointer transition-all shadow-xs';
+    addBtn.innerHTML = isAddingBook ? '✕ Close' : `${PLUS_SVG} <span>Add New Book</span>`;
     addBtn.addEventListener('click', () => {
       isAddingBook = !isAddingBook;
       render();
     });
-
-    header.appendChild(backBtn);
     header.appendChild(addBtn);
     wrap.appendChild(header);
 
@@ -440,19 +478,19 @@ export function mount(rootEl) {
       const empty = document.createElement('div');
       empty.id = 'books-empty-state';
       empty.className =
-        'p-8 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl text-center flex flex-col items-center gap-2 text-zinc-500';
+        'p-8 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl text-center flex flex-col items-center gap-2.5 text-zinc-500 bg-zinc-50/50 dark:bg-zinc-900/40';
 
       const emptyIcon = document.createElement('div');
       emptyIcon.className =
-        'w-16 h-16 rounded-2xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center p-2.5 mb-2 border border-zinc-200/80 dark:border-zinc-700/80 shadow-xs';
+        'w-16 h-16 rounded-2xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center p-2.5 mb-2 border border-zinc-200/80 dark:border-zinc-700/80 shadow-xs';
       emptyIcon.innerHTML = BOOKS_SUMMARY_LOGO_SVG;
 
       const emptyMain = document.createElement('p');
-      emptyMain.className = 'text-sm font-medium';
+      emptyMain.className = 'text-sm font-semibold text-zinc-800 dark:text-zinc-200';
       emptyMain.textContent = 'No books in your library yet';
 
       const emptySub = document.createElement('p');
-      emptySub.className = 'text-xs text-zinc-400';
+      emptySub.className = 'text-xs text-zinc-500 dark:text-zinc-400 max-w-xs leading-relaxed';
       emptySub.textContent = 'Click "+ Add New Book" above to get started.';
 
       empty.appendChild(emptyIcon);
@@ -465,7 +503,7 @@ export function mount(rootEl) {
         const card = document.createElement('button');
         card.type = 'button';
         card.className =
-          'book-item-card flex items-center justify-between p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 hover:border-indigo-500 dark:hover:border-indigo-500 transition shadow-xs group cursor-pointer text-left';
+          'book-item-card group flex items-center justify-between p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-xs active:scale-[0.985] transition-all cursor-pointer text-left w-full';
 
         const chapterCount = chapters.length;
         const countText = chapterCount > 0 ? `${chapterCount} chapter${chapterCount > 1 ? 's' : ''}` : 'No chapters yet';
@@ -494,9 +532,8 @@ export function mount(rootEl) {
 
         const selectBadge = document.createElement('span');
         selectBadge.className =
-          'px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 shrink-0';
+          'px-3 py-1.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 group-hover:bg-indigo-50 group-hover:text-indigo-600 dark:group-hover:bg-indigo-950/60 dark:group-hover:text-indigo-400 transition-colors shrink-0';
         selectBadge.textContent = 'Select →';
-
         card.appendChild(left);
         card.appendChild(selectBadge);
 
@@ -537,8 +574,9 @@ export function mount(rootEl) {
     const backBtn = document.createElement('button');
     backBtn.type = 'button';
     backBtn.id = 'btn-back-to-books-list';
-    backBtn.className = 'text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer';
-    backBtn.textContent = '← Back to Books List';
+    backBtn.className =
+      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 active:scale-95 transition-all cursor-pointer';
+    backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>Back to Books List</span>`;
     backBtn.addEventListener('click', () => {
       currentView = 'books-list';
       render();
@@ -594,8 +632,8 @@ export function mount(rootEl) {
 
     const iconC = document.createElement('div');
     iconC.className =
-      'w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-lg shadow-xs shrink-0';
-    iconC.textContent = '✍️';
+      'w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center p-2.5 shadow-xs shrink-0 group-hover:scale-105 transition-transform';
+    iconC.innerHTML = PENCIL_WRITE_SVG;
 
     const textC = document.createElement('div');
     const titleC = document.createElement('div');
@@ -612,7 +650,7 @@ export function mount(rootEl) {
     leftC.appendChild(textC);
 
     const badgeC = document.createElement('span');
-    badgeC.className = 'px-3 py-1 rounded-full text-xs font-bold bg-indigo-600 text-white shrink-0';
+    badgeC.className = 'px-3.5 py-1.5 rounded-full text-xs font-bold bg-indigo-600 text-white shrink-0 group-hover:shadow-xs transition';
     badgeC.textContent = 'Write →';
 
     btnContinue.appendChild(leftC);
@@ -637,8 +675,8 @@ export function mount(rootEl) {
 
     const iconR = document.createElement('div');
     iconR.className =
-      'w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center text-lg shrink-0';
-    iconR.textContent = '👓';
+      'w-11 h-11 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center p-2.5 shrink-0 group-hover:scale-105 transition-transform';
+    iconR.innerHTML = BOOK_OPEN_SVG;
 
     const textR = document.createElement('div');
     const titleR = document.createElement('div');
@@ -656,7 +694,7 @@ export function mount(rootEl) {
 
     const badgeR = document.createElement('span');
     badgeR.className =
-      'px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 shrink-0';
+      'px-3.5 py-1.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition shrink-0';
     badgeR.textContent = 'Read →';
 
     btnRead.appendChild(leftR);
@@ -693,8 +731,9 @@ export function mount(rootEl) {
     const backBtn = document.createElement('button');
     backBtn.type = 'button';
     backBtn.id = 'btn-back-to-book-menu';
-    backBtn.className = 'text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer';
-    backBtn.textContent = '← Back to Book Menu';
+    backBtn.className =
+      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 active:scale-95 transition-all cursor-pointer';
+    backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>Back to Book Menu</span>`;
     backBtn.addEventListener('click', () => {
       currentView = 'book-menu';
       render();
@@ -703,13 +742,13 @@ export function mount(rootEl) {
     const readLink = document.createElement('button');
     readLink.type = 'button';
     readLink.id = 'btn-shortcut-read-all';
-    readLink.className = 'text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer flex items-center gap-1';
-    readLink.textContent = '👓 Read All Chapters';
+    readLink.className =
+      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer';
+    readLink.innerHTML = `${BOOK_OPEN_SVG} <span>Read All Chapters</span>`;
     readLink.addEventListener('click', () => {
       currentView = 'book-read';
       render();
     });
-
     backBar.appendChild(backBtn);
     backBar.appendChild(readLink);
     wrap.appendChild(backBar);
@@ -806,8 +845,8 @@ export function mount(rootEl) {
     cardHeader.className = 'flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800';
 
     const modeTitle = document.createElement('span');
-    modeTitle.className = 'text-sm font-bold text-indigo-600 dark:text-indigo-400';
-    modeTitle.textContent = isNew ? '✍️ Writing New Chapter' : '✍️ Editing Chapter Summary';
+    modeTitle.className = 'text-sm font-bold text-indigo-600 dark:text-indigo-400 inline-flex items-center gap-1.5';
+    modeTitle.innerHTML = `${PENCIL_WRITE_SVG} <span>${isNew ? 'Writing New Chapter' : 'Editing Chapter Summary'}</span>`;
 
     const statusSpan = document.createElement('span');
     statusSpan.id = 'chapter-save-status';
@@ -856,19 +895,18 @@ export function mount(rootEl) {
     const bulletBtn = document.createElement('button');
     bulletBtn.type = 'button';
     bulletBtn.id = 'btn-chapter-bullet';
-    bulletBtn.title = 'Insert Bullet / Dot list';
+    bulletBtn.title = 'Insert Bullet list';
     bulletBtn.className =
-      'min-h-[44px] px-3 py-2 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer flex items-center gap-1 active:scale-95';
-    bulletBtn.textContent = '• Dot';
+      'min-h-[44px] px-3 py-1.5 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer inline-flex items-center gap-1.5 active:scale-95';
+    bulletBtn.innerHTML = `${LIST_BULLET_SVG} <span>Bullet</span>`;
 
     const numberBtn = document.createElement('button');
     numberBtn.type = 'button';
     numberBtn.id = 'btn-chapter-number';
     numberBtn.title = 'Insert Numbered list';
     numberBtn.className =
-      'min-h-[44px] px-3 py-2 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer flex items-center gap-1 active:scale-95';
-    numberBtn.textContent = '1. Number';
-
+      'min-h-[44px] px-3 py-1.5 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer inline-flex items-center gap-1.5 active:scale-95';
+    numberBtn.innerHTML = `${LIST_NUMBER_SVG} <span>Numbered</span>`;
     toolbar.appendChild(bulletBtn);
     toolbar.appendChild(numberBtn);
     contentHeader.appendChild(contentLabel);
@@ -957,8 +995,8 @@ export function mount(rootEl) {
       viewCompiledBtn.type = 'button';
       viewCompiledBtn.id = 'btn-view-compiled-reader';
       viewCompiledBtn.className =
-        'min-h-[44px] px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold rounded-xl transition cursor-pointer flex items-center';
-      viewCompiledBtn.textContent = '👓 Read Summary';
+        'min-h-[44px] px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-95 text-zinc-700 dark:text-zinc-300 text-xs font-semibold rounded-xl transition cursor-pointer inline-flex items-center gap-1.5';
+      viewCompiledBtn.innerHTML = `${BOOK_OPEN_SVG} <span>Read Summary</span>`;
       viewCompiledBtn.addEventListener('click', () => {
         currentView = 'book-read';
         render();
@@ -1046,8 +1084,9 @@ export function mount(rootEl) {
     const backBtn = document.createElement('button');
     backBtn.type = 'button';
     backBtn.id = 'btn-back-from-read-to-menu';
-    backBtn.className = 'text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer';
-    backBtn.textContent = '← Back to Book Menu';
+    backBtn.className =
+      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 active:scale-95 transition-all cursor-pointer';
+    backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>Back to Book Menu</span>`;
     backBtn.addEventListener('click', () => {
       currentView = 'book-menu';
       render();
@@ -1056,8 +1095,9 @@ export function mount(rootEl) {
     const writeShortcut = document.createElement('button');
     writeShortcut.type = 'button';
     writeShortcut.id = 'btn-shortcut-continue-summary';
-    writeShortcut.className = 'text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer';
-    writeShortcut.textContent = 'Continue Summary ✍️';
+    writeShortcut.className =
+      'min-h-[44px] inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 active:scale-95 transition-all cursor-pointer';
+    writeShortcut.innerHTML = `<span>Continue Summary</span> ${PENCIL_WRITE_SVG}`;
     writeShortcut.addEventListener('click', () => {
       selectedChapterId = 'new';
       currentView = 'book-edit';
@@ -1152,8 +1192,9 @@ export function mount(rootEl) {
     const backBtn = document.createElement('button');
     backBtn.type = 'button';
     backBtn.id = 'btn-back-from-journal-to-activities';
-    backBtn.className = 'text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer';
-    backBtn.textContent = '← Back to Activities';
+    backBtn.className =
+      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 active:scale-95 transition-all cursor-pointer';
+    backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>Back to Activities</span>`;
     backBtn.addEventListener('click', () => {
       currentView = 'home';
       render();
@@ -1161,9 +1202,9 @@ export function mount(rootEl) {
 
     const statusBadge = document.createElement('span');
     statusBadge.id = 'journal-status';
-    statusBadge.className = 'text-xs text-zinc-400 dark:text-zinc-500';
+    statusBadge.className =
+      'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800/80';
     statusBadge.textContent = journalStatus;
-
     backBar.appendChild(backBtn);
     backBar.appendChild(statusBadge);
     wrap.appendChild(backBar);
@@ -1212,17 +1253,16 @@ export function mount(rootEl) {
     bulletBtn.id = 'btn-journal-bullet';
     bulletBtn.title = 'Insert Bullet / Dot';
     bulletBtn.className =
-      'px-2.5 py-1 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer flex items-center gap-1 active:scale-95';
-    bulletBtn.textContent = '• Dot';
+      'min-h-[44px] px-3 py-1.5 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer inline-flex items-center gap-1.5 active:scale-95';
+    bulletBtn.innerHTML = `${LIST_BULLET_SVG} <span>Bullet</span>`;
 
     const numberBtn = document.createElement('button');
     numberBtn.type = 'button';
     numberBtn.id = 'btn-journal-number';
     numberBtn.title = 'Insert Numbered list';
     numberBtn.className =
-      'px-2.5 py-1 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer flex items-center gap-1 active:scale-95';
-    numberBtn.textContent = '1. Number';
-
+      'min-h-[44px] px-3 py-1.5 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer inline-flex items-center gap-1.5 active:scale-95';
+    numberBtn.innerHTML = `${LIST_NUMBER_SVG} <span>Numbered</span>`;
     toolbar.appendChild(bulletBtn);
     toolbar.appendChild(numberBtn);
     row.appendChild(label);

@@ -3,6 +3,12 @@ import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  server: {
+    host: true,
+  },
+  preview: {
+    host: true,
+  },
   plugins: [
     tailwindcss(),
     VitePWA({
@@ -10,6 +16,7 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.js',
       registerType: 'autoUpdate',
+      injectRegister: null,
       manifest: {
         name: 'Habbit',
         short_name: 'Habbit',

@@ -16,6 +16,8 @@ import {
   onChange,
 } from '../data/repo.js';
 import { navigate, showToast } from './shell.js';
+import { parseStructuredJournalBlocks } from '../domain/journal.js';
+import { htmlToText } from '../domain/text.js';
 
 /**
  * Escapes unsafe HTML characters.
@@ -40,10 +42,12 @@ function escapeHtml(str) {
  * @param {Array<[number, number]>} highlights
  */
 function setSnippetContent(containerEl, content, highlights) {
-  if (!content) {
+  const plainContent = content ? htmlToText(content) : '';
+  if (!plainContent) {
     containerEl.innerHTML = '<span class="text-zinc-400 italic">No entry text</span>';
     return;
   }
+  content = plainContent;
 
   if (!highlights || highlights.length === 0) {
     containerEl.textContent = content;
@@ -237,9 +241,38 @@ export function mount(el) {
     const body = document.createElement('div');
     body.className = 'p-5 overflow-y-auto flex-1';
     const contentEl = document.createElement('div');
-    contentEl.className = 'journal-reader-text text-sm sm:text-base text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap break-words leading-relaxed select-text';
-    contentEl.textContent = entry.content || 'No entry text';
-    body.appendChild(contentEl);
+    contentEl.className = 'journal-reader-text flex flex-col gap-4 text-sm sm:text-base text-zinc-800 dark:text-zinc-200 break-words leading-relaxed select-text';
+
+    if (!entry.content || !entry.content.trim()) {
+      contentEl.textContent = 'No entry text';
+    } else {
+      const blocks = parseStructuredJournalBlocks(entry.content);
+      if (blocks.length === 1 && blocks[0].type === 'freeform') {
+        const p = document.createElement('div');
+        p.className = 'whitespace-pre-wrap';
+        p.textContent = blocks[0].contentHtml;
+        contentEl.appendChild(p);
+      } else {
+        for (const block of blocks) {
+          const sectionEl = document.createElement('section');
+          sectionEl.className = 'journal-reader-section flex flex-col gap-1.5 p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800';
+
+          const h4 = document.createElement('h4');
+          h4.className = 'font-bold text-sm text-zinc-900 dark:text-zinc-100 leading-snug';
+          h4.textContent = block.title;
+          sectionEl.appendChild(h4);
+
+          const answerDiv = document.createElement('div');
+          answerDiv.className = 'journal-reader-answer text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-6 [&_ol]:my-1.5 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-6 [&_ul]:my-1.5 [&_p]:my-1';
+          answerDiv.innerHTML = block.contentHtml;
+          if (answerDiv.children.length === 0 && !answerDiv.textContent) {
+            answerDiv.textContent = block.contentHtml.replace(/<[^>]*>/g, '').trim();
+          }
+          sectionEl.appendChild(answerDiv);
+          contentEl.appendChild(sectionEl);
+        }
+      }
+    }
     dialog.appendChild(body);
 
     // Footer

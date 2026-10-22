@@ -15,6 +15,7 @@ import {
 } from '../data/repo.js';
 import { navigate, showToast } from './shell.js';
 import { LINKED_ACTIVITIES } from '../shared/contracts.js';
+import { JOURNAL_SUBVIEW } from '../domain/journal.js';
 
 /**
  * Mounts the Today tab into the provided element.
@@ -358,10 +359,23 @@ export function mount(el) {
         }`;
         nameEl.textContent = habit.name;
         if (habit.linkedActivity) {
-          nameEl.classList.add('cursor-pointer', 'hover:text-indigo-600');
-          nameEl.addEventListener('click', () => {
+          const isJournal = habit.linkedActivity === LINKED_ACTIVITIES.JOURNAL;
+          const navigateToActivity = () => {
+            if (typeof window !== 'undefined' && window.location && window.history) {
+              try {
+                const url = new URL(window.location.href);
+                if (isJournal) {
+                  url.searchParams.set('subview', JOURNAL_SUBVIEW);
+                } else {
+                  url.searchParams.delete('subview');
+                }
+                window.history.replaceState({}, '', url.toString());
+              } catch {}
+            }
             navigate('activities');
-          });
+          };
+          nameEl.classList.add('cursor-pointer', 'hover:text-indigo-600');
+          nameEl.addEventListener('click', navigateToActivity);
           const actBadge = document.createElement('button');
           actBadge.type = 'button';
           actBadge.className =
@@ -369,7 +383,7 @@ export function mount(el) {
           actBadge.textContent = habit.linkedActivity === LINKED_ACTIVITIES.BOOK_SUMMARY ? '📖 Book Summary' : '✍️ Journal';
           actBadge.addEventListener('click', (e) => {
             e.stopPropagation();
-            navigate('activities');
+            navigateToActivity();
           });
           leftWrap.appendChild(actBadge);
         }

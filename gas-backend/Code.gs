@@ -828,9 +828,37 @@ function getOrCreateDiaryDoc(folder, year, props) {
 
 function writeEntryParagraphs(body, startIndex, lines) {
   let pos = startIndex;
-  for (const line of lines) {
-    const p = pos === -1 ? body.appendParagraph(line) : body.insertParagraph(pos++, line);
+  for (const rawLine of lines) {
+    const line = String(rawLine ?? '');
+    const trimmed = line.trim();
+
+    // Check if line contains a question heading (HTML <h3> or Markdown ###)
+    const h3Match = trimmed.match(/<h3[^>]*>([\s\S]*?)<\/h3>/i) || trimmed.match(/^###\s*(.*)$/);
+    if (h3Match) {
+      const headingText = h3Match[1].replace(/<[^>]*>/g, '').trim();
+      const p = pos === -1 ? body.appendParagraph(headingText) : body.insertParagraph(pos++, headingText);
+      p.setHeading(DocumentApp.ParagraphHeading.NORMAL);
+      if (typeof p.setBold === 'function') {
+        p.setBold(true);
+      }
+      continue;
+    }
+
+    // Skip pure block opening/closing HTML tags
+    if (/^<\/?(?:div|section)\b[^>]*>$/i.test(trimmed)) {
+      continue;
+    }
+
+    // Clean inline tags from answer text
+    const cleanText = line.includes('<') && line.includes('>')
+      ? line.replace(/<[^>]*>/g, '').trim()
+      : line;
+
+    const p = pos === -1 ? body.appendParagraph(cleanText) : body.insertParagraph(pos++, cleanText);
     p.setHeading(DocumentApp.ParagraphHeading.NORMAL);
+    if (typeof p.setBold === 'function') {
+      p.setBold(false);
+    }
   }
   const blank = pos === -1 ? body.appendParagraph('') : body.insertParagraph(pos++, '');
   blank.setHeading(DocumentApp.ParagraphHeading.NORMAL);

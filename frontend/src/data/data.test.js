@@ -27,6 +27,7 @@ import {
   saveBookChapter,
   listBookChapters,
   triggerActivityCheckIn,
+  triggerActivityUncheck,
 } from './repo.js';
 import {
   getOutboxEntries,
@@ -920,5 +921,33 @@ describe('Data Layer - API & Sync Flow', () => {
     const outbox = await getOutboxEntries();
     const bookOutbox = outbox.filter((o) => o.type === 'books' || o.type === 'bookChapters');
     expect(bookOutbox.length).toBe(0);
+  });
+
+  it('bidirectionally checks in and unchecks habits linked to journal on saveJournalEntry', async () => {
+    const habit = await addHabit('Daily Reflection', { linkedActivity: 'journal' });
+    expect(habit.linkedActivity).toBe('journal');
+
+    // Initially not checked in
+    let checkIns = await getCheckInDays(habit.id);
+    expect(checkIns.has('2026-10-20')).toBe(false);
+
+    // Saving non-empty journal for today automatically checks in
+    await saveJournalEntry('2026-10-20', '<p>Reflected on accomplishments</p>');
+    checkIns = await getCheckInDays(habit.id);
+    expect(checkIns.has('2026-10-20')).toBe(true);
+
+    // Saving empty journal for today automatically unchecks
+    await saveJournalEntry('2026-10-20', '');
+    checkIns = await getCheckInDays(habit.id);
+    expect(checkIns.has('2026-10-20')).toBe(false);
+
+    // Direct triggerActivityCheckIn and triggerActivityUncheck
+    await triggerActivityCheckIn('journal');
+    checkIns = await getCheckInDays(habit.id);
+    expect(checkIns.has('2026-10-20')).toBe(true);
+
+    await triggerActivityUncheck('journal');
+    checkIns = await getCheckInDays(habit.id);
+    expect(checkIns.has('2026-10-20')).toBe(false);
   });
 });

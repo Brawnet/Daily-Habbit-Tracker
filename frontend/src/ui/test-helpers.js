@@ -119,6 +119,10 @@ export class MockElement {
     return this.attributes[name] ?? null;
   }
 
+  getAttributeNames() {
+    return Object.keys(this.attributes);
+  }
+
   removeAttribute(name) {
     delete this.attributes[name];
     if (name === 'id') {
@@ -136,6 +140,15 @@ export class MockElement {
   }
 
   remove() {
+    const unregister = (el) => {
+      if (el.doc && el._id) {
+        el.doc.elementsById.delete(el._id);
+      }
+      for (const child of el.children) {
+        unregister(child);
+      }
+    };
+    unregister(this);
     if (this.parentElement) {
       const idx = this.parentElement.children.indexOf(this);
       if (idx !== -1) {

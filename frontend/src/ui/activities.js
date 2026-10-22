@@ -17,8 +17,19 @@ import {
   listBookChapters,
   getJournalEntry,
   saveJournalEntry,
+  getSetting,
+  setSetting,
   onChange,
 } from '../data/repo.js';
+import {
+  DEFAULT_JOURNAL_PROMPTS,
+  loadJournalPrompts,
+  saveJournalPrompts,
+  compilePromptJournal,
+  decompilePromptJournal,
+  renderPromptCardsJournal,
+  openCustomizePromptsModal,
+} from './journal-prompts.js';
 import { today } from '../domain/day.js';
 import { showToast } from './shell.js';
 import { isBlank, htmlToText, htmlToMarkdownText } from '../domain/text.js';
@@ -112,7 +123,7 @@ export const BOOKS_SUMMARY_LOGO_SVG = `
 </svg>
 `.trim();
 
-const CHEVRON_LEFT_SVG = `
+export const CHEVRON_LEFT_SVG = `
 <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <path d="M15 19l-7-7 7-7" />
 </svg>
@@ -136,13 +147,13 @@ const PLUS_SVG = `
 </svg>
 `.trim();
 
-const LIST_BULLET_SVG = `
+export const LIST_BULLET_SVG = `
 <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <path d="M4 6h.01M4 12h.01M4 18h.01M8 6h12M8 12h12M8 18h12" />
 </svg>
 `.trim();
 
-const LIST_NUMBER_SVG = `
+export const LIST_NUMBER_SVG = `
 <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <path d="M4 6h1v4m-1 0h2m-2 4h2a1 1 0 011 1v1a1 1 0 01-1 1h-2v2h3M10 6h10M10 12h10M10 18h10" />
 </svg>
@@ -163,6 +174,15 @@ export function mount(rootEl) {
 
   // View state: 'home' | 'journal' | 'books-list' | 'book-menu' | 'book-edit' | 'book-read'
   let currentView = 'home';
+  try {
+    if (typeof window !== 'undefined' && window.location) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('subview') === 'journal' || params.get('view') === 'journal') {
+        currentView = 'journal';
+      }
+    }
+  } catch {}
+
   let selectedBookId = null;
   let selectedChapterId = 'new'; // 'new' | chapterId
   let isAddingBook = false;
@@ -173,7 +193,17 @@ export function mount(rootEl) {
   let journalDraft = '';
   let journalStatus = 'Saved';
   let chapterStatus = 'Saved';
-
+  let cachedPrompts = JSON.parse(JSON.stringify(DEFAULT_JOURNAL_PROMPTS));
+  loadJournalPrompts(getSetting)
+    .then((p) => {
+      if (Array.isArray(p) && p.length > 0) {
+        cachedPrompts = p;
+        if (isMounted && currentView === 'journal') {
+          render();
+        }
+      }
+    })
+    .catch(() => {});
   rootEl.innerHTML = '';
 
   const container = document.createElement('div');
@@ -185,6 +215,9 @@ export function mount(rootEl) {
     .then((entry) => {
       if (entry?.content) {
         journalDraft = entry.content;
+        if (isMounted) {
+          render();
+        }
       }
     })
     .catch(() => {});
@@ -328,9 +361,16 @@ export function mount(rootEl) {
     leftJ.appendChild(textJ);
 
     const actionJ = document.createElement('span');
-    actionJ.className =
-      'inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 group-hover:bg-indigo-50 group-hover:text-indigo-600 dark:group-hover:bg-indigo-950/60 dark:group-hover:text-indigo-400 transition-colors shrink-0';
-    actionJ.textContent = 'Write Journal →';
+    const isTodayJournalDone = Boolean(journalDraft && journalDraft.trim());
+    if (isTodayJournalDone) {
+      actionJ.className =
+        'inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60 transition-colors shrink-0';
+      actionJ.textContent = 'Done ✓';
+    } else {
+      actionJ.className =
+        'inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 group-hover:bg-indigo-50 group-hover:text-indigo-600 dark:group-hover:bg-indigo-950/60 dark:group-hover:text-indigo-400 transition-colors shrink-0';
+      actionJ.textContent = 'Write Journal →';
+    }
     btnJournal.appendChild(leftJ);
     btnJournal.appendChild(actionJ);
     btnJournal.addEventListener('click', () => {
@@ -1179,154 +1219,73 @@ export function mount(rootEl) {
     return wrap;
   }
 
-  // --- 6. Journals View ---
+  // --- 6. Journals View (Prototype) ---
   async function renderJournalView() {
     const wrap = document.createElement('div');
     wrap.id = 'journal-view';
-    wrap.className = 'flex flex-col gap-4 animate-in fade-in duration-150';
+    wrap.className = 'flex flex-col gap-4 animate-in fade-in duration-150 relative';
 
-    const backBar = document.createElement('div');
-    backBar.className = 'flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800';
+    let prompts = cachedPrompts;
+    const { answers, additionalNotes } = decompilePromptJournal(journalDraft, prompts);
+    let currentNotes = additionalNotes;
 
-    const backBtn = document.createElement('button');
-    backBtn.type = 'button';
-    backBtn.id = 'btn-back-from-journal-to-activities';
-    backBtn.className =
-      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 active:scale-95 transition-all cursor-pointer';
-    backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>Back to Activities</span>`;
-    backBtn.addEventListener('click', () => {
-      currentView = 'home';
-      render();
-    });
-
-    const statusBadge = document.createElement('span');
-    statusBadge.id = 'journal-status';
-    statusBadge.className =
-      'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800/80';
-    statusBadge.textContent = journalStatus;
-    backBar.appendChild(backBtn);
-    backBar.appendChild(statusBadge);
-    wrap.appendChild(backBar);
-
-    const card = document.createElement('div');
-    card.className = 'flex flex-col gap-4 p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs';
-
-    const cardHeader = document.createElement('div');
-    cardHeader.className = 'flex items-center gap-2 pb-2 border-b border-zinc-100 dark:border-zinc-800';
-
-    const iconJ = document.createElement('div');
-    iconJ.className =
-      'w-10 h-10 rounded-xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center p-1.5 shrink-0 border border-zinc-200/80 dark:border-zinc-700/80 shadow-xs';
-    iconJ.innerHTML = JOURNALING_LOGO_SVG;
-
-    const titleWrap = document.createElement('div');
-    const h2 = document.createElement('h2');
-    h2.className = 'text-base font-bold text-zinc-900 dark:text-zinc-100';
-    h2.textContent = 'Daily Journal Reflection';
-
-    const p = document.createElement('p');
-    p.className = 'text-xs text-zinc-500';
-    p.textContent = 'Personal thoughts, memories, and ideas for today';
-
-    titleWrap.appendChild(h2);
-    titleWrap.appendChild(p);
-    cardHeader.appendChild(iconJ);
-    cardHeader.appendChild(titleWrap);
-    card.appendChild(cardHeader);
-
-    const formGroup = document.createElement('div');
-    formGroup.className = 'flex flex-col gap-1.5';
-
-    const row = document.createElement('div');
-    row.className = 'flex items-center justify-between';
-
-    const label = document.createElement('label');
-    label.className = 'text-xs font-semibold text-zinc-500';
-    label.textContent = 'Reflections & Notes';
-
-    const toolbar = document.createElement('div');
-    toolbar.className = 'flex items-center gap-1.5';
-
-    const bulletBtn = document.createElement('button');
-    bulletBtn.type = 'button';
-    bulletBtn.id = 'btn-journal-bullet';
-    bulletBtn.title = 'Insert Bullet / Dot';
-    bulletBtn.className =
-      'min-h-[44px] px-3 py-1.5 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer inline-flex items-center gap-1.5 active:scale-95';
-    bulletBtn.innerHTML = `${LIST_BULLET_SVG} <span>Bullet</span>`;
-
-    const numberBtn = document.createElement('button');
-    numberBtn.type = 'button';
-    numberBtn.id = 'btn-journal-number';
-    numberBtn.title = 'Insert Numbered list';
-    numberBtn.className =
-      'min-h-[44px] px-3 py-1.5 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer inline-flex items-center gap-1.5 active:scale-95';
-    numberBtn.innerHTML = `${LIST_NUMBER_SVG} <span>Numbered</span>`;
-    toolbar.appendChild(bulletBtn);
-    toolbar.appendChild(numberBtn);
-    row.appendChild(label);
-    row.appendChild(toolbar);
-
-    const jEditor = document.createElement('div');
-    jEditor.id = 'editor-journal-content';
-    jEditor.setAttribute('contenteditable', 'true');
-    jEditor.setAttribute('role', 'textbox');
-    jEditor.setAttribute('aria-multiline', 'true');
-    jEditor.className =
-      'rich-editor w-full min-h-[200px] p-3.5 text-base rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 overflow-y-auto leading-relaxed outline-none [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-7 [&_ol]:my-2 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-7 [&_ul]:my-2 [&_ul]:space-y-1 [&_li]:pl-1 [&_li]:leading-relaxed [&_p]:my-1.5 [&_p]:leading-relaxed';
-
-    formGroup.appendChild(row);
-    formGroup.appendChild(jEditor);
-    card.appendChild(formGroup);
-
-    const footer = document.createElement('div');
-    footer.className = 'flex items-center justify-between text-xs text-zinc-400';
-
-    const note = document.createElement('span');
-    note.textContent = 'Always editable';
-
-    const jWordCount = document.createElement('span');
-    jWordCount.id = 'journal-word-count';
-    jWordCount.className = 'font-mono';
-    jWordCount.textContent = '0 words';
-
-    footer.appendChild(note);
-    footer.appendChild(jWordCount);
-    card.appendChild(footer);
-
-    const { insertBullet: jBullet, insertNumber: jNum } = attachRichListEditor(
-      jEditor,
-      journalDraft,
-      (html) => {
-        journalDraft = html;
-        const textOnly = htmlToText(html);
-        jWordCount.textContent = `${textOnly ? textOnly.split(/\s+/).filter(Boolean).length : 0} words`;
-
-        statusBadge.textContent = 'Saving...';
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(async () => {
-          try {
-            await saveJournalEntry(today(), htmlToMarkdownText(journalDraft));
-            statusBadge.textContent = 'Saved';
-          } catch {
-            statusBadge.textContent = 'Error';
-          }
-        }, 800);
+    function handleUpdateAnswers(updatedNotes) {
+      if (typeof updatedNotes === 'string') {
+        currentNotes = updatedNotes;
       }
-    );
+      const statusBadge =
+        wrap.querySelector('#journal-status') ||
+        wrap.querySelector('#journal-status-badge');
+      if (statusBadge) statusBadge.textContent = 'Saving...';
 
-    const initWords = htmlToText(journalDraft);
-    jWordCount.textContent = `${initWords ? initWords.split(/\s+/).filter(Boolean).length : 0} words`;
-    bulletBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      jBullet();
-    });
-    numberBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      jNum();
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(async () => {
+        try {
+          const compiled = compilePromptJournal(prompts, answers, currentNotes);
+          journalDraft = compiled;
+          await saveJournalEntry(today(), compiled);
+          if (statusBadge) statusBadge.textContent = 'Saved';
+        } catch {
+          if (statusBadge) statusBadge.textContent = 'Error';
+        }
+      }, 800);
+    }
+
+    function handleSavePrompts(newPrompts) {
+      cachedPrompts = newPrompts;
+      prompts = newPrompts;
+      saveJournalPrompts(setSetting, newPrompts);
+      const compiled = compilePromptJournal(newPrompts, answers, currentNotes);
+      journalDraft = compiled;
+      saveJournalEntry(today(), compiled).catch(() => {});
+    }
+
+    function handleOpenCustomizeModal() {
+      openCustomizePromptsModal({
+        prompts,
+        onSave: (p) => {
+          handleSavePrompts(p);
+        },
+        onClose: () => {
+          render();
+        },
+      });
+    }
+
+    const cardsEl = renderPromptCardsJournal({
+      prompts,
+      answers,
+      additionalNotes: currentNotes,
+      status: journalStatus,
+      onUpdateAnswers: handleUpdateAnswers,
+      onOpenCustomizeModal: handleOpenCustomizeModal,
+      onBack: () => {
+        currentView = 'home';
+        render();
+      },
     });
 
-    wrap.appendChild(card);
+    wrap.appendChild(cardsEl);
     return wrap;
   }
 
@@ -1336,10 +1295,10 @@ export function mount(rootEl) {
   return () => {
     isMounted = false;
     clearTimeout(debounceTimer);
+
     unsubscribeRepo();
   };
 }
-
 /**
  * Rich Editor helper supporting hanging indents (list-outside) and auto-conversion:
  * - Typing "1." or "1" + space -> converts automatically to a numbered list

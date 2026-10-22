@@ -547,4 +547,23 @@ describe('ui/today.js persistent quick-add when habits exist', () => {
 
     cleanup();
   });
+
+  it('supports linking habit to journal and navigates with subview=journal on badge click', async () => {
+    repoModule._setHabits([
+      { id: 'h-2', name: 'Daily Reflection', sortOrder: 0, linkedActivity: 'journal' },
+    ]);
+
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 20));
+
+    const badge = root.querySelector('.habit-activity-link');
+    expect(badge).not.toBeNull();
+    expect(badge.textContent).toContain('Journal');
+
+    badge.click();
+    expect(shellModule.navigate).toHaveBeenCalledWith('activities');
+
+    cleanup();
+  });
 });

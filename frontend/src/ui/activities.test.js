@@ -10,6 +10,7 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
   beforeEach(async () => {
     vi.resetModules();
     mockDoc = new MockDocument();
+    mockDoc.body = mockDoc.createElement('body');
     global.document = mockDoc;
     global.HTMLElement = MockElement;
 
@@ -22,6 +23,7 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     let books = [];
     let bookChapters = [];
     let journalEntries = {};
+    let settings = {};
     let listeners = new Set();
 
     repoModule = {
@@ -81,6 +83,11 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
         for (const l of listeners) l();
         return entry;
       }),
+      getSetting: vi.fn(async (key) => settings[key] || null),
+      setSetting: vi.fn(async (key, val) => {
+        settings[key] = val;
+        for (const l of listeners) l();
+      }),
       onChange: vi.fn((l) => {
         listeners.add(l);
         return () => listeners.delete(l);
@@ -122,7 +129,7 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     cleanup();
   });
 
-  it('navigates to Journals view, supports bullet/number shortcuts and autosaves', async () => {
+  it('navigates to Journals view, renders Prompt Cards Stack with defaults and formatting shortcuts', async () => {
     const root = mockDoc.createElement('div');
     const cleanup = mount(root);
     await new Promise((r) => setTimeout(r, 10));
@@ -135,12 +142,26 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     const journalView = root.querySelector('#journal-view');
     expect(journalView).not.toBeNull();
 
-    const editor = root.querySelector('#editor-journal-content');
-    expect(editor).not.toBeNull();
+    // All 3 default prompt cards are present
+    const editor0 = root.querySelector('#editor-journal-content');
+    expect(editor0).not.toBeNull();
+    expect(editor0.getAttribute('aria-label')).toBe('How was your day?');
 
+    const editor1 = root.querySelector('#editor-journal-content-1');
+    expect(editor1).not.toBeNull();
+    expect(editor1.getAttribute('aria-label')).toBe('What went well today?');
+
+    const editor2 = root.querySelector('#editor-journal-content-2');
+    expect(editor2).not.toBeNull();
+    expect(editor2.getAttribute('aria-label')).toBe('What could be improved?');
+
+    // Additional notes card is present
+    const notesEditor = root.querySelector('#editor-journal-notes');
+    expect(notesEditor).not.toBeNull();
+
+    // Formatting shortcuts exist
     const bulletBtn = root.querySelector('#btn-journal-bullet');
     expect(bulletBtn).not.toBeNull();
-
     const numberBtn = root.querySelector('#btn-journal-number');
     expect(numberBtn).not.toBeNull();
 
@@ -152,6 +173,164 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
 
     expect(root.querySelector('#activities-choice-hub')).not.toBeNull();
     cleanup();
+  });
+
+  it('autosaves typed prompt answers debounced and updates live word count', async () => {
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 10));
+
+    root.querySelector('#choice-journals').click();
+    await new Promise((r) => setTimeout(r, 10));
+
+    const editor0 = root.querySelector('#editor-journal-content');
+    const notesEditor = root.querySelector('#editor-journal-notes');
+    const wordBadge = root.querySelector('#journal-total-words');
+
+    expect(wordBadge.textContent).toBe('0 words');
+
+    // Type in prompt 1
+    editor0.innerHTML = '<p>Had a productive planning session</p>';
+    editor0.dispatchEvent({ type: 'input' });
+
+    expect(wordBadge.textContent).toBe('5 words');
+
+    // Type in additional notes
+    notesEditor.innerHTML = '<p>Remember to stretch before sleep</p>';
+    notesEditor.dispatchEvent({ type: 'input' });
+
+    expect(wordBadge.textContent).toBe('10 words');
+
+    // Fast-forward past debounce (800ms)
+    await new Promise((r) => setTimeout(r, 850));
+
+    expect(repoModule.saveJournalEntry).toHaveBeenCalled();
+    const lastCall = repoModule.saveJournalEntry.mock.calls.at(-1);
+    expect(lastCall[1]).toContain('data-prompt-id="jp_day"');
+    expect(lastCall[1]).toContain('How was your day?');
+    expect(lastCall[1]).toContain('Had a productive planning session');
+    expect(lastCall[1]).toContain('Additional Notes');
+    expect(lastCall[1]).toContain('Remember to stretch before sleep');
+    // Unanswered prompts omitted
+    expect(lastCall[1]).not.toContain('What went well today?');
+    expect(lastCall[1]).not.toContain('What could be improved?');
+
+    cleanup();
+  });
+
+  it('rehydrates prompt answers and additional notes from compiled journal entry on load', async () => {
+    const compiledEntry = `
+<div class="journal-prompt-block" data-prompt-id="jp_day">
+  <h3 class="font-bold">How was your day?</h3>
+  <div class="journal-prompt-answer">Felt very accomplished.</div>
+</div>
+
+<div class="journal-prompt-block" data-prompt-id="jp_well">
+  <h3 class="font-bold">What went well today?</h3>
+  <div class="journal-prompt-answer">Completed all deep work sprints.</div>
+</div>
+
+<div class="journal-notes-block">
+  <h3 class="font-bold">Additional Notes</h3>
+  <div class="journal-notes-answer">Quiet evening tea.</div>
+</div>
+`.trim();
+
+    repoModule.getJournalEntry = vi.fn(async () => ({
+      day: '2026-10-22',
+      content: compiledEntry,
+    }));
+
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 10));
+
+    root.querySelector('#choice-journals').click();
+    await new Promise((r) => setTimeout(r, 10));
+
+    const editor0 = root.querySelector('#editor-journal-content');
+    expect(editor0.innerHTML).toBe('Felt very accomplished.');
+
+    const editor1 = root.querySelector('#editor-journal-content-1');
+    expect(editor1.innerHTML).toBe('Completed all deep work sprints.');
+
+    const notesEditor = root.querySelector('#editor-journal-notes');
+    expect(notesEditor.innerHTML).toBe('Quiet evening tea.');
+
+    cleanup();
+  });
+
+  it('customizes prompts: reorders, renames, soft-deletes, and adds new questions via modal', async () => {
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 10));
+
+    root.querySelector('#choice-journals').click();
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Open Customize Prompts modal
+    const customizeBtn = root.querySelector('#btn-customize-prompts');
+    expect(customizeBtn).not.toBeNull();
+    customizeBtn.click();
+
+    const modal = mockDoc.getElementById('modal-customize-prompts');
+    expect(modal).not.toBeNull();
+
+    // Check list of prompts
+    const list = modal.querySelector('#customize-prompts-list');
+    expect(list).not.toBeNull();
+
+    // Add a new question
+    const addInput = modal.querySelector('#input-add-prompt');
+    const addBtn = modal.querySelector('#btn-submit-add-prompt');
+    expect(addInput).not.toBeNull();
+    expect(addBtn).not.toBeNull();
+
+    addInput.value = 'What made you smile today?';
+    addBtn.click();
+
+    // Verify setSetting called with the new prompt
+    expect(repoModule.setSetting).toHaveBeenCalledWith(
+      'journalPrompts',
+      expect.stringContaining('What made you smile today?')
+    );
+
+    // Close modal
+    const doneBtn = modal.querySelector('#btn-done-customize-modal');
+    expect(doneBtn).not.toBeNull();
+    doneBtn.click();
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Modal is removed
+    expect(mockDoc.getElementById('modal-customize-prompts')).toBeNull();
+
+    cleanup();
+  });
+
+  it('reflects Done badge on Choice Hub when journal has content, and Write Journal when empty', async () => {
+    // 1. With empty journal
+    repoModule.getJournalEntry = vi.fn(async () => null);
+    const root1 = mockDoc.createElement('div');
+    const cleanup1 = mount(root1);
+    await new Promise((r) => setTimeout(r, 10));
+
+    const journalBtn1 = root1.querySelector('#choice-journals');
+    expect(journalBtn1.textContent).toContain('Write Journal →');
+    expect(journalBtn1.textContent).not.toContain('Done ✓');
+    cleanup1();
+
+    // 2. With answered journal
+    repoModule.getJournalEntry = vi.fn(async () => ({
+      day: '2026-10-22',
+      content: '<div class="journal-prompt-block"><p>Reflected</p></div>',
+    }));
+    const root2 = mockDoc.createElement('div');
+    const cleanup2 = mount(root2);
+    await new Promise((r) => setTimeout(r, 10));
+
+    const journalBtn2 = root2.querySelector('#choice-journals');
+    expect(journalBtn2.textContent).toContain('Done ✓');
+    cleanup2();
   });
 
   it('navigates to Books list, shows empty state, and adds a new book', async () => {

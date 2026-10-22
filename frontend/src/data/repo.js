@@ -336,7 +336,7 @@ export async function saveJournalEntry(day, content) {
   };
 
   await commitSingleMutation(STORES.JOURNAL_ENTRIES, record, 'journalEntries', day);
-  if (day === currentDay && record.content.trim() !== '') {
+  if (day === currentDay && record.content.replace(/<[^>]*>/g, ' ').trim() !== '') {
     try {
       await triggerActivityCheckIn('journal');
     } catch (err) {

@@ -174,7 +174,7 @@ export function mount(el) {
             class="flex-1 min-h-[44px] px-3 py-2 text-base rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           <select
             id="select-habit-linked-activity"
-            class="min-h-[44px] px-3 py-2 text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="min-h-[44px] px-3 py-2 text-base rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             <option value="">No Activity Link</option>
             <option value="book_summary">Link: Book Summary 📖</option>

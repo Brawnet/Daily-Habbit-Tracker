@@ -64,7 +64,7 @@ export function mount(rootEl) {
     .catch(() => {});
 
   const unsubscribeRepo = onChange(() => {
-    if (isMounted) {
+    if (isMounted && currentView !== 'book-edit' && currentView !== 'journal') {
       render();
     }
   });
@@ -281,14 +281,16 @@ export function mount(rootEl) {
       titleInput.id = 'input-new-book-title';
       titleInput.placeholder = 'Book Title *';
       titleInput.className =
-        'w-full px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100';
+        'w-full min-h-[44px] px-3.5 py-2 text-base rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100';
+      titleInput.style.fontSize = '16px';
 
       const authorInput = document.createElement('input');
       authorInput.type = 'text';
       authorInput.id = 'input-new-book-author';
       authorInput.placeholder = 'Author (optional)';
       authorInput.className =
-        'w-full px-3 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100';
+        'w-full min-h-[44px] px-3.5 py-2 text-base rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100';
+      authorInput.style.fontSize = '16px';
 
       const formActions = document.createElement('div');
       formActions.className = 'flex items-center gap-2 pt-1';
@@ -297,7 +299,7 @@ export function mount(rootEl) {
       saveBtn.type = 'button';
       saveBtn.id = 'btn-save-new-book';
       saveBtn.className =
-        'px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg cursor-pointer';
+        'min-h-[44px] px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl cursor-pointer flex items-center justify-center';
       saveBtn.textContent = 'Save Book';
       saveBtn.addEventListener('click', async () => {
         const title = titleInput.value.trim();
@@ -321,7 +323,7 @@ export function mount(rootEl) {
       const cancelBtn = document.createElement('button');
       cancelBtn.type = 'button';
       cancelBtn.id = 'btn-cancel-new-book';
-      cancelBtn.className = 'px-3 py-2 text-zinc-500 hover:text-zinc-700 text-xs font-medium cursor-pointer';
+      cancelBtn.className = 'min-h-[44px] px-3 py-2 text-zinc-500 hover:text-zinc-700 text-xs font-medium cursor-pointer flex items-center justify-center';
       cancelBtn.textContent = 'Cancel';
       cancelBtn.addEventListener('click', () => {
         isAddingBook = false;
@@ -670,8 +672,8 @@ export function mount(rootEl) {
     const select = document.createElement('select');
     select.id = 'chapter-select';
     select.className =
-      'w-full min-h-[44px] px-3.5 py-2.5 text-sm font-medium rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer';
-
+      'w-full min-h-[44px] px-3.5 py-2.5 text-base font-medium rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer';
+    select.style.fontSize = '16px';
     const newOpt = document.createElement('option');
     newOpt.value = 'new';
     newOpt.textContent = `✍️ + Write New Chapter (Active Draft)`;
@@ -740,8 +742,8 @@ export function mount(rootEl) {
     titleInput.placeholder = `e.g. Chapter ${chapters.length + 1}: Key Principles`;
     titleInput.value = titleValue;
     titleInput.className =
-      'w-full px-3.5 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500';
-
+      'w-full min-h-[44px] px-3.5 py-2 text-base rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500';
+    titleInput.style.fontSize = '16px';
     titleGroup.appendChild(titleLabel);
     titleGroup.appendChild(titleInput);
     editCard.appendChild(titleGroup);
@@ -765,7 +767,7 @@ export function mount(rootEl) {
     bulletBtn.id = 'btn-chapter-bullet';
     bulletBtn.title = 'Insert Bullet / Dot list';
     bulletBtn.className =
-      'px-2.5 py-1 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer flex items-center gap-1 active:scale-95';
+      'min-h-[44px] px-3 py-2 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer flex items-center gap-1 active:scale-95';
     bulletBtn.textContent = '• Dot';
 
     const numberBtn = document.createElement('button');
@@ -773,7 +775,7 @@ export function mount(rootEl) {
     numberBtn.id = 'btn-chapter-number';
     numberBtn.title = 'Insert Numbered list';
     numberBtn.className =
-      'px-2.5 py-1 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer flex items-center gap-1 active:scale-95';
+      'min-h-[44px] px-3 py-2 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer flex items-center gap-1 active:scale-95';
     numberBtn.textContent = '1. Number';
 
     toolbar.appendChild(bulletBtn);
@@ -835,17 +837,45 @@ export function mount(rootEl) {
       });
       footer.appendChild(saveChBtn);
     } else {
+      const rightBtns = document.createElement('div');
+      rightBtns.className = 'flex items-center gap-2';
+
+      const saveExistingBtn = document.createElement('button');
+      saveExistingBtn.type = 'button';
+      saveExistingBtn.id = 'btn-save-existing-chapter';
+      saveExistingBtn.className =
+        'min-h-[44px] px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs active:scale-95';
+      saveExistingBtn.textContent = 'Save Changes ✓';
+      saveExistingBtn.addEventListener('click', async () => {
+        if (!currentChapter) return;
+        try {
+          await saveBookChapter({
+            id: currentChapter.id,
+            bookId: currentChapter.bookId,
+            title: currentChapter.title,
+            content: currentChapter.content,
+          });
+          showToast('Chapter updated');
+          statusSpan.textContent = 'Saved';
+        } catch (err) {
+          showToast(err.message || 'Failed to save');
+        }
+      });
+
       const viewCompiledBtn = document.createElement('button');
       viewCompiledBtn.type = 'button';
       viewCompiledBtn.id = 'btn-view-compiled-reader';
       viewCompiledBtn.className =
-        'px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold rounded-xl transition cursor-pointer';
-      viewCompiledBtn.textContent = '👓 View in Read Summary';
+        'min-h-[44px] px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold rounded-xl transition cursor-pointer flex items-center';
+      viewCompiledBtn.textContent = '👓 Read Summary';
       viewCompiledBtn.addEventListener('click', () => {
         currentView = 'book-read';
         render();
       });
-      footer.appendChild(viewCompiledBtn);
+
+      rightBtns.appendChild(saveExistingBtn);
+      rightBtns.appendChild(viewCompiledBtn);
+      footer.appendChild(rightBtns);
     }
 
     editCard.appendChild(footer);
@@ -1006,8 +1036,7 @@ export function mount(rootEl) {
         const contentDiv = document.createElement('div');
         contentDiv.className =
           'flex flex-col gap-2 text-zinc-700 dark:text-zinc-300 text-sm leading-relaxed [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-7 [&_ol]:my-2 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-7 [&_ul]:my-2 [&_ul]:space-y-1 [&_li]:pl-1 [&_li]:leading-relaxed [&_p]:my-1.5 [&_p]:leading-relaxed';
-        contentDiv.innerHTML = textToHtml(ch.content);
-        contentDiv.textContent = ch.content.replace(/<[^>]*>/g, ' ');
+        renderSummaryContent(contentDiv, ch.content);
         chEl.appendChild(contentDiv);
 
         chaptersList.appendChild(chEl);
@@ -1270,34 +1299,56 @@ function attachRichListEditor(editorEl, initialContent, onUpdate) {
 /**
  * Converts plain text or HTML to formatted content with hanging-indented lists (<ol class="list-outside">)
  */
-function textToHtml(content) {
-  if (!content) return '<p><br></p>';
-  if (content.includes('<p>') || content.includes('<li>')) return content;
+function renderSummaryContent(containerEl, content) {
+  if (!content) return;
+  if (content.includes('<p>') || content.includes('<li>')) {
+    containerEl.innerHTML = content;
+    if (!containerEl.children.length) {
+      containerEl.textContent = content.replace(/<[^>]*>/g, ' ');
+    }
+    return;
+  }
   const blocks = content.split('\n\n');
-  return blocks
-    .map((block) => {
-      const lines = block.split('\n');
-      const isBullet = lines.every((l) => /^\s*•\s/.test(l));
-      const isNumber = lines.every((l) => /^\s*\d+\.\s/.test(l));
+  blocks.forEach((block) => {
+    const lines = block.split('\n');
+    const isBullet = lines.every((l) => /^\s*[•\-\*]\s/.test(l));
+    const isNumber = lines.every((l) => /^\s*\d+\.\s/.test(l));
 
-      if (isBullet) {
-        const items = lines
-          .map((l) => `<li class="pl-1 leading-relaxed">${escapeHtml(l.replace(/^\s*•\s*/, ''))}</li>`)
-          .join('');
-        return `<ul class="list-disc list-outside pl-7 my-2 space-y-1">${items}</ul>`;
-      }
-      if (isNumber) {
-        const items = lines
-          .map((l) => `<li class="pl-1 leading-relaxed">${escapeHtml(l.replace(/^\s*\d+\.\s*/, ''))}</li>`)
-          .join('');
-        return `<ol class="list-decimal list-outside pl-7 my-2 space-y-1">${items}</ol>`;
-      }
-
-      return `<p class="my-1.5 leading-relaxed">${lines.map(escapeHtml).join('<br>')}</p>`;
-    })
-    .join('');
+    if (isBullet) {
+      const ul = document.createElement('ul');
+      ul.className = 'list-disc list-outside pl-7 my-2 space-y-1';
+      lines.forEach((l) => {
+        const li = document.createElement('li');
+        li.className = 'pl-1 leading-relaxed';
+        li.textContent = l.replace(/^\s*[•\-\*]\s*/, '');
+        ul.appendChild(li);
+      });
+      containerEl.appendChild(ul);
+    } else if (isNumber) {
+      const ol = document.createElement('ol');
+      ol.className = 'list-decimal list-outside pl-7 my-2 space-y-1';
+      lines.forEach((l) => {
+        const li = document.createElement('li');
+        li.className = 'pl-1 leading-relaxed';
+        li.textContent = l.replace(/^\s*\d+\.\s*/, '');
+        ol.appendChild(li);
+      });
+      containerEl.appendChild(ol);
+    } else {
+      const p = document.createElement('p');
+      p.className = 'my-1.5 leading-relaxed';
+      p.textContent = lines.join(' ');
+      containerEl.appendChild(p);
+    }
+  });
 }
 
+function textToHtml(content) {
+  if (!content) return '<p><br></p>';
+  const temp = document.createElement('div');
+  renderSummaryContent(temp, content);
+  return temp.innerHTML || content;
+}
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)

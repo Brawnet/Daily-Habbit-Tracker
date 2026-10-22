@@ -357,10 +357,14 @@ export function mount(el) {
         }`;
         nameEl.textContent = habit.name;
         if (habit.linkedActivity) {
+          nameEl.classList.add('cursor-pointer', 'hover:text-indigo-600');
+          nameEl.addEventListener('click', () => {
+            navigate('activities');
+          });
           const actBadge = document.createElement('button');
           actBadge.type = 'button';
           actBadge.className =
-            'habit-activity-link text-xs px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-medium hover:underline cursor-pointer ml-2 shrink-0';
+            'habit-activity-link min-h-[44px] min-w-[44px] inline-flex items-center text-xs px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-medium hover:underline cursor-pointer ml-2 shrink-0';
           actBadge.textContent = habit.linkedActivity === 'book_summary' ? '📖 Book Summary' : '✍️ Journal';
           actBadge.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -436,7 +440,8 @@ export function mount(el) {
       const selectActivityEl = document.createElement('select');
       selectActivityEl.id = 'today-add-habit-linked-activity';
       selectActivityEl.className =
-        'w-full min-h-[44px] px-3.5 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500';
+        'w-full min-h-[44px] px-3.5 py-2 text-base rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500';
+      selectActivityEl.style.fontSize = '16px';
 
       const optNone = document.createElement('option');
       optNone.value = '';

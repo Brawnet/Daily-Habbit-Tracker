@@ -11,8 +11,6 @@ import {
   addHabit,
   getCheckInDays,
   toggleCheckIn,
-  getJournalEntry,
-  saveJournalEntry,
   onChange,
 } from '../data/repo.js';
 import { navigate, showToast } from './shell.js';
@@ -30,9 +28,6 @@ export function mount(el) {
 
   let isMounted = true;
   let renderToken = 0;
-  let debounceTimer = null;
-  let saveSeq = 0;
-  let hasUserTyped = false;
   let isAddHabitExpanded = false;
 
   el.innerHTML = '';
@@ -77,48 +72,10 @@ export function mount(el) {
 
   container.appendChild(habitsSectionEl);
 
-  // --- Journal Section ---
-  const journalSectionEl = document.createElement('section');
-  journalSectionEl.className = 'flex flex-col gap-2 pt-2';
-  journalSectionEl.setAttribute('aria-labelledby', 'journal-heading');
-
-  const journalHeaderEl = document.createElement('div');
-  journalHeaderEl.className = 'flex items-center justify-between';
-
-  const journalHeadingEl = document.createElement('h2');
-  journalHeadingEl.id = 'journal-heading';
-  journalHeadingEl.className = 'text-lg font-semibold text-zinc-900 dark:text-zinc-100';
-  journalHeadingEl.textContent = 'Daily Journal';
-
-  const journalStatusEl = document.createElement('span');
-  journalStatusEl.id = 'journal-status';
-  journalStatusEl.className = 'text-xs font-medium text-zinc-500 dark:text-zinc-400';
-  journalStatusEl.setAttribute('aria-live', 'polite');
-  journalStatusEl.textContent = 'Saved';
-
-  journalHeaderEl.appendChild(journalHeadingEl);
-  journalHeaderEl.appendChild(journalStatusEl);
-  journalSectionEl.appendChild(journalHeaderEl);
-
-  const journalLabelEl = document.createElement('label');
-  journalLabelEl.htmlFor = 'today-journal-input';
-  journalLabelEl.className = 'sr-only';
-  journalLabelEl.textContent = 'Daily Journal';
-  journalSectionEl.appendChild(journalLabelEl);
-
-  const journalTextareaEl = document.createElement('textarea');
-  journalTextareaEl.id = 'today-journal-input';
-  journalTextareaEl.className =
-    'w-full min-h-[160px] p-3 text-base rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/80 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition-colors resize-y';
-  journalTextareaEl.style.fontSize = '16px';
-  journalTextareaEl.placeholder = "Write today's reflections, notes, or memories...";
-  journalSectionEl.appendChild(journalTextareaEl);
-
-  container.appendChild(journalSectionEl);
   el.appendChild(container);
 
   // Shared habit creation helper with unified validation, loading guard, and toast notifications
-  async function executeAddHabit({ name, setSubmitting, onSuccess, onError }) {
+  async function executeAddHabit({ name, linkedActivity = null, setSubmitting, onSuccess, onError }) {
     const trimmed = (name || '').trim();
     if (!trimmed) {
       onError?.();
@@ -126,7 +83,11 @@ export function mount(el) {
     }
     setSubmitting(true);
     try {
-      await addHabit(trimmed);
+      if (linkedActivity) {
+        await addHabit(trimmed, { linkedActivity });
+      } else {
+        await addHabit(trimmed);
+      }
       if (!isMounted) return;
       showToast(`Habit "${trimmed}" created!`);
       onSuccess?.(trimmed);
@@ -395,8 +356,19 @@ export function mount(el) {
             : 'text-zinc-900 dark:text-zinc-100'
         }`;
         nameEl.textContent = habit.name;
+        if (habit.linkedActivity) {
+          const actBadge = document.createElement('button');
+          actBadge.type = 'button';
+          actBadge.className =
+            'habit-activity-link text-xs px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-medium hover:underline cursor-pointer ml-2 shrink-0';
+          actBadge.textContent = habit.linkedActivity === 'book_summary' ? '📖 Book Summary' : '✍️ Journal';
+          actBadge.addEventListener('click', (e) => {
+            e.stopPropagation();
+            navigate('activities');
+          });
+          leftWrap.appendChild(actBadge);
+        }
         leftWrap.appendChild(nameEl);
-
         itemEl.appendChild(leftWrap);
 
         // Streak badge
@@ -461,6 +433,28 @@ export function mount(el) {
       inputEl.placeholder = 'e.g. Read 10 mins, Morning walk...';
       inputEl.setAttribute('aria-label', 'New habit name');
 
+      const selectActivityEl = document.createElement('select');
+      selectActivityEl.id = 'today-add-habit-linked-activity';
+      selectActivityEl.className =
+        'w-full min-h-[44px] px-3.5 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500';
+
+      const optNone = document.createElement('option');
+      optNone.value = '';
+      optNone.textContent = 'Link to Activity: None';
+      selectActivityEl.appendChild(optNone);
+
+      const optBook = document.createElement('option');
+      optBook.value = 'book_summary';
+      optBook.textContent = 'Link to Activity: Book Summary 📖';
+      selectActivityEl.appendChild(optBook);
+
+      const optJournal = document.createElement('option');
+      optJournal.value = 'journal';
+      optJournal.textContent = 'Link to Activity: Daily Journal ✍️';
+      selectActivityEl.appendChild(optJournal);
+
+      formEl.appendChild(inputEl);
+      formEl.appendChild(selectActivityEl);
       const actionsWrap = document.createElement('div');
       actionsWrap.className = 'flex items-center gap-2 justify-end';
 
@@ -496,6 +490,7 @@ export function mount(el) {
         if (isSubmitting) return;
         await executeAddHabit({
           name: inputEl.value,
+          linkedActivity: selectActivityEl.value || null,
           setSubmitting: (submitting) => {
             isSubmitting = submitting;
             submitBtn.disabled = submitting;
@@ -561,98 +556,18 @@ export function mount(el) {
     containerEl.appendChild(manageWrap);
   }
 
-  // --- Journal Autosave Logic ---
-  let journalDay = today();
-
-  async function loadJournalInitial() {
-    try {
-      const entry = await getJournalEntry(journalDay);
-      if (isMounted && !hasUserTyped) {
-        journalTextareaEl.value = entry?.content || '';
-        journalStatusEl.textContent = 'Saved';
-      }
-    } catch (err) {
-      console.warn('Failed to load journal entry:', err);
-      if (isMounted && !hasUserTyped) {
-        journalStatusEl.textContent = 'Error';
-      }
-    }
-  }
-
-  journalTextareaEl.addEventListener('input', () => {
-    hasUserTyped = true;
-    journalStatusEl.textContent = 'Saving...';
-
-    clearTimeout(debounceTimer);
-
-    const currentSeq = ++saveSeq;
-    debounceTimer = setTimeout(async () => {
-      debounceTimer = null;
-      try {
-        await saveJournalEntry(today(), journalTextareaEl.value);
-        if (isMounted && currentSeq === saveSeq) {
-          journalStatusEl.textContent = 'Saved';
-        }
-      } catch (err) {
-        console.warn('Failed to autosave journal entry:', err);
-        if (isMounted && currentSeq === saveSeq) {
-          journalStatusEl.textContent = 'Error';
-        }
-      }
-    }, 800);
-  });
-
   // --- Master Render & Subscription ---
   async function render() {
     await renderHabits();
-
-    const currentDay = today();
-    if (currentDay !== journalDay) {
-      journalDay = currentDay;
-      hasUserTyped = false;
-      clearTimeout(debounceTimer);
-      debounceTimer = null;
-      try {
-        const entry = await getJournalEntry(journalDay);
-        if (isMounted) {
-          journalTextareaEl.value = entry?.content || '';
-          journalStatusEl.textContent = 'Saved';
-        }
-      } catch (err) {
-        console.warn('Failed to reload journal entry on day change:', err);
-      }
-    } else if (
-      !debounceTimer &&
-      (!document.activeElement || document.activeElement !== journalTextareaEl)
-    ) {
-      try {
-        const entry = await getJournalEntry(currentDay);
-        const content = entry?.content || '';
-        if (
-          isMounted &&
-          journalTextareaEl.value !== content &&
-          (!document.activeElement || document.activeElement !== journalTextareaEl) &&
-          !debounceTimer
-        ) {
-          journalTextareaEl.value = content;
-        }
-      } catch (err) {
-        // Ignore background sync check errors
-      }
-    }
   }
 
   const unsubscribe = onChange(render);
 
-  // Initial renders
+  // Initial render
   render();
-  loadJournalInitial();
-
   // Return cleanup
   return () => {
     isMounted = false;
-    clearTimeout(debounceTimer);
-    debounceTimer = null;
     if (unsubscribe) {
       unsubscribe();
     }

@@ -1,10 +1,12 @@
 /**
  * Habbit Data Model Typedefs & Constants (SPEC §4)
  *
- * @typedef {{ id: string, name: string, sortOrder: number, archived: boolean, createdAt: string, updatedAt: string }} Habit
+ * @typedef {{ id: string, name: string, sortOrder: number, archived: boolean, linkedActivity?: 'journal' | 'book_summary' | null, createdAt: string, updatedAt: string }} Habit
  * @typedef {{ id: string, habitId: string, day: string, deleted: boolean, updatedAt: string }} CheckIn
  * @typedef {{ day: string, content: string, updatedAt: string, printedToDiaryAt: string }} JournalEntry
  * @typedef {{ key: 'reminderTime', value: string, updatedAt: string }} Setting
+ * @typedef {{ id: string, title: string, author: string, createdAt: string, updatedAt: string }} Book
+ * @typedef {{ id: string, bookId: string, title: string, content: string, createdAt: string, updatedAt: string }} BookChapter
  * @typedef {{ id: string, title: string, author: string, type: string, status: 'Backlog' | 'In Progress' | 'Completed' | string, totalPages: number, summary: string, archived: boolean, createdAt: string, updatedAt: string }} Activity
  * @typedef {{ state: 'not-configured' | 'idle' | 'syncing' | 'offline' | 'error', pending: number, lastSyncedAt: string | null, error: string | null }} SyncStatus
  */
@@ -33,6 +35,8 @@ export const STORES = Object.freeze({
   OUTBOX: 'outbox',
   META: 'meta',
   ACTIVITIES: 'activities',
+  BOOKS: 'books',
+  BOOK_CHAPTERS: 'bookChapters',
 });
 
 export const ACTIVITY_STATUS = Object.freeze({

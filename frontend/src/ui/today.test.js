@@ -260,6 +260,9 @@ describe('ui/today.js persistent quick-add when habits exist', () => {
         listeners.add(l);
         return () => listeners.delete(l);
       }),
+      _setHabits: (h) => {
+        habitsList = h;
+      },
     };
     vi.doMock('../data/repo.js', () => repoModule);
 
@@ -497,5 +500,51 @@ describe('ui/today.js persistent quick-add when habits exist', () => {
     expect(shellModule.showToast).toHaveBeenCalledWith('Failed to create habit: Storage failure');
     expect(mockDoc.getElementById('today-add-habit-form')).not.toBeNull();
     expect(mockDoc.getElementById('today-add-habit-input').value).toBe('Unsaved Habit');
+  });
+
+  it('does not render the daily journal textarea on the Today tab', async () => {
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 20));
+
+    const journalInput = mockDoc.getElementById('today-journal-input');
+    expect(journalInput).toBeNull();
+    cleanup();
+  });
+
+  it('supports linking habit to activity and navigates to activities on badge click', async () => {
+    repoModule._setHabits([
+      { id: 'h-1', name: 'Read Book', sortOrder: 0, linkedActivity: 'book_summary' },
+    ]);
+
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 20));
+
+    const badge = root.querySelector('.habit-activity-link');
+    expect(badge).not.toBeNull();
+    expect(badge.textContent).toContain('Book Summary');
+
+    badge.click();
+    expect(shellModule.navigate).toHaveBeenCalledWith('activities');
+
+    // Open add habit form and verify linked activity selector
+    mockDoc.getElementById('today-add-habit-trigger').click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    const select = mockDoc.getElementById('today-add-habit-linked-activity');
+    expect(select).not.toBeNull();
+    select.value = 'book_summary';
+
+    const input = mockDoc.getElementById('today-add-habit-input');
+    input.value = 'Atomic Reading';
+    mockDoc.getElementById('today-add-habit-submit').click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(repoModule.addHabit).toHaveBeenCalledWith('Atomic Reading', {
+      linkedActivity: 'book_summary',
+    });
+
+    cleanup();
   });
 });

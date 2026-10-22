@@ -21,6 +21,12 @@ import {
   addActivity,
   updateActivity,
   setActivityArchived,
+  addBook,
+  listBooks,
+  getBook,
+  saveBookChapter,
+  listBookChapters,
+  triggerActivityCheckIn,
 } from './repo.js';
 import {
   getOutboxEntries,
@@ -834,5 +840,71 @@ describe('Data Layer - API & Sync Flow', () => {
     expect(body.pin).toBe('test-pin');
     expect(body.deviceId).toBeDefined();
     expect(body.extra).toBe('test');
+  });
+
+  it('persists books, chapters, and manages habit linking with auto-check-in', async () => {
+    // 1. Add book
+    const book = await addBook({ title: 'Atomic Habits', author: 'James Clear' });
+    expect(book.id).toBeDefined();
+    expect(book.title).toBe('Atomic Habits');
+    expect(book.author).toBe('James Clear');
+
+    const books = await listBooks();
+    expect(books.length).toBe(1);
+    expect(books[0].id).toBe(book.id);
+
+    // 2. Add chapters
+    const ch1 = await saveBookChapter({
+      bookId: book.id,
+      title: 'Chapter 1: Fundamentals',
+      content: 'Small habits compound.',
+    });
+    expect(ch1.id).toBeDefined();
+    expect(ch1.bookId).toBe(book.id);
+
+    const ch2 = await saveBookChapter({
+      bookId: book.id,
+      title: 'Chapter 2: Identity',
+      content: 'Focus on who you want to become.',
+    });
+
+    const chapters = await listBookChapters(book.id);
+    expect(chapters.length).toBe(2);
+    // Chronological order: ch1 then ch2
+    expect(chapters[0].title).toBe('Chapter 1: Fundamentals');
+    expect(chapters[1].title).toBe('Chapter 2: Identity');
+
+    // 3. Edit existing chapter in place
+    const updatedCh1 = await saveBookChapter({
+      id: ch1.id,
+      bookId: book.id,
+      title: 'Chapter 1: Fundamentals (Updated)',
+      content: 'Small habits compound exponentially.',
+    });
+    expect(updatedCh1.id).toBe(ch1.id);
+    expect(updatedCh1.title).toBe('Chapter 1: Fundamentals (Updated)');
+
+    const chaptersAfterUpdate = await listBookChapters(book.id);
+    expect(chaptersAfterUpdate.length).toBe(2);
+    expect(chaptersAfterUpdate[0].title).toBe('Chapter 1: Fundamentals (Updated)');
+
+    // 4. Habit linking and auto-check-in
+    const habit = await addHabit('Read 20 Mins', { linkedActivity: 'book_summary' });
+    expect(habit.linkedActivity).toBe('book_summary');
+
+    // Check-in days initially empty
+    let checkIns = await getCheckInDays(habit.id);
+    expect(checkIns.has('2026-10-20')).toBe(false);
+
+    // Trigger auto-check-in for book_summary
+    await triggerActivityCheckIn('book_summary');
+
+    checkIns = await getCheckInDays(habit.id);
+    expect(checkIns.has('2026-10-20')).toBe(true);
+
+    // Triggering again does not toggle it off
+    await triggerActivityCheckIn('book_summary');
+    checkIns = await getCheckInDays(habit.id);
+    expect(checkIns.has('2026-10-20')).toBe(true);
   });
 });

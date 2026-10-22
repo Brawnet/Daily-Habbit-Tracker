@@ -22,6 +22,96 @@ import {
 import { today } from '../domain/day.js';
 import { showToast } from './shell.js';
 
+export const JOURNALING_LOGO_SVG = `
+<svg class="w-full h-full" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+  <defs>
+    <style>
+      .act-logo-fill { fill: #ffffff; }
+      @media (prefers-color-scheme: dark) {
+        .act-logo-fill { fill: #27272a; }
+      }
+    </style>
+  </defs>
+  <g transform="rotate(-7.5 46 51)" stroke-width="3.2">
+    <rect class="act-logo-fill" x="26" y="22" width="44" height="53" rx="8" />
+    <rect x="26" y="22" width="44" height="53" rx="8" fill="none" />
+    <path d="M 27 28 C 17 26 17 33 27 32" />
+    <path d="M 27 36 C 17 34 17 41 27 40" />
+    <path d="M 27 44 C 17 42 17 49 27 48" />
+    <path d="M 27 52 C 17 50 17 57 27 56" />
+    <path d="M 27 60 C 17 58 17 65 27 64" />
+    <path d="M 27 68 C 17 66 17 73 27 72" />
+    <line x1="37" y1="33" x2="60" y2="33" />
+    <line x1="37" y1="41" x2="54" y2="41" />
+  </g>
+  <g transform="translate(53, 67) rotate(138)" stroke-width="3.2">
+    <path class="act-logo-fill" d="M 0 0 C -2.5 -3.5 -6 -8 -6 -12 C -6 -15 6 -15 6 -12 C 6 -8 2.5 -3.5 0 0 Z" />
+    <line x1="0" y1="0" x2="0" y2="-6.5" stroke-width="2.2" />
+    <circle cx="0" cy="-8.5" r="1.1" fill="currentColor" stroke="none" />
+    <line x1="-6.5" y1="-15" x2="6.5" y2="-15" />
+    <path class="act-logo-fill" d="M -5.2 -15 L -5.2 -33 C -5.2 -36.5 5.2 -36.5 5.2 -33 L 5.2 -15" />
+  </g>
+</svg>
+`.trim();
+
+export const BOOKS_SUMMARY_LOGO_SVG = `
+<svg class="w-full h-full" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+  <defs>
+    <style>
+      .act-logo-fill { fill: #ffffff; }
+      @media (prefers-color-scheme: dark) {
+        .act-logo-fill { fill: #27272a; }
+      }
+    </style>
+  </defs>
+  <g stroke-width="3">
+    <path d="M 17 38 C 17 37 18 36 19 36 M 83 38 C 83 37 82 36 81 36" />
+    <path d="M 17 38 L 17 67 C 17 73 33 77 50 72 C 67 77 83 73 83 67 L 83 38" />
+
+    <path class="act-logo-fill" d="M 50 38 C 38 33 24 35 21 38 L 21 66 C 24 69 38 66 50 71 Z" />
+    <path class="act-logo-fill" d="M 50 38 C 62 33 76 35 79 38 L 79 66 C 76 69 62 66 50 71 Z" />
+
+    <line x1="50" y1="38" x2="50" y2="71" />
+
+    <path class="act-logo-fill" d="M 35 34.5 Q 35 41.5 28 41.5 Q 35 41.5 35 48.5 Q 35 41.5 42 41.5 Q 35 41.5 35 34.5 Z" />
+
+    <circle cx="27" cy="54" r="1.1" fill="currentColor" stroke="none" />
+    <line x1="31" y1="54" x2="43" y2="54" stroke-width="2.6" />
+
+    <circle cx="27" cy="59.5" r="1.1" fill="currentColor" stroke="none" />
+    <line x1="31" y1="59.5" x2="41" y2="59.5" stroke-width="2.6" />
+
+    <circle cx="27" cy="65" r="1.1" fill="currentColor" stroke="none" />
+    <line x1="31" y1="65" x2="38" y2="65" stroke-width="2.6" />
+
+    <line x1="53.5" y1="41.5" x2="56.5" y2="41.5" stroke-width="2.2" />
+    <line x1="71" y1="41.5" x2="75" y2="41.5" stroke-width="2.2" />
+
+    <line x1="53.5" y1="45.5" x2="56.5" y2="45.5" stroke-width="2.2" />
+    <line x1="71" y1="45.5" x2="75" y2="45.5" stroke-width="2.2" />
+
+    <line x1="53.5" y1="49.5" x2="56.5" y2="49.5" stroke-width="2.2" />
+    <line x1="71" y1="49.5" x2="75" y2="49.5" stroke-width="2.2" />
+
+    <line x1="53.5" y1="53.5" x2="56.5" y2="53.5" stroke-width="2.2" />
+    <line x1="71" y1="53.5" x2="75" y2="53.5" stroke-width="2.2" />
+
+    <line x1="53.5" y1="57.5" x2="56.5" y2="57.5" stroke-width="2.2" />
+    <line x1="71" y1="57.5" x2="75" y2="57.5" stroke-width="2.2" />
+
+    <line x1="53.5" y1="61.5" x2="56.5" y2="61.5" stroke-width="2.2" />
+    <line x1="71" y1="61.5" x2="75" y2="61.5" stroke-width="2.2" />
+
+    <line x1="53.5" y1="65.5" x2="56.5" y2="65.5" stroke-width="2.2" />
+    <line x1="71" y1="65.5" x2="74" y2="65.5" stroke-width="2.2" />
+
+    <path class="act-logo-fill" d="M 59 36 L 59 30 C 59 27.5 67 27.5 67 30 L 67 81 L 63 77 L 59 81 Z" />
+    <path d="M 59 36 L 59 81 L 63 77 L 67 81 L 67 36" />
+    <path d="M 59 36 L 59 30 C 59 27.5 67 27.5 67 30 L 67 36" />
+  </g>
+</svg>
+`.trim();
+
 /**
  * Mounts the Activities tab into rootEl.
  *
@@ -137,8 +227,8 @@ export function mount(rootEl) {
 
     const iconB = document.createElement('div');
     iconB.className =
-      'w-11 h-11 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 flex items-center justify-center text-xl shrink-0';
-    iconB.textContent = '📖';
+      'w-14 h-14 rounded-2xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center p-2 shrink-0 border border-zinc-200/80 dark:border-zinc-700/80 shadow-xs group-hover:scale-105 transition-transform';
+    iconB.innerHTML = BOOKS_SUMMARY_LOGO_SVG;
 
     const textB = document.createElement('div');
     const titleB = document.createElement('div');
@@ -180,8 +270,8 @@ export function mount(rootEl) {
 
     const iconJ = document.createElement('div');
     iconJ.className =
-      'w-11 h-11 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 flex items-center justify-center text-xl shrink-0';
-    iconJ.textContent = '✍️';
+      'w-14 h-14 rounded-2xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center p-2 shrink-0 border border-zinc-200/80 dark:border-zinc-700/80 shadow-xs group-hover:scale-105 transition-transform';
+    iconJ.innerHTML = JOURNALING_LOGO_SVG;
 
     const textJ = document.createElement('div');
     const titleJ = document.createElement('div');
@@ -352,9 +442,10 @@ export function mount(rootEl) {
       empty.className =
         'p-8 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl text-center flex flex-col items-center gap-2 text-zinc-500';
 
-      const emptyIcon = document.createElement('span');
-      emptyIcon.className = 'text-3xl';
-      emptyIcon.textContent = '📖';
+      const emptyIcon = document.createElement('div');
+      emptyIcon.className =
+        'w-16 h-16 rounded-2xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center p-2.5 mb-2 border border-zinc-200/80 dark:border-zinc-700/80 shadow-xs';
+      emptyIcon.innerHTML = BOOKS_SUMMARY_LOGO_SVG;
 
       const emptyMain = document.createElement('p');
       emptyMain.className = 'text-sm font-medium';
@@ -384,8 +475,8 @@ export function mount(rootEl) {
 
         const icon = document.createElement('div');
         icon.className =
-          'w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 flex items-center justify-center text-lg shrink-0';
-        icon.textContent = '📖';
+          'w-11 h-11 rounded-xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center p-1.5 shrink-0 border border-zinc-200/80 dark:border-zinc-700/80 shadow-xs';
+        icon.innerHTML = BOOKS_SUMMARY_LOGO_SVG;
 
         const text = document.createElement('div');
         const titleEl = document.createElement('div');
@@ -462,8 +553,8 @@ export function mount(rootEl) {
 
     const icon = document.createElement('div');
     icon.className =
-      'w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 flex items-center justify-center text-3xl mx-auto mb-2';
-    icon.textContent = '📖';
+      'w-16 h-16 rounded-2xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center p-2.5 mx-auto mb-2 border border-zinc-200/80 dark:border-zinc-700/80 shadow-xs';
+    icon.innerHTML = BOOKS_SUMMARY_LOGO_SVG;
 
     const titleH1 = document.createElement('h1');
     titleH1.id = 'book-menu-title';
@@ -1083,9 +1174,10 @@ export function mount(rootEl) {
     const cardHeader = document.createElement('div');
     cardHeader.className = 'flex items-center gap-2 pb-2 border-b border-zinc-100 dark:border-zinc-800';
 
-    const iconJ = document.createElement('span');
-    iconJ.className = 'text-xl';
-    iconJ.textContent = '✍️';
+    const iconJ = document.createElement('div');
+    iconJ.className =
+      'w-10 h-10 rounded-xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center p-1.5 shrink-0 border border-zinc-200/80 dark:border-zinc-700/80 shadow-xs';
+    iconJ.innerHTML = JOURNALING_LOGO_SVG;
 
     const titleWrap = document.createElement('div');
     const h2 = document.createElement('h2');

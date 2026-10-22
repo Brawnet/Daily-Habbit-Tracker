@@ -109,11 +109,16 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     const booksBtn = root.querySelector('#choice-books-summary');
     expect(booksBtn).not.toBeNull();
     expect(booksBtn.textContent).toContain('Books Summary');
+    const booksIcon = booksBtn.children[0].children[0];
+    expect(booksIcon.innerHTML).toContain('<svg');
+    expect(booksIcon.innerHTML).toContain('viewBox="0 0 100 100"');
 
     const journalBtn = root.querySelector('#choice-journals');
     expect(journalBtn).not.toBeNull();
     expect(journalBtn.textContent).toContain('Journals');
-
+    const journalIcon = journalBtn.children[0].children[0];
+    expect(journalIcon.innerHTML).toContain('<svg');
+    expect(journalIcon.innerHTML).toContain('viewBox="0 0 100 100"');
     cleanup();
   });
 

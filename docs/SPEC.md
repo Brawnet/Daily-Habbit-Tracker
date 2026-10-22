@@ -61,11 +61,13 @@ Vanilla JS (ES modules), tanpa framework UI. Install dengan versi **exact** (`np
 Semua timestamp ISO-8601 UTC string. `updatedAt` diisi Device saat mutasi; `serverUpdatedAt` diisi server saat menulis (dipakai untuk cursor pull, kebal clock skew).
 
 ```js
-/** @typedef {{ id: string /*uuid*/, name: string /*1–60*/, sortOrder: number, archived: boolean, createdAt: string, updatedAt: string }} Habit */
-/** @typedef {{ id: string /*`${habitId}:${day}`*/, habitId: string, day: string, deleted: boolean, updatedAt: string }} CheckIn */
-/** @typedef {{ day: string, content: string, updatedAt: string, printedToDiaryAt: string /*'' bila belum; milik server, read-only di klien*/ }} JournalEntry */
-/** @typedef {{ key: 'reminderTime', value: string /*'HH:MM'*/, updatedAt: string }} Setting */
-/** @typedef {{ id: string /*uuid*/, title: string, author: string, type: string, status: 'Backlog' | 'In Progress' | 'Completed', totalPages: number, summary: string, archived: boolean, createdAt: string, updatedAt: string }} Activity */
+/** @typedef {{ id: string /*uuid*/, name: string /*1–60*/, sortOrder: number, archived: boolean, linkedActivity?: 'journal' | 'book_summary' | null, createdAt: string, updatedAt: string }} Habit */
+/** @typedef {{ id: string /*uuid*/, habitId: string, day: string /*YYYY-MM-DD*/, deleted: boolean, updatedAt: string }} CheckIn */
+/** @typedef {{ day: string /*YYYY-MM-DD*/, content: string, updatedAt: string, printedToDiaryAt: string }} JournalEntry */
+/** @typedef {{ key: 'reminderTime', value: string, updatedAt: string }} Setting */
+/** @typedef {{ id: string, title: string, author: string, createdAt: string, updatedAt: string }} Book */
+/** @typedef {{ id: string, bookId: string, title: string, content: string, sortOrder: number, createdAt: string, updatedAt: string }} BookChapter */
+/** @typedef {{ id: string, title: string, author: string, type: 'Book' | 'Course' | 'Article' | 'Other', status: 'Backlog' | 'In Progress' | 'Completed', totalPages: number, summary: string, archived: boolean, createdAt: string, updatedAt: string }} Activity */
 
 Google Sheets (dibuat `setup()`; seluruh sheet diformat teks `@` agar tanggal tidak dikonversi; boolean ditulis/dibaca sebagai string `TRUE`/`FALSE`):
 
@@ -78,7 +80,7 @@ Google Sheets (dibuat `setup()`; seluruh sheet diformat teks `@` agar tanggal ti
 | `Push_Subscriptions` | deviceId, endpoint, p256dh, auth, createdAt |
 | `Activities` | id, title, author, type, status, totalPages, summary, archived, createdAt, updatedAt, serverUpdatedAt |
 
-IndexedDB `habbit` (via `idb`): stores `habits` (keyPath `id`), `checkIns` (`id`, index `habitId`), `journalEntries` (`day`), `settings` (`key`), `activities` (`id`), `outbox` (`key` = `${type}:${recordKey}`, nilai = snapshot record terbaru, ter-coalesce), `meta` (`key`: `cursor`, `lastSyncedAt`).
+IndexedDB `habbit` (via `idb`): stores `habits` (keyPath `id`), `checkIns` (`id`, index `habitId`), `journalEntries` (`day`), `settings` (`key`), `activities` (`id`), `books` (`id`), `bookChapters` (`id`, index `bookId`), `outbox` (`key` = `${type}:${recordKey}`, nilai = snapshot record terbaru, ter-coalesce), `meta` (`key`: `cursor`, `lastSyncedAt`). Catatan: `books` dan `bookChapters` adalah workspace pembelajaran lokal pada Device dan tidak diantrikan ke outbox sync Google Sheets.
 
 localStorage: `habbit.gasUrl`, `habbit.pin`, `habbit.deviceId` (uuid, dibuat sekali).
 

@@ -42,6 +42,17 @@ _Avoid_: Main journal, journal database, Buku Harian
 Aktivitas pembelajaran atau bacaan terstruktur (buku, kursus, artikel) yang memiliki status penyelesaian, total halaman, dan ringkasan; berdiri sendiri dan bukan pengganti Habit harian.
 _Avoid_: Task, Item, materi, reading item
 
+**Book**:
+Buku yang didokumentasikan pengguna dalam Books Summary untuk diringkas per bab.
+_Avoid_: Course, article, materi bacaan
+
+**Book Chapter**:
+Bab atau bagian dari suatu Book yang berisi catatan ringkasan atau intisari pembelajaran.
+_Avoid_: Note, sub-task, section
+
+**Linked Activity**:
+Penghubung opsional antara Habit dengan aktivitas pembelajaran (Books Summary atau Daily Journal) yang otomatis menandai Check-in selesai saat pengguna mencatat bab atau jurnal pada hari ini.
+_Avoid_: Habit link, sync trigger, habit activity
 ### Pemakaian
 
 **Device**:

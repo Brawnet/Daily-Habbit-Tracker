@@ -2,7 +2,7 @@ import { openDB } from 'idb';
 import { STORES } from '../shared/contracts.js';
 
 export const DB_NAME = 'habbit';
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
 let dbPromise = null;
 
@@ -34,6 +34,13 @@ export function getDb() {
         }
         if (!db.objectStoreNames.contains(STORES.ACTIVITIES)) {
           db.createObjectStore(STORES.ACTIVITIES, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains(STORES.BOOKS)) {
+          db.createObjectStore(STORES.BOOKS, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains(STORES.BOOK_CHAPTERS)) {
+          const chapterStore = db.createObjectStore(STORES.BOOK_CHAPTERS, { keyPath: 'id' });
+          chapterStore.createIndex('bookId', 'bookId', { unique: false });
         }
       },
       blocked() {

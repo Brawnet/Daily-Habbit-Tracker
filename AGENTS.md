@@ -25,3 +25,14 @@ All dependencies and scripts are isolated in `frontend/`:
 ## Worktrees & Branches
 - Work in dedicated Git worktrees for isolated features or fixes (`../Daily-Habbit-Tracker-worktree-<feature>`).
 - Always compare PR diffs against the true pre-feature merge-base commit.
+
+## Agent skills
+
+### Issue tracker
+GitHub Issues on `Brawnet/Daily-Habbit-Tracker`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+Standard 5 triage labels mapped. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+Single-context repository. See `docs/agents/domain.md`.

@@ -1,7 +1,8 @@
 import { getDb } from './db.js';
-import { STORES, ACTIVITY_STATUS } from '../shared/contracts.js';
+import { STORES, ACTIVITY_STATUS, LINKED_ACTIVITIES } from '../shared/contracts.js';
 import { scheduleSync } from './sync.js';
 import { isCheckInEditable, isJournalEditable, today } from '../domain/day.js';
+import { isBlank } from '../domain/text.js';
 
 const changeListeners = new Set();
 
@@ -56,6 +57,18 @@ async function commitSingleMutation(storeName, record, outboxType, recordKey) {
 }
 
 /**
+ * Atomically commits a local-only record mutation to its target store without queuing to outbox.
+ *
+ * @param {string} storeName
+ * @param {any} record
+ */
+async function commitLocalMutation(storeName, record) {
+  const db = await getDb();
+  await db.put(storeName, record);
+  notifyChange();
+}
+
+/**
  * Atomically commits multiple record mutations to their target stores and the outbox.
  *
  * @param {Array<{ storeName: string, record: any, outboxType: string, recordKey: string }>} mutations
@@ -100,7 +113,7 @@ export async function listHabits({ includeArchived = false } = {}) {
  * @param {string} name
  * @returns {Promise<import('../shared/contracts.js').Habit>}
  */
-export async function addHabit(name) {
+export async function addHabit(name, { linkedActivity = null } = {}) {
   const trimmed = (name || '').trim();
   if (!trimmed) {
     throw new Error('Habit name cannot be empty');
@@ -120,6 +133,7 @@ export async function addHabit(name) {
     name: trimmed,
     sortOrder: maxSortOrder + 1,
     archived: false,
+    linkedActivity: linkedActivity || null,
     createdAt: now,
     updatedAt: now,
   };
@@ -135,7 +149,7 @@ export async function addHabit(name) {
  * @param {string} name
  * @returns {Promise<import('../shared/contracts.js').Habit>}
  */
-export async function renameHabit(id, name) {
+export async function renameHabit(id, name, linkedActivity) {
   const trimmed = (name || '').trim();
   if (!trimmed) {
     throw new Error('Habit name cannot be empty');
@@ -154,6 +168,9 @@ export async function renameHabit(id, name) {
     name: trimmed,
     updatedAt: now,
   };
+  if (linkedActivity !== undefined) {
+    updated.linkedActivity = linkedActivity || null;
+  }
 
   await commitSingleMutation(STORES.HABITS, updated, 'habits', id);
   return updated;
@@ -335,6 +352,13 @@ export async function saveJournalEntry(day, content) {
   };
 
   await commitSingleMutation(STORES.JOURNAL_ENTRIES, record, 'journalEntries', day);
+  if (day === currentDay && !isBlank(record.content)) {
+    try {
+      await triggerActivityCheckIn(LINKED_ACTIVITIES.JOURNAL);
+    } catch (err) {
+      console.warn('Journal auto-checkin failed:', err);
+    }
+  }
   return record;
 }
 
@@ -505,4 +529,139 @@ export async function updateActivity(id, updates = {}) {
  */
 export async function setActivityArchived(id, archived = true) {
   return updateActivity(id, { archived: Boolean(archived) });
+}
+
+/**
+ * Triggers auto-check-in for habits linked to an activity.
+ * @param {'journal' | 'book_summary'} activityType
+ */
+export async function triggerActivityCheckIn(activityType) {
+  const habits = await listHabits({ includeArchived: false });
+  const linkedHabits = habits.filter((h) => h.linkedActivity === activityType);
+  if (linkedHabits.length === 0) return;
+
+  const currentDay = today();
+  for (const habit of linkedHabits) {
+    const days = await getCheckInDays(habit.id);
+    if (!days.has(currentDay)) {
+      await toggleCheckIn(habit.id, currentDay);
+    }
+  }
+}
+
+/**
+ * Adds a new book to the library.
+ * @param {{ title: string, author?: string }} data
+ * @returns {Promise<import('../shared/contracts.js').Book>}
+ */
+export async function addBook({ title, author = '' }) {
+  const trimmedTitle = (title || '').trim();
+  if (!trimmedTitle) {
+    throw new Error('Book title cannot be empty');
+  }
+  const now = new Date().toISOString();
+  const id = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `book-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+  /** @type {import('../shared/contracts.js').Book} */
+  const book = {
+    id,
+    title: trimmedTitle,
+    author: (author || '').trim(),
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await commitLocalMutation(STORES.BOOKS, book);
+  return book;
+}
+
+/**
+ * Lists all books sorted newest first.
+ * @returns {Promise<Array<import('../shared/contracts.js').Book>>}
+ */
+export async function listBooks() {
+  const db = await getDb();
+  const books = await db.getAll(STORES.BOOKS);
+  return books.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+}
+
+/**
+ * Gets a book by id.
+ * @param {string} id
+ * @returns {Promise<import('../shared/contracts.js').Book | null>}
+ */
+export async function getBook(id) {
+  const db = await getDb();
+  const book = await db.get(STORES.BOOKS, id);
+  return book || null;
+}
+
+/**
+ * Saves a chapter for a book (create or update).
+ * @param {{ id?: string, bookId: string, title?: string, content?: string }} data
+ * @returns {Promise<import('../shared/contracts.js').BookChapter>}
+ */
+export async function saveBookChapter({ id, bookId, title = '', content = '' }) {
+  if (!bookId) {
+    throw new Error('bookId is required');
+  }
+  const db = await getDb();
+  const now = new Date().toISOString();
+  let existing = null;
+  if (id) {
+    existing = await db.get(STORES.BOOK_CHAPTERS, id);
+  }
+  let sortOrder = existing?.sortOrder;
+  if (sortOrder === undefined) {
+    const existingChapters = await listBookChapters(bookId);
+    const maxSort = existingChapters.reduce((max, c) => Math.max(max, c.sortOrder ?? 0), 0);
+    sortOrder = maxSort + 1;
+  }
+
+  const chapterId = id || (typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `ch-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
+
+  /** @type {import('../shared/contracts.js').BookChapter} */
+  const chapter = {
+    id: chapterId,
+    bookId,
+    title: (title || '').trim(),
+    content: String(content ?? ''),
+    sortOrder,
+    createdAt: existing?.createdAt || now,
+    updatedAt: now,
+  };
+
+  await commitLocalMutation(STORES.BOOK_CHAPTERS, chapter);
+
+  // Auto-check in linked habit for today if content is present
+  if (!isBlank(chapter.content)) {
+    try {
+      await triggerActivityCheckIn(LINKED_ACTIVITIES.BOOK_SUMMARY);
+    } catch (err) {
+      console.warn('Auto-checkin failed:', err);
+    }
+  }
+
+  return chapter;
+}
+
+/**
+ * Lists all chapters for a given book, sorted chronologically (oldest first).
+ * @param {string} bookId
+ * @returns {Promise<Array<import('../shared/contracts.js').BookChapter>>}
+ */
+export async function listBookChapters(bookId) {
+  const db = await getDb();
+  let chapters = [];
+  try {
+    chapters = await db.getAllFromIndex(STORES.BOOK_CHAPTERS, 'bookId', bookId);
+  } catch {
+    const all = await db.getAll(STORES.BOOK_CHAPTERS);
+    chapters = all.filter((c) => c.bookId === bookId);
+  }
+  return chapters.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 }

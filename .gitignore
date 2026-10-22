@@ -75,5 +75,6 @@ $RECYCLE.BIN/
 
 # Local workspace scratch
 .kiro/
+.scratch/
 Bug screenshoot/
 Photos/

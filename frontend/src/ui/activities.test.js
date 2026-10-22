@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MockElement, MockDocument } from './test-helpers.js';
 
-describe('ui/activities.js UI view', () => {
+describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
   let mockDoc;
   let repoModule;
   let shellModule;
@@ -19,63 +19,68 @@ describe('ui/activities.js UI view', () => {
     };
     vi.doMock('./shell.js', () => shellModule);
 
-    let activitiesList = [];
+    let books = [];
+    let bookChapters = [];
+    let journalEntries = {};
     let listeners = new Set();
 
     repoModule = {
-      listActivities: vi.fn(async ({ includeArchived = false, status } = {}) => {
-        let res = [...activitiesList];
-        if (!includeArchived) res = res.filter((a) => !a.archived);
-        if (status && status !== 'All') res = res.filter((a) => a.status === status);
-        return res;
-      }),
-      getActivity: vi.fn(async (id) => activitiesList.find((a) => a.id === id) || null),
-      addActivity: vi.fn(async (data) => {
-        const trimmed = (data.title || '').trim();
-        if (!trimmed) throw new Error('Activity title cannot be empty');
-        const act = {
-          id: `act-${Date.now()}-${Math.random()}`,
+      listBooks: vi.fn(async () => [...books].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))),
+      addBook: vi.fn(async ({ title, author = '' }) => {
+        const trimmed = (title || '').trim();
+        if (!trimmed) throw new Error('Book title cannot be empty');
+        const b = {
+          id: `book-${Date.now()}-${Math.random()}`,
           title: trimmed,
-          author: (data.author || '').trim(),
-          type: (data.type || 'Book').trim(),
-          status: (data.status || 'Backlog').trim(),
-          totalPages: Number(data.totalPages) || 0,
-          summary: (data.summary || '').trim(),
-          archived: false,
+          author: (author || '').trim(),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
-        activitiesList.push(act);
+        books.push(b);
         for (const l of listeners) l();
-        return act;
+        return b;
       }),
-      updateActivity: vi.fn(async (id, updates) => {
-        const idx = activitiesList.findIndex((a) => a.id === id);
-        if (idx === -1) throw new Error('Not found');
-        activitiesList[idx] = {
-          ...activitiesList[idx],
-          ...updates,
-          updatedAt: new Date().toISOString(),
+      getBook: vi.fn(async (id) => books.find((b) => b.id === id) || null),
+      saveBookChapter: vi.fn(async ({ id, bookId, title = '', content = '' }) => {
+        let existing = bookChapters.find((c) => c.id === id);
+        const now = new Date().toISOString();
+        if (existing) {
+          existing.title = title;
+          existing.content = content;
+          existing.updatedAt = now;
+          for (const l of listeners) l();
+          return existing;
+        }
+        const ch = {
+          id: id || `ch-${Date.now()}-${Math.random()}`,
+          bookId,
+          title,
+          content,
+          sortOrder: bookChapters.filter((c) => c.bookId === bookId).length + 1,
+          createdAt: now,
+          updatedAt: now,
         };
+        bookChapters.push(ch);
         for (const l of listeners) l();
-        return activitiesList[idx];
+        return ch;
       }),
-      setActivityArchived: vi.fn(async (id, archived = true) => {
-        const idx = activitiesList.findIndex((a) => a.id === id);
-        if (idx === -1) throw new Error('Not found');
-        activitiesList[idx].archived = Boolean(archived);
-        activitiesList[idx].updatedAt = new Date().toISOString();
+      listBookChapters: vi.fn(async (bookId) =>
+        bookChapters
+          .filter((c) => c.bookId === bookId)
+          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+      ),
+      getJournalEntry: vi.fn(async (day) => journalEntries[day] || null),
+      saveJournalEntry: vi.fn(async (day, content) => {
+        const entry = {
+          day,
+          content: String(content ?? ''),
+          updatedAt: new Date().toISOString(),
+          printedToDiaryAt: '',
+        };
+        journalEntries[day] = entry;
         for (const l of listeners) l();
-        return activitiesList[idx];
+        return entry;
       }),
-      normalizeActivityInput: vi.fn((input = {}) => ({
-        title: String(input.title ?? '').trim(),
-        author: String(input.author ?? '').trim(),
-        type: String(input.type ?? 'Book').trim(),
-        status: String(input.status ?? 'Backlog').trim(),
-        totalPages: Math.max(0, parseInt(input.totalPages, 10) || 0),
-        summary: String(input.summary ?? '').trim(),
-      })),
       onChange: vi.fn((l) => {
         listeners.add(l);
         return () => listeners.delete(l);
@@ -93,237 +98,176 @@ describe('ui/activities.js UI view', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders empty state when no activities exist, with action button to create new Activity', async () => {
+  it('renders root Choice Hub with Books Summary and Journals choices', async () => {
     const root = mockDoc.createElement('div');
     const cleanup = mount(root);
-
     await new Promise((r) => setTimeout(r, 10));
 
-    const emptyState = root.querySelector('#activities-empty-state');
-    expect(emptyState).not.toBeNull();
-    expect(emptyState.textContent).toMatch(/No activities yet/i);
+    const choiceHub = root.querySelector('#activities-choice-hub');
+    expect(choiceHub).not.toBeNull();
 
-    const createBtn = root.querySelector('#btn-create-activity-empty');
-    expect(createBtn).not.toBeNull();
+    const booksBtn = root.querySelector('#choice-books-summary');
+    expect(booksBtn).not.toBeNull();
+    expect(booksBtn.textContent).toContain('Books Summary');
+    const booksIcon = booksBtn.children[0].children[0];
+    expect(booksIcon.innerHTML).toContain('<svg');
+    expect(booksIcon.innerHTML).toContain('viewBox="0 0 100 100"');
 
+    const journalBtn = root.querySelector('#choice-journals');
+    expect(journalBtn).not.toBeNull();
+    expect(journalBtn.textContent).toContain('Journals');
+    const journalIcon = journalBtn.children[0].children[0];
+    expect(journalIcon.innerHTML).toContain('<svg');
+    expect(journalIcon.innerHTML).toContain('viewBox="0 0 100 100"');
     cleanup();
   });
 
-  it('opens create modal/form on button click and submits new activity with all required fields', async () => {
+  it('navigates to Journals view, supports bullet/number shortcuts and autosaves', async () => {
     const root = mockDoc.createElement('div');
     const cleanup = mount(root);
     await new Promise((r) => setTimeout(r, 10));
 
-    // Tap + New Activity button
-    const newBtn = root.querySelector('#btn-new-activity');
-    expect(newBtn).not.toBeNull();
-    newBtn.click();
+    // Open Journals
+    const journalBtn = root.querySelector('#choice-journals');
+    journalBtn.click();
+    await new Promise((r) => setTimeout(r, 10));
 
-    // Form modal appears
-    const formModal = root.querySelector('#activity-modal');
-    expect(formModal).not.toBeNull();
+    const journalView = root.querySelector('#journal-view');
+    expect(journalView).not.toBeNull();
 
-    const titleInput = root.querySelector('#activity-input-title');
-    const authorInput = root.querySelector('#activity-input-author');
-    const typeSelect = root.querySelector('#activity-input-type');
-    const statusSelect = root.querySelector('#activity-input-status');
-    const pagesInput = root.querySelector('#activity-input-pages');
-    const summaryInput = root.querySelector('#activity-input-summary');
-    const saveBtn = root.querySelector('#activity-btn-save');
+    const editor = root.querySelector('#editor-journal-content');
+    expect(editor).not.toBeNull();
+
+    const bulletBtn = root.querySelector('#btn-journal-bullet');
+    expect(bulletBtn).not.toBeNull();
+
+    const numberBtn = root.querySelector('#btn-journal-number');
+    expect(numberBtn).not.toBeNull();
+
+    // Back to activities
+    const backBtn = root.querySelector('#btn-back-from-journal-to-activities');
+    expect(backBtn).not.toBeNull();
+    backBtn.click();
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(root.querySelector('#activities-choice-hub')).not.toBeNull();
+    cleanup();
+  });
+
+  it('navigates to Books list, shows empty state, and adds a new book', async () => {
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Open Books Summary
+    root.querySelector('#choice-books-summary').click();
+    await new Promise((r) => setTimeout(r, 10));
+
+    const booksListView = root.querySelector('#books-list-view');
+    expect(booksListView).not.toBeNull();
+
+    const emptyState = root.querySelector('#books-empty-state');
+    expect(emptyState).not.toBeNull();
+    expect(emptyState.textContent).toContain('No books in your library yet');
+
+    // Toggle Add Book form
+    const toggleAddBtn = root.querySelector('#btn-toggle-add-book');
+    toggleAddBtn.click();
+    await new Promise((r) => setTimeout(r, 10));
+
+    const titleInput = root.querySelector('#input-new-book-title');
+    const authorInput = root.querySelector('#input-new-book-author');
+    const saveBtn = root.querySelector('#btn-save-new-book');
 
     expect(titleInput).not.toBeNull();
     expect(authorInput).not.toBeNull();
-    expect(typeSelect).not.toBeNull();
-    expect(statusSelect).not.toBeNull();
-    expect(pagesInput).not.toBeNull();
-    expect(summaryInput).not.toBeNull();
 
-    titleInput.value = 'Designing Data-Intensive Applications';
-    authorInput.value = 'Martin Kleppmann';
-    typeSelect.value = 'Book';
-    statusSelect.value = 'In Progress';
-    pagesInput.value = '616';
-    summaryInput.value = 'Reliability, scalability, and maintainability in distributed systems.';
-
+    titleInput.value = 'Atomic Habits';
+    authorInput.value = 'James Clear';
     saveBtn.click();
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(repoModule.addActivity).toHaveBeenCalledWith({
-      title: 'Designing Data-Intensive Applications',
-      author: 'Martin Kleppmann',
-      type: 'Book',
-      status: 'In Progress',
-      totalPages: 616,
-      summary: 'Reliability, scalability, and maintainability in distributed systems.',
+    expect(repoModule.addBook).toHaveBeenCalledWith({
+      title: 'Atomic Habits',
+      author: 'James Clear',
     });
+    expect(shellModule.showToast).toHaveBeenCalledWith('Book added');
 
-    expect(shellModule.showToast).toHaveBeenCalledWith('Activity created');
-
-    const cards = root.querySelectorAll('.activity-card');
-    expect(cards.length).toBe(1);
-    expect(cards[0].textContent).toContain('Designing Data-Intensive Applications');
+    // Should transition directly to the book action menu
+    const bookActionMenu = root.querySelector('#book-action-menu-view');
+    expect(bookActionMenu).not.toBeNull();
+    expect(root.querySelector('#book-menu-title').textContent).toBe('Atomic Habits');
 
     cleanup();
   });
 
-  it('prevents duplicate card rendering on concurrent renders and repo change notifications', async () => {
-    const root = mockDoc.createElement('div');
-    const cleanup = mount(root);
-    await new Promise((r) => setTimeout(r, 10));
-
-    await repoModule.addActivity({
-      title: 'Race Condition Test Book',
-      type: 'Book',
-      status: 'In Progress',
-    });
-
-    await new Promise((r) => setTimeout(r, 10));
-
-    const cards = root.querySelectorAll('.activity-card');
-    expect(cards.length).toBe(1);
-    expect(cards[0].textContent).toContain('Race Condition Test Book');
-    cleanup();
-  });
-
-  it('renders activities list with cards and filters by status pills', async () => {
-    // Seed repo with 2 activities
-    await repoModule.addActivity({
-      title: 'Clean Architecture',
-      author: 'Robert C. Martin',
-      type: 'Book',
-      status: 'Backlog',
-      totalPages: 350,
-      summary: 'SOLID principles',
-    });
-    await repoModule.addActivity({
-      title: 'System Design Interview',
-      author: 'Alex Xu',
-      type: 'Book',
-      status: 'In Progress',
-      totalPages: 300,
-      summary: 'Distributed architecture diagrams',
-    });
+  it('allows writing chapters in Continue Summary and reading compiled book in Read Summary', async () => {
+    // Seed repo with a book
+    const book = await repoModule.addBook({ title: 'Deep Work', author: 'Cal Newport' });
 
     const root = mockDoc.createElement('div');
     const cleanup = mount(root);
     await new Promise((r) => setTimeout(r, 10));
 
-    // Cards should render
-    let cards = root.querySelectorAll('.activity-card');
-    expect(cards.length).toBe(2);
-
-    // Filter by 'In Progress'
-    const inProgressPill = root.querySelector('#filter-pill-in-progress');
-    expect(inProgressPill).not.toBeNull();
-    inProgressPill.click();
+    // Open Books Summary
+    root.querySelector('#choice-books-summary').click();
     await new Promise((r) => setTimeout(r, 10));
 
-    cards = root.querySelectorAll('.activity-card');
-    expect(cards.length).toBe(1);
-    expect(cards[0].textContent).toContain('System Design Interview');
-
-    // Filter by 'Backlog'
-    const backlogPill = root.querySelector('#filter-pill-backlog');
-    backlogPill.click();
+    // Select the book
+    const bookCard = root.querySelector('.book-item-card');
+    expect(bookCard).not.toBeNull();
+    expect(bookCard.textContent).toContain('Deep Work');
+    bookCard.click();
     await new Promise((r) => setTimeout(r, 10));
 
-    cards = root.querySelectorAll('.activity-card');
-    expect(cards.length).toBe(1);
-    expect(cards[0].textContent).toContain('Clean Architecture');
+    // Action menu choices
+    const continueBtn = root.querySelector('#btn-choice-continue-summary');
+    const readBtn = root.querySelector('#btn-choice-read-summary');
+    expect(continueBtn).not.toBeNull();
+    expect(readBtn).not.toBeNull();
 
-    // Filter by 'All'
-    const allPill = root.querySelector('#filter-pill-all');
-    allPill.click();
+    // Click Continue Summary
+    continueBtn.click();
     await new Promise((r) => setTimeout(r, 10));
 
-    cards = root.querySelectorAll('.activity-card');
-    expect(cards.length).toBe(2);
+    const editView = root.querySelector('#book-edit-view');
+    expect(editView).not.toBeNull();
 
-    cleanup();
-  });
+    const chapterSelect = root.querySelector('#chapter-select');
+    expect(chapterSelect).not.toBeNull();
+    // Initially has "+ Write New Chapter"
+    expect(chapterSelect.children.length).toBe(1);
 
-  it('allows editing an existing activity', async () => {
-    const act = await repoModule.addActivity({
-      title: 'Pragmatic Programmer',
-      author: 'Andy Hunt',
-      type: 'Book',
-      status: 'Backlog',
-      totalPages: 352,
-      summary: 'From journeyman to master',
+    const titleInput = root.querySelector('#input-chapter-title');
+    const editor = root.querySelector('#editor-chapter-content');
+    const saveChapterBtn = root.querySelector('#btn-save-chapter');
+
+    titleInput.value = 'Chapter 1: Deep Work is Valuable';
+    editor.innerHTML = 'Focus without distraction is a superpower.';
+    saveChapterBtn.click();
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(repoModule.saveBookChapter).toHaveBeenCalledWith({
+      bookId: book.id,
+      title: 'Chapter 1: Deep Work is Valuable',
+      content: 'Focus without distraction is a superpower.',
     });
 
-    const root = mockDoc.createElement('div');
-    const cleanup = mount(root);
+    // Check that dropdown now lists the saved chapter
+    const updatedSelect = root.querySelector('#chapter-select');
+    expect(updatedSelect.children.length).toBe(2);
+
+    // Click Read All Chapters button
+    const readAllBtn = root.querySelector('#btn-shortcut-read-all');
+    readAllBtn.click();
     await new Promise((r) => setTimeout(r, 10));
 
-    const editBtn = root.querySelector(`[data-action="edit"][data-id="${act.id}"]`);
-    expect(editBtn).not.toBeNull();
-    editBtn.click();
-
-    // Modal opens populated with existing data
-    const titleInput = root.querySelector('#activity-input-title');
-    expect(titleInput.value).toBe('Pragmatic Programmer');
-
-    const statusSelect = root.querySelector('#activity-input-status');
-    statusSelect.value = 'Completed';
-
-    const saveBtn = root.querySelector('#activity-btn-save');
-    saveBtn.click();
-    await new Promise((r) => setTimeout(r, 10));
-
-    expect(repoModule.updateActivity).toHaveBeenCalledWith(
-      act.id,
-      expect.objectContaining({
-        status: 'Completed',
-      })
-    );
-
-    cleanup();
-  });
-
-  it('allows archiving an activity and toggling archived list view', async () => {
-    const act = await repoModule.addActivity({
-      title: 'Old Course',
-      author: 'Unknown',
-      type: 'Course',
-      status: 'Completed',
-      totalPages: 100,
-    });
-
-    const root = mockDoc.createElement('div');
-    const cleanup = mount(root);
-    await new Promise((r) => setTimeout(r, 10));
-
-    const archiveBtn = root.querySelector(`[data-action="archive"][data-id="${act.id}"]`);
-    expect(archiveBtn).not.toBeNull();
-    archiveBtn.click();
-    await new Promise((r) => setTimeout(r, 10));
-
-    expect(repoModule.setActivityArchived).toHaveBeenCalledWith(act.id, true);
-    expect(shellModule.showToast).toHaveBeenCalledWith('Activity archived');
-
-    cleanup();
-  });
-
-  it('complies with mobile safe-area touch ergonomics and 16px input font size', async () => {
-    const root = mockDoc.createElement('div');
-    const cleanup = mount(root);
-    await new Promise((r) => setTimeout(r, 10));
-
-    // Tap + New Activity
-    const newBtn = root.querySelector('#btn-new-activity');
-    newBtn.click();
-
-    const inputs = root.querySelectorAll('input, select, textarea');
-    expect(inputs.length).toBeGreaterThan(0);
-    for (const input of inputs) {
-      expect(input.className).toContain('text-base'); // Tailwind text-base is 16px
-    }
-
-    const buttons = root.querySelectorAll('button');
-    for (const btn of buttons) {
-      expect(btn.className).toMatch(/min-h-\[44px\]|min-w-\[44px\]|h-11|py-2\.5|p-3/);
-    }
+    const readerView = root.querySelector('#book-read-view');
+    expect(readerView).not.toBeNull();
+    const readerCard = root.querySelector('#book-reader-card');
+    expect(readerCard.textContent).toContain('Deep Work');
+    expect(readerCard.textContent).toContain('Chapter 1: Deep Work is Valuable');
+    expect(readerCard.textContent).toContain('Focus without distraction is a superpower.');
 
     cleanup();
   });

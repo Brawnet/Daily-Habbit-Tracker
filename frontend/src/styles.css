@@ -7,35 +7,36 @@
   --sar: env(safe-area-inset-right, 0px);
   --app-height: 100dvh;
 
-  /* Warm Editorial Minimalism Tokens (SPEC & 60-30-10 Rule) */
+  /* Crisp Editorial Minimalism Tokens (Crisp Gallery Light + Warm Obsidian Dark) */
   --font-serif: 'Newsreader', 'Instrument Serif', 'Playfair Display', Georgia, serif;
   --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  /* 60% Primary Canvas & 30% Structural Surfaces */
-  --bg-canvas: #FAF8F5;          /* Warm Ivory */
-  --surface-card: #F3EFEA;       /* Soft Sand */
-  --surface-hover: #EAE4DC;      /* Muted Linen */
+  /* Light Mode (Crisp Gallery) */
+  --bg-canvas: #F6F5F2;          /* Subtle Alabaster (App Shell / secondary canvas) */
+  --surface-card: #FFFFFF;       /* Pure Crisp White (Elevated Cards / Writing Sheets) */
+  --surface-hover: #EFECE6;      /* Soft Stone */
   --text-primary: #1C1B18;       /* Charcoal Ink */
-  --text-secondary: #6E6A63;     /* Warm Umber */
-  --border-hairline: #E2DCD3;    /* Subtle Parchment */
+  --text-secondary: #68655F;     /* Muted Graphite */
+  --border-hairline: #E6E4DF;    /* Crisp Stone (1px solid borders) */
 
-  /* 10% Earthy Semantic Accent Tokens */
+  /* Refined Semantic Accents */
   --accent-terracotta: #C86D51;  /* Primary CTA & Active State */
-  --accent-terracotta-soft: #F9EBE6;
-  --accent-sage: #4A6B5D;        /* Habits / To-Do & Completion */
-  --accent-sage-soft: #E8F0EC;
+  --accent-terracotta-soft: #FDF2EE;
+  --accent-sage: #3D6B58;        /* To-Do List & Completion */
+  --accent-sage-soft: #EEF5F2;
   --accent-ochre: #D49A45;       /* Daily Schedule & Timeline */
-  --accent-ochre-soft: #FBF3E4;
+  --accent-ochre-soft: #FDF7EC;
   --accent-rose: #B56565;        /* Journaling & Reflection */
-  --accent-rose-soft: #F7ECEC;
+  --accent-rose-soft: #FBF2F2;
   --accent-slate: #4A607A;       /* Book Summary & Insights */
-  --accent-slate-soft: #EBF0F5;
+  --accent-slate-soft: #F0F4F8;
 
   /* Geometry & Shadows */
   --radius-card: 12px;
   --radius-btn: 8px;
   --radius-pill: 9999px;
+  --shadow-card: 0 2px 8px rgba(28, 27, 24, 0.04);
   --shadow-soft: 0 8px 24px -4px rgba(28, 27, 24, 0.06);
 }
 
@@ -59,6 +60,7 @@
     --accent-slate: #5E7796;
     --accent-slate-soft: rgba(74, 96, 122, 0.22);
 
+    --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.4);
     --shadow-soft: 0 8px 24px -4px rgba(0, 0, 0, 0.4);
   }
 }
@@ -141,14 +143,14 @@ button, a, input, select, textarea, [role="button"], [role="tab"] {
 
 /* Editorial Structural Surfaces */
 .editorial-header {
-  background-color: rgba(243, 239, 234, 0.92);
+  background-color: rgba(246, 245, 242, 0.92);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-hairline);
 }
 
 .editorial-nav {
-  background-color: rgba(243, 239, 234, 0.94);
+  background-color: rgba(246, 245, 242, 0.94);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-top: 1px solid var(--border-hairline);
@@ -170,7 +172,7 @@ button, a, input, select, textarea, [role="button"], [role="tab"] {
   background-color: var(--surface-card);
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-card);
-  box-shadow: none;
+  box-shadow: var(--shadow-card);
   transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
 }
 

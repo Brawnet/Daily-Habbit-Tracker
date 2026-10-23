@@ -127,7 +127,7 @@ export function mount(el) {
 
   // --- 2. Archived Habits Section (Collapsible) ---
   const archivedDetails = document.createElement('details');
-  archivedDetails.className = 'group editorial-card p-4 transition-colors bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]';
+  archivedDetails.className = 'group editorial-card p-4 transition-colors bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
 
   const archivedSummary = document.createElement('summary');
   archivedSummary.className = 'font-serif font-semibold text-sm text-[#1C1B18] dark:text-[#F4F1EA] cursor-pointer select-none py-1';
@@ -156,7 +156,7 @@ export function mount(el) {
   searchInput.type = 'search';
   searchInput.placeholder = 'Search entries by keyword or date...';
   searchInput.setAttribute('aria-label', 'Search entries by keyword or date...');
-  searchInput.className = 'journal-search-input w-full px-4 py-2.5 rounded-lg border border-[#E2DCD3] dark:border-[#33302C] bg-[#FAF8F5] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#6E6A63] focus:outline-none focus:ring-2 focus:ring-[#C86D51] text-base';
+  searchInput.className = 'journal-search-input w-full px-4 py-2.5 rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F] focus:outline-none focus:ring-2 focus:ring-[#C86D51] text-base';
   searchInput.style.fontSize = '16px';
   searchWrapper.appendChild(searchInput);
   journalSection.appendChild(searchWrapper);
@@ -203,7 +203,7 @@ export function mount(el) {
     backdrop.setAttribute('aria-label', `Journal entry for ${formatShort(entry.day)}`);
 
     const dialog = document.createElement('div');
-    dialog.className = 'reader-dialog editorial-card bg-[#FAF8F5] dark:bg-[#161514] max-w-lg w-full max-h-[85vh] flex flex-col shadow-xl border border-[#E2DCD3] dark:border-[#33302C] overflow-hidden';
+    dialog.className = 'reader-dialog editorial-card bg-[#FFFFFF] dark:bg-[#161514] max-w-lg w-full max-h-[85vh] flex flex-col shadow-xl border border-[#E6E4DF] dark:border-[#33302C] overflow-hidden';
 
     // Header
     const header = document.createElement('div');
@@ -214,7 +214,7 @@ export function mount(el) {
     title.className = 'font-serif font-semibold text-base text-[#1C1B18] dark:text-[#F4F1EA]';
     title.textContent = formatLong(entry.day);
     const subtitle = document.createElement('p');
-    subtitle.className = 'text-xs font-mono text-[#6E6A63] dark:text-[#A39E93]';
+    subtitle.className = 'text-xs font-mono text-[#68655F] dark:text-[#A39E93]';
     subtitle.textContent = formatShort(entry.day);
     titleWrap.appendChild(title);
     titleWrap.appendChild(subtitle);
@@ -300,7 +300,7 @@ export function mount(el) {
    */
   function renderHabitCard(habit, checkInDays, isArchived) {
     const card = document.createElement('div');
-    card.className = 'habit-card editorial-card p-4 shadow-none flex flex-col gap-3 bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]';
+    card.className = 'habit-card editorial-card p-4 shadow-none flex flex-col gap-3 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
     card.dataset.habitId = habit.id;
     card.dataset.archived = isArchived ? 'true' : 'false';
 
@@ -314,7 +314,7 @@ export function mount(el) {
 
     if (isArchived) {
       const badge = document.createElement('span');
-      badge.className = 'text-[10px] font-mono font-semibold uppercase px-2 py-0.5 rounded-full bg-[#EAE4DC] dark:bg-[#2C2926] text-[#6E6A63] dark:text-[#A39E93] shrink-0';
+      badge.className = 'text-[10px] font-mono font-semibold uppercase px-2 py-0.5 rounded-full bg-[#EFECE6] dark:bg-[#2C2926] text-[#68655F] dark:text-[#A39E93] shrink-0';
       badge.textContent = 'Archived';
       header.appendChild(badge);
     }
@@ -328,7 +328,7 @@ export function mount(el) {
     const ratePct = `${Math.round(rate * 100)}%`;
 
     const statsRow = document.createElement('div');
-    statsRow.className = 'stats-row flex flex-wrap items-center gap-3 text-xs font-mono font-semibold text-[#6E6A63] dark:text-[#A39E93]';
+    statsRow.className = 'stats-row flex flex-wrap items-center gap-3 text-xs font-mono font-semibold text-[#68655F] dark:text-[#A39E93]';
 
     const curStreakSpan = document.createElement('span');
     curStreakSpan.className = 'stat-current-streak flex items-center gap-1';
@@ -375,8 +375,8 @@ export function mount(el) {
           btn.type = 'button';
           btn.className = `heatmap-cell editable w-7 h-7 min-w-[28px] min-h-[28px] rounded flex items-center justify-center text-[10px] font-medium transition cursor-pointer select-none ${
             cell.done
-              ? 'bg-[#4A6B5D] dark:bg-[#5F8776] text-[#FAF8F5] ring-2 ring-offset-1 ring-[#4A6B5D] dark:ring-[#5F8776] dark:ring-offset-[#22201E]'
-              : 'bg-[#FAF8F5] dark:bg-[#161514] border border-[#E2DCD3] dark:border-[#33302C] ring-2 ring-offset-1 ring-[#6E6A63] dark:ring-[#A39E93] dark:ring-offset-[#22201E] hover:bg-[#EAE4DC] dark:hover:bg-[#2C2926]'
+              ? 'bg-[#3D6B58] dark:bg-[#5F8776] text-[#FFFFFF] ring-2 ring-offset-1 ring-[#3D6B58] dark:ring-[#5F8776] dark:ring-offset-[#22201E]'
+              : 'bg-[#FFFFFF] dark:bg-[#161514] border border-[#E6E4DF] dark:border-[#33302C] ring-2 ring-offset-1 ring-[#68655F] dark:ring-[#A39E93] dark:ring-offset-[#22201E] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926]'
           }`;
           btn.style.width = '28px';
           btn.style.height = '28px';
@@ -405,7 +405,7 @@ export function mount(el) {
           const cellDiv = document.createElement('div');
           let cellColorClass = 'bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/60';
           if (cell.done) {
-            cellColorClass = 'bg-[#4A6B5D] dark:bg-[#5F8776] text-[#FAF8F5]';
+            cellColorClass = 'bg-[#3D6B58] dark:bg-[#5F8776] text-[#FFFFFF]';
           }
           cellDiv.className = `heatmap-cell w-7 h-7 min-w-[28px] min-h-[28px] rounded flex items-center justify-center text-[10px] select-none ${cellColorClass}`;
           cellDiv.style.width = '28px';
@@ -458,7 +458,7 @@ export function mount(el) {
       const { entry, highlights } = item;
       const entryBtn = document.createElement('button');
       entryBtn.type = 'button';
-      entryBtn.className = 'journal-entry-item editorial-card group text-left w-full p-3.5 hover:border-[#6E6A63] dark:hover:border-[#A39E93] transition flex flex-col gap-1.5 cursor-pointer tactile-spring bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]';
+      entryBtn.className = 'journal-entry-item editorial-card group text-left w-full p-3.5 hover:border-[#68655F] dark:hover:border-[#A39E93] transition flex flex-col gap-1.5 cursor-pointer tactile-spring bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
       entryBtn.dataset.day = entry.day;
       entryBtn.setAttribute('aria-label', `Read journal entry for ${formatShort(entry.day)}`);
 

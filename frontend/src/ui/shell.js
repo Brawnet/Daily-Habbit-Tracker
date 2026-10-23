@@ -163,7 +163,7 @@ function renderBottomNavButtons() {
     btn.className = `flex flex-col items-center justify-center flex-1 min-w-[44px] min-h-[44px] py-1 px-2 text-xs transition-all cursor-pointer select-none tactile-spring ${
       isActive
         ? 'text-[#C86D51] dark:text-[#D97E63] font-semibold'
-        : 'text-[#6E6A63] dark:text-[#A39E93] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA]'
+        : 'text-[#68655F] dark:text-[#A39E93] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA]'
     }`;
 
     const iconSpan = document.createElement('span');
@@ -264,7 +264,7 @@ export function navigate(name, updateUrl = true) {
           'flex flex-col items-center justify-center flex-1 min-w-[44px] min-h-[44px] py-1 px-2 text-xs transition-all cursor-pointer select-none tactile-spring text-[#C86D51] dark:text-[#D97E63] font-semibold';
       } else {
         btn.className =
-          'flex flex-col items-center justify-center flex-1 min-w-[44px] min-h-[44px] py-1 px-2 text-xs transition-all cursor-pointer select-none tactile-spring text-[#6E6A63] dark:text-[#A39E93] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA]';
+          'flex flex-col items-center justify-center flex-1 min-w-[44px] min-h-[44px] py-1 px-2 text-xs transition-all cursor-pointer select-none tactile-spring text-[#68655F] dark:text-[#A39E93] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA]';
       }
     }
   }
@@ -385,7 +385,7 @@ export function mountShell(rootEl) {
   attachAppHeightListeners();
 
   const shellLayout = document.createElement('div');
-  shellLayout.className = 'shell-layout flex flex-col bg-[#FAF8F5] text-[#1C1B18] dark:bg-[#161514] dark:text-[#F4F1EA] antialiased select-none';
+  shellLayout.className = 'shell-layout flex flex-col bg-[#F6F5F2] text-[#1C1B18] dark:bg-[#161514] dark:text-[#F4F1EA] antialiased select-none';
   // --- Header ---
   const header = document.createElement('header');
   header.className =
@@ -406,7 +406,7 @@ export function mountShell(rootEl) {
   // Sync indicator
   const syncWrap = document.createElement('div');
   syncWrap.id = 'sync-status';
-  syncWrap.className = 'flex items-center gap-1.5 text-xs text-[#6E6A63] dark:text-[#A39E93] font-mono';
+  syncWrap.className = 'flex items-center gap-1.5 text-xs text-[#68655F] dark:text-[#A39E93] font-mono';
   syncWrap.setAttribute('aria-live', 'polite');
 
   syncDotElement = document.createElement('span');
@@ -421,7 +421,7 @@ export function mountShell(rootEl) {
   syncBadgeElement = document.createElement('span');
   syncBadgeElement.id = 'sync-badge';
   syncBadgeElement.className =
-    'hidden px-2 py-0.5 text-[10px] font-semibold font-mono bg-[#F9EBE6] dark:bg-[#2C2926] text-[#C86D51] dark:text-[#D97E63] rounded-full leading-none border border-[#E2DCD3] dark:border-[#33302C]';
+    'hidden px-2 py-0.5 text-[10px] font-semibold font-mono bg-[#FDF2EE] dark:bg-[#2C2926] text-[#C86D51] dark:text-[#D97E63] rounded-full leading-none border border-[#E6E4DF] dark:border-[#33302C]';
   syncWrap.appendChild(syncDotElement);
   syncWrap.appendChild(syncTextElement);
   syncWrap.appendChild(syncBadgeElement);
@@ -433,7 +433,7 @@ export function mountShell(rootEl) {
   syncButtonElement.setAttribute('aria-label', 'Sync now');
   syncButtonElement.title = 'Sync now';
   syncButtonElement.className =
-    'p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-[#EAE4DC] dark:hover:bg-[#2C2926] active:scale-95 transition text-[#6E6A63] dark:text-[#A39E93] hover:text-[#C86D51] dark:hover:text-[#D97E63] cursor-pointer tactile-spring';
+    'p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] active:scale-95 transition text-[#68655F] dark:text-[#A39E93] hover:text-[#C86D51] dark:hover:text-[#D97E63] cursor-pointer tactile-spring';
   syncButtonElement.innerHTML = `
     <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
       <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

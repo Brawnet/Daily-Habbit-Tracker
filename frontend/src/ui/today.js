@@ -148,7 +148,7 @@ export function mount(el) {
       const emptyCard = document.createElement('div');
       emptyCard.id = 'habits-empty-state';
       emptyCard.className =
-        'editorial-card flex flex-col items-center justify-center p-6 sm:p-8 text-center border-dashed gap-5 bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]';
+        'editorial-card flex flex-col items-center justify-center p-6 sm:p-8 text-center border-dashed gap-5 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
 
       // Icon & Greeting
       const headerWrap = document.createElement('div');
@@ -156,7 +156,7 @@ export function mount(el) {
 
       const iconWrap = document.createElement('div');
       iconWrap.className =
-        'w-14 h-14 rounded-xl bg-[#E8F0EC] dark:bg-[rgba(74,107,93,0.25)] text-[#4A6B5D] dark:text-[#5F8776] flex items-center justify-center mb-1 border border-[#E2DCD3] dark:border-[#33302C]';
+        'w-14 h-14 rounded-xl bg-[#EEF5F2] dark:bg-[rgba(61,107,88,0.25)] text-[#3D6B58] dark:text-[#5F8776] flex items-center justify-center mb-1 border border-[#E6E4DF] dark:border-[#33302C]';
       iconWrap.innerHTML = `
         <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
@@ -172,10 +172,10 @@ export function mount(el) {
 
       const subtitleEl = document.createElement('p');
       subtitleEl.id = 'today-empty-subtitle';
-      subtitleEl.className = 'text-xs sm:text-sm text-[#6E6A63] dark:text-[#A39E93] leading-relaxed';
+      subtitleEl.className = 'text-xs sm:text-sm text-[#68655F] dark:text-[#A39E93] leading-relaxed';
       subtitleEl.textContent =
         'Start building your daily momentum. Your data stays on this Device.';
-
+      headerWrap.appendChild(subtitleEl);
       emptyCard.appendChild(headerWrap);
 
       // Inline Quick Add Form
@@ -197,7 +197,7 @@ export function mount(el) {
       inputEl.type = 'text';
       inputEl.id = 'today-empty-add-input';
       inputEl.className =
-        'w-full min-h-[44px] min-w-[44px] px-3.5 py-2.5 text-base rounded-lg border border-[#E2DCD3] dark:border-[#33302C] bg-[#FAF8F5] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#6E6A63] focus:outline-none focus:ring-2 focus:ring-[#C86D51] transition-colors';
+        'w-full min-h-[44px] min-w-[44px] px-3.5 py-2.5 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F] focus:outline-none focus:ring-2 focus:ring-[#C86D51] transition-colors';
       inputEl.style.fontSize = '16px';
       inputEl.placeholder = 'e.g. Drink 2L water, Morning walk...';
 
@@ -262,7 +262,7 @@ export function mount(el) {
         chipBtn.type = 'button';
         chipBtn.dataset.starterChip = starter;
         chipBtn.className =
-          'min-h-[44px] min-w-[44px] px-3.5 py-2 text-xs font-mono font-medium rounded-lg bg-[#FAF8F5] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] hover:border-[#C86D51] hover:text-[#C86D51] dark:hover:text-[#D97E63] border border-[#E2DCD3] dark:border-[#33302C] transition-all cursor-pointer flex items-center justify-center tactile-spring';
+          'min-h-[44px] min-w-[44px] px-3.5 py-2 text-xs font-mono font-medium rounded-lg bg-[#FFFFFF] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] hover:border-[#C86D51] hover:text-[#C86D51] dark:hover:text-[#D97E63] border border-[#E6E4DF] dark:border-[#33302C] transition-all cursor-pointer flex items-center justify-center tactile-spring';
         chipBtn.textContent = `+ ${starter}`;
         chipBtn.addEventListener('click', () => {
           handleAddHabit(starter);
@@ -280,7 +280,7 @@ export function mount(el) {
       manageBtn.type = 'button';
       manageBtn.id = 'manage-habits-btn';
       manageBtn.className =
-        'min-h-[44px] min-w-[44px] px-4 py-2 text-xs font-semibold text-[#6E6A63] hover:text-[#C86D51] dark:text-[#A39E93] dark:hover:text-[#D97E63] transition-colors cursor-pointer inline-flex items-center gap-1.5 focus:outline-none focus:underline tactile-spring';
+        'min-h-[44px] min-w-[44px] px-4 py-2 text-xs font-semibold text-[#68655F] hover:text-[#C86D51] dark:text-[#A39E93] dark:hover:text-[#D97E63] transition-colors cursor-pointer inline-flex items-center gap-1.5 focus:outline-none focus:underline tactile-spring';
       manageBtn.textContent = 'Manage Habits in Settings →';
       manageBtn.addEventListener('click', () => {
         navigate('settings');
@@ -299,7 +299,7 @@ export function mount(el) {
       for (const { habit, isChecked, streak } of habitData) {
         const itemEl = document.createElement('li');
         itemEl.className =
-          'editorial-card flex items-center justify-between p-3.5 gap-3 transition-all hover:border-[#6E6A63] dark:hover:border-[#A39E93] tactile-spring bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]';
+          'editorial-card flex items-center justify-between p-3.5 gap-3 transition-all hover:border-[#68655F] dark:hover:border-[#A39E93] tactile-spring bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
         itemEl.dataset.habitId = habit.id;
 
         const leftWrap = document.createElement('div');
@@ -324,7 +324,7 @@ export function mount(el) {
         const iconWrap = document.createElement('span');
         if (isChecked) {
           iconWrap.className =
-            'w-7 h-7 rounded-lg bg-[#4A6B5D] dark:bg-[#5F8776] text-[#FAF8F5] flex items-center justify-center shadow-xs transition-all';
+            'w-7 h-7 rounded-lg bg-[#3D6B58] dark:bg-[#5F8776] text-[#FFFFFF] flex items-center justify-center shadow-xs transition-all';
           iconWrap.innerHTML = `
             <svg class="w-4 h-4 stroke-[2.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="20 6 9 17 4 12"></polyline>
@@ -332,7 +332,7 @@ export function mount(el) {
           `;
         } else {
           iconWrap.className =
-            'w-7 h-7 rounded-lg border-2 border-[#E2DCD3] dark:border-[#33302C] hover:border-[#4A6B5D] transition-colors bg-[#FAF8F5] dark:bg-[#161514]';
+            'w-7 h-7 rounded-lg border-2 border-[#E6E4DF] dark:border-[#33302C] hover:border-[#3D6B58] transition-colors bg-[#FFFFFF] dark:bg-[#161514]';
         }
         checkBtn.appendChild(iconWrap);
 
@@ -354,7 +354,7 @@ export function mount(el) {
         const nameEl = document.createElement('span');
         nameEl.className = `text-base font-medium truncate flex-1 ${
           isChecked
-            ? 'text-[#6E6A63] dark:text-[#A39E93] line-through'
+            ? 'text-[#68655F] dark:text-[#A39E93] line-through'
             : 'text-[#1C1B18] dark:text-[#F4F1EA]'
         }`;
         nameEl.textContent = habit.name;
@@ -410,7 +410,7 @@ export function mount(el) {
       triggerBtn.setAttribute('aria-controls', 'today-add-habit-control');
       triggerBtn.setAttribute('aria-label', '+ Add Habit');
       triggerBtn.className =
-        'min-h-[44px] min-w-[44px] w-full px-4 py-3 rounded-xl border border-dashed border-[#E2DCD3] dark:border-[#33302C] hover:border-[#C86D51] dark:hover:border-[#D97E63] bg-[#FAF8F5] dark:bg-[#161514] text-[#6E6A63] dark:text-[#A39E93] text-sm font-semibold hover:text-[#C86D51] dark:hover:text-[#D97E63] transition-all cursor-pointer flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-[#C86D51] tactile-spring';
+        'min-h-[44px] min-w-[44px] w-full px-4 py-3 rounded-xl border border-dashed border-[#E6E4DF] dark:border-[#33302C] hover:border-[#C86D51] dark:hover:border-[#D97E63] bg-[#FFFFFF] dark:bg-[#161514] text-[#68655F] dark:text-[#A39E93] text-sm font-semibold hover:text-[#C86D51] dark:hover:text-[#D97E63] transition-all cursor-pointer flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-[#C86D51] tactile-spring';
       triggerBtn.textContent = '+ Add Habit';
 
       triggerBtn.addEventListener('click', () => {
@@ -422,7 +422,7 @@ export function mount(el) {
       const formEl = document.createElement('form');
       formEl.id = 'today-add-habit-form';
       formEl.className =
-        'editorial-card flex flex-col gap-3 p-4 bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]';
+        'editorial-card flex flex-col gap-3 p-4 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
       formEl.setAttribute('role', 'form');
       formEl.setAttribute('aria-label', 'Add new habit');
 
@@ -430,7 +430,7 @@ export function mount(el) {
       inputEl.type = 'text';
       inputEl.id = 'today-add-habit-input';
       inputEl.className =
-        'w-full min-h-[44px] min-w-[44px] px-3.5 py-2.5 text-base rounded-lg border border-[#E2DCD3] dark:border-[#33302C] bg-[#FAF8F5] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#6E6A63] focus:outline-none focus:ring-2 focus:ring-[#C86D51] transition-colors';
+        'w-full min-h-[44px] min-w-[44px] px-3.5 py-2.5 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F] focus:outline-none focus:ring-2 focus:ring-[#C86D51] transition-colors';
       inputEl.placeholder = 'e.g. Read 10 mins, Morning walk...';
       inputEl.setAttribute('aria-label', 'New habit name');
       inputEl.style.fontSize = '16px';
@@ -438,7 +438,7 @@ export function mount(el) {
       const selectActivityEl = document.createElement('select');
       selectActivityEl.id = 'today-add-habit-linked-activity';
       selectActivityEl.className =
-        'w-full min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E2DCD3] dark:border-[#33302C] bg-[#FAF8F5] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
+        'w-full min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
       selectActivityEl.style.fontSize = '16px';
 
       const optNone = document.createElement('option');
@@ -473,7 +473,7 @@ export function mount(el) {
       cancelBtn.id = 'today-add-habit-cancel';
       cancelBtn.setAttribute('aria-label', 'Cancel adding habit');
       cancelBtn.className =
-        'min-h-[44px] min-w-[44px] px-4 py-2 text-sm font-medium text-[#6E6A63] dark:text-[#A39E93] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA] rounded-lg transition-colors cursor-pointer tactile-spring';
+        'min-h-[44px] min-w-[44px] px-4 py-2 text-sm font-medium text-[#68655F] dark:text-[#A39E93] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA] rounded-lg transition-colors cursor-pointer tactile-spring';
       cancelBtn.textContent = 'Cancel';
       cancelBtn.addEventListener('click', collapseAddControl);
 
@@ -550,7 +550,7 @@ export function mount(el) {
     manageLink.setAttribute('role', 'link');
     manageLink.setAttribute('aria-label', 'Manage and reorder habits in Settings');
     manageLink.className =
-      'min-h-[44px] min-w-[44px] px-4 py-2 text-xs font-semibold text-[#6E6A63] hover:text-[#C86D51] dark:text-[#A39E93] dark:hover:text-[#D97E63] transition-colors cursor-pointer inline-flex items-center gap-1.5 focus:outline-none focus:underline tactile-spring';
+      'min-h-[44px] min-w-[44px] px-4 py-2 text-xs font-semibold text-[#68655F] hover:text-[#C86D51] dark:text-[#A39E93] dark:hover:text-[#D97E63] transition-colors cursor-pointer inline-flex items-center gap-1.5 focus:outline-none focus:underline tactile-spring';
     manageLink.textContent = 'Manage & reorder in Settings →';
     manageLink.addEventListener('click', () => {
       navigate('settings');

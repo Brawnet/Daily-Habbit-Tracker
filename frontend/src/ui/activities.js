@@ -26,7 +26,7 @@ export const JOURNALING_LOGO_SVG = `
 <svg class="w-full h-full" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
   <defs>
     <style>
-      .act-logo-fill { fill: #FAF8F5; }
+      .act-logo-fill { fill: #FFFFFF; }
       @media (prefers-color-scheme: dark) {
         .act-logo-fill { fill: #22201E; }
       }
@@ -58,7 +58,7 @@ export const BOOKS_SUMMARY_LOGO_SVG = `
 <svg class="w-full h-full" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
   <defs>
     <style>
-      .act-logo-fill { fill: #FAF8F5; }
+      .act-logo-fill { fill: #FFFFFF; }
       @media (prefers-color-scheme: dark) {
         .act-logo-fill { fill: #22201E; }
       }
@@ -246,7 +246,7 @@ export function mount(rootEl) {
     h1.textContent = 'Choose Activity';
 
     const sub = document.createElement('p');
-    sub.className = 'text-sm text-[#6E6A63] dark:text-[#A39E93] max-w-xs';
+    sub.className = 'text-sm text-[#68655F] dark:text-[#A39E93] max-w-xs';
     sub.textContent = 'Pick what you want to focus on and document today';
 
     header.appendChild(pill);
@@ -261,13 +261,13 @@ export function mount(rootEl) {
     btnBooks.type = 'button';
     btnBooks.id = 'choice-books-summary';
     btnBooks.className =
-      'editorial-card group flex items-center justify-between p-4 sm:p-5 hover:border-[#4A607A] dark:hover:border-[#5E7796] active:scale-[0.985] transition-all cursor-pointer text-left w-full tactile-spring bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]';
+      'editorial-card group flex items-center justify-between p-4 sm:p-5 hover:border-[#4A607A] dark:hover:border-[#5E7796] active:scale-[0.985] transition-all duration-150 cursor-pointer text-left w-full tactile-spring bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
     const leftB = document.createElement('div');
     leftB.className = 'flex items-center gap-4';
 
     const iconB = document.createElement('div');
     iconB.className =
-      'w-14 h-14 rounded-xl bg-[#EBF0F5] dark:bg-[rgba(74,96,122,0.25)] text-[#4A607A] dark:text-[#5E7796] flex items-center justify-center p-2.5 shrink-0 border border-[#E2DCD3] dark:border-[#33302C] shadow-none group-hover:scale-105 transition-transform';
+      'w-14 h-14 rounded-xl bg-[#F0F4F8] dark:bg-[rgba(74,96,122,0.25)] text-[#4A607A] dark:text-[#5E7796] flex items-center justify-center p-2.5 shrink-0 border border-[#E6E4DF] dark:border-[#33302C] shadow-none group-hover:scale-105 transition-transform';
     iconB.innerHTML = BOOKS_SUMMARY_LOGO_SVG;
 
     const textB = document.createElement('div');
@@ -276,7 +276,7 @@ export function mount(rootEl) {
     titleB.textContent = 'Books Summary';
 
     const descB = document.createElement('div');
-    descB.className = 'text-xs text-[#6E6A63] dark:text-[#A39E93] leading-snug';
+    descB.className = 'text-xs text-[#68655F] dark:text-[#A39E93] leading-snug';
     descB.textContent = 'Document book chapters and key takeaways';
     textB.appendChild(titleB);
     textB.appendChild(descB);
@@ -301,13 +301,13 @@ export function mount(rootEl) {
     btnJournal.type = 'button';
     btnJournal.id = 'choice-journals';
     btnJournal.className =
-      'editorial-card group flex items-center justify-between p-4 sm:p-5 hover:border-[#B56565] dark:hover:border-[#C67878] active:scale-[0.985] transition-all cursor-pointer text-left w-full tactile-spring bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]';
+      'editorial-card group flex items-center justify-between p-4 sm:p-5 hover:border-[#B56565] dark:hover:border-[#C67878] active:scale-[0.985] transition-all duration-150 cursor-pointer text-left w-full tactile-spring bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
     const leftJ = document.createElement('div');
     leftJ.className = 'flex items-center gap-4';
 
     const iconJ = document.createElement('div');
     iconJ.className =
-      'w-14 h-14 rounded-xl bg-[#F7ECEC] dark:bg-[rgba(181,101,101,0.25)] text-[#B56565] dark:text-[#C67878] flex items-center justify-center p-2.5 shrink-0 border border-[#E2DCD3] dark:border-[#33302C] shadow-none group-hover:scale-105 transition-transform';
+      'w-14 h-14 rounded-xl bg-[#FBF2F2] dark:bg-[rgba(181,101,101,0.25)] text-[#B56565] dark:text-[#C67878] flex items-center justify-center p-2.5 shrink-0 border border-[#E6E4DF] dark:border-[#33302C] shadow-none group-hover:scale-105 transition-transform';
     iconJ.innerHTML = JOURNALING_LOGO_SVG;
 
     const textJ = document.createElement('div');
@@ -316,7 +316,7 @@ export function mount(rootEl) {
     titleJ.textContent = 'Journals';
 
     const descJ = document.createElement('div');
-    descJ.className = 'text-xs text-[#6E6A63] dark:text-[#A39E93] leading-snug';
+    descJ.className = 'text-xs text-[#68655F] dark:text-[#A39E93] leading-snug';
     descJ.textContent = 'Daily personal reflections and memories';
     textJ.appendChild(titleJ);
     textJ.appendChild(descJ);
@@ -348,13 +348,13 @@ export function mount(rootEl) {
     wrap.className = 'flex flex-col gap-5';
 
     const header = document.createElement('div');
-    header.className = 'flex items-center justify-between pb-2 border-b border-[#E2DCD3] dark:border-[#33302C]';
+    header.className = 'flex items-center justify-between pb-2 border-b border-[#E6E4DF] dark:border-[#33302C]';
 
     const backBtn = document.createElement('button');
     backBtn.type = 'button';
     backBtn.id = 'btn-back-to-activities';
     backBtn.className =
-      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-lg text-xs font-semibold text-[#6E6A63] dark:text-[#A39E93] hover:text-[#C86D51] dark:hover:text-[#D97E63] hover:bg-[#EAE4DC] dark:hover:bg-[#2C2926] active:scale-95 transition-all cursor-pointer tactile-spring';
+      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-lg text-xs font-semibold text-[#68655F] dark:text-[#A39E93] hover:text-[#C86D51] dark:hover:text-[#D97E63] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] active:scale-95 transition-all cursor-pointer tactile-spring';
     backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>Back to Activities</span>`;
     backBtn.addEventListener('click', () => {
       currentView = 'home';
@@ -383,7 +383,7 @@ export function mount(rootEl) {
     h1.textContent = 'Books Summary';
 
     const p = document.createElement('p');
-    p.className = 'text-sm text-[#6E6A63] dark:text-[#A39E93]';
+    p.className = 'text-sm text-[#68655F] dark:text-[#A39E93]';
     p.textContent = 'Select a book from your library';
     titles.appendChild(p);
     wrap.appendChild(titles);
@@ -393,10 +393,10 @@ export function mount(rootEl) {
       const addForm = document.createElement('div');
       addForm.id = 'form-add-book';
       addForm.className =
-        'editorial-card p-4 flex flex-col gap-3 bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]';
+        'editorial-card p-4 flex flex-col gap-3 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
 
       const formTitle = document.createElement('div');
-      formTitle.className = 'text-xs font-bold uppercase tracking-wider text-[#6E6A63] dark:text-[#A39E93]';
+      formTitle.className = 'text-xs font-bold uppercase tracking-wider text-[#68655F] dark:text-[#A39E93]';
       formTitle.textContent = 'Add a New Book';
 
       const titleInput = document.createElement('input');
@@ -404,7 +404,7 @@ export function mount(rootEl) {
       titleInput.id = 'input-new-book-title';
       titleInput.placeholder = 'Book Title *';
       titleInput.className =
-        'w-full min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E2DCD3] dark:border-[#33302C] bg-[#FAF8F5] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#6E6A63] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
+        'w-full min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
       titleInput.style.fontSize = '16px';
 
       const authorInput = document.createElement('input');
@@ -412,7 +412,7 @@ export function mount(rootEl) {
       authorInput.id = 'input-new-book-author';
       authorInput.placeholder = 'Author (optional)';
       authorInput.className =
-        'w-full min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E2DCD3] dark:border-[#33302C] bg-[#FAF8F5] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#6E6A63] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
+        'w-full min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
       authorInput.style.fontSize = '16px';
 
       const formActions = document.createElement('div');
@@ -446,7 +446,7 @@ export function mount(rootEl) {
       const cancelBtn = document.createElement('button');
       cancelBtn.type = 'button';
       cancelBtn.id = 'btn-cancel-new-book';
-      cancelBtn.className = 'min-h-[44px] px-3 py-2 text-[#6E6A63] hover:text-[#1C1B18] dark:text-[#A39E93] dark:hover:text-[#F4F1EA] text-xs font-medium cursor-pointer flex items-center justify-center tactile-spring';
+      cancelBtn.className = 'min-h-[44px] px-3 py-2 text-[#68655F] hover:text-[#1C1B18] dark:text-[#A39E93] dark:hover:text-[#F4F1EA] text-xs font-medium cursor-pointer flex items-center justify-center tactile-spring';
       cancelBtn.textContent = 'Cancel';
       cancelBtn.addEventListener('click', () => {
         isAddingBook = false;
@@ -473,10 +473,10 @@ export function mount(rootEl) {
       const empty = document.createElement('div');
       empty.id = 'books-empty-state';
       empty.className =
-        'editorial-card p-8 border-dashed text-center flex flex-col items-center gap-2.5 text-[#6E6A63] dark:text-[#A39E93] bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]';
+        'editorial-card p-8 border-dashed text-center flex flex-col items-center gap-2.5 text-[#68655F] dark:text-[#A39E93] bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
       const emptyIcon = document.createElement('div');
       emptyIcon.className =
-        'w-16 h-16 rounded-xl bg-[#EBF0F5] dark:bg-[rgba(74,96,122,0.25)] text-[#4A607A] dark:text-[#5E7796] flex items-center justify-center p-2.5 mb-2 border border-[#E2DCD3] dark:border-[#33302C]';
+        'w-16 h-16 rounded-xl bg-[#F0F4F8] dark:bg-[rgba(74,96,122,0.25)] text-[#4A607A] dark:text-[#5E7796] flex items-center justify-center p-2.5 mb-2 border border-[#E6E4DF] dark:border-[#33302C]';
       emptyIcon.innerHTML = BOOKS_SUMMARY_LOGO_SVG;
 
       const emptyMain = document.createElement('p');
@@ -484,7 +484,7 @@ export function mount(rootEl) {
       emptyMain.textContent = 'No books in your library yet';
 
       const emptySub = document.createElement('p');
-      emptySub.className = 'text-xs text-[#6E6A63] dark:text-[#A39E93] max-w-xs leading-relaxed';
+      emptySub.className = 'text-xs text-[#68655F] dark:text-[#A39E93] max-w-xs leading-relaxed';
       emptySub.textContent = 'Click "+ Add New Book" above to get started.';
 
       empty.appendChild(emptyIcon);
@@ -497,7 +497,7 @@ export function mount(rootEl) {
         const card = document.createElement('button');
         card.type = 'button';
         card.className =
-          'book-item-card editorial-card group flex items-center justify-between p-4 hover:border-[#4A607A] dark:hover:border-[#5E7796] active:scale-[0.985] transition-all cursor-pointer text-left w-full tactile-spring bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]';
+          'book-item-card editorial-card group flex items-center justify-between p-4 hover:border-[#4A607A] dark:hover:border-[#5E7796] active:scale-[0.985] transition-all cursor-pointer text-left w-full tactile-spring bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
 
         const chapterCount = chapters.length;
         const countText = chapterCount > 0 ? `${chapterCount} chapter${chapterCount > 1 ? 's' : ''}` : 'No chapters yet';
@@ -507,7 +507,7 @@ export function mount(rootEl) {
 
         const icon = document.createElement('div');
         icon.className =
-          'w-11 h-11 rounded-lg bg-[#EBF0F5] dark:bg-[rgba(74,96,122,0.25)] text-[#4A607A] dark:text-[#5E7796] flex items-center justify-center p-1.5 shrink-0 border border-[#E2DCD3] dark:border-[#33302C]';
+          'w-11 h-11 rounded-lg bg-[#F0F4F8] dark:bg-[rgba(74,96,122,0.25)] text-[#4A607A] dark:text-[#5E7796] flex items-center justify-center p-1.5 shrink-0 border border-[#E6E4DF] dark:border-[#33302C]';
         icon.innerHTML = BOOKS_SUMMARY_LOGO_SVG;
 
         const text = document.createElement('div');
@@ -516,7 +516,7 @@ export function mount(rootEl) {
         titleEl.textContent = book.title;
 
         const subEl = document.createElement('div');
-        subEl.className = 'text-xs font-mono text-[#6E6A63] dark:text-[#A39E93]';
+        subEl.className = 'text-xs font-mono text-[#68655F] dark:text-[#A39E93]';
         subEl.textContent = `${book.author ? `by ${book.author} · ` : ''}${countText}`;
 
         text.appendChild(titleEl);
@@ -563,13 +563,13 @@ export function mount(rootEl) {
 
     // Back to Books List
     const backBar = document.createElement('div');
-    backBar.className = 'flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800';
+    backBar.className = 'flex items-center justify-between pb-2 border-b border-[#E6E4DF] dark:border-[#33302C]';
 
     const backBtn = document.createElement('button');
     backBtn.type = 'button';
     backBtn.id = 'btn-back-to-books-list';
     backBtn.className =
-      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-lg text-xs font-semibold text-[#6E6A63] dark:text-[#A39E93] hover:text-[#C86D51] dark:hover:text-[#D97E63] hover:bg-[#EAE4DC] dark:hover:bg-[#2C2926] active:scale-95 transition-all cursor-pointer tactile-spring';
+      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-lg text-xs font-semibold text-[#68655F] dark:text-[#A39E93] hover:text-[#C86D51] dark:hover:text-[#D97E63] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] active:scale-95 transition-all cursor-pointer tactile-spring';
     backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>Back to Books List</span>`;
     backBtn.addEventListener('click', () => {
       currentView = 'books-list';
@@ -585,7 +585,7 @@ export function mount(rootEl) {
 
     const icon = document.createElement('div');
     icon.className =
-      'w-16 h-16 rounded-xl bg-[#EBF0F5] dark:bg-[rgba(74,96,122,0.25)] text-[#4A607A] dark:text-[#5E7796] flex items-center justify-center p-2.5 mx-auto mb-2 border border-[#E2DCD3] dark:border-[#33302C]';
+      'w-16 h-16 rounded-xl bg-[#F0F4F8] dark:bg-[rgba(74,96,122,0.25)] text-[#4A607A] dark:text-[#5E7796] flex items-center justify-center p-2.5 mx-auto mb-2 border border-[#E6E4DF] dark:border-[#33302C]';
     icon.innerHTML = BOOKS_SUMMARY_LOGO_SVG;
 
     const titleH1 = document.createElement('h1');
@@ -597,12 +597,12 @@ export function mount(rootEl) {
 
     if (book.author) {
       const authorP = document.createElement('p');
-      authorP.className = 'text-sm font-medium text-[#6E6A63] dark:text-[#A39E93]';
+      authorP.className = 'text-sm font-medium text-[#68655F] dark:text-[#A39E93]';
       authorP.textContent = `by ${book.author}`;
       bookInfo.appendChild(authorP);
     }
     const chapCountP = document.createElement('p');
-    chapCountP.className = 'text-xs font-mono text-[#6E6A63] dark:text-[#A39E93] mt-1';
+    chapCountP.className = 'text-xs font-mono text-[#68655F] dark:text-[#A39E93] mt-1';
     chapCountP.textContent = `${chapters.length} chapters documented`;
     bookInfo.appendChild(chapCountP);
 
@@ -617,7 +617,7 @@ export function mount(rootEl) {
     btnContinue.type = 'button';
     btnContinue.id = 'btn-choice-continue-summary';
     btnContinue.className =
-      'flex items-center justify-between p-4 rounded-xl border-2 border-[#4A607A] bg-[#EBF0F5] dark:bg-[rgba(74,96,122,0.2)] hover:bg-[#E2EAF1] dark:hover:bg-[rgba(74,96,122,0.3)] transition-all group cursor-pointer text-left tactile-spring';
+      'flex items-center justify-between p-4 rounded-xl border-2 border-[#4A607A] bg-[#F0F4F8] dark:bg-[rgba(74,96,122,0.2)] hover:bg-[#E4ECF3] dark:hover:bg-[rgba(74,96,122,0.3)] transition-all group cursor-pointer text-left tactile-spring';
     const leftC = document.createElement('div');
     leftC.className = 'flex items-center gap-3.5';
 
@@ -632,7 +632,7 @@ export function mount(rootEl) {
     titleC.textContent = 'Continue Summary';
 
     const descC = document.createElement('div');
-    descC.className = 'text-xs text-[#6E6A63] dark:text-[#A39E93]';
+    descC.className = 'text-xs text-[#68655F] dark:text-[#A39E93]';
     descC.textContent = 'Write or edit chapters (newest at top)';
 
     textC.appendChild(titleC);
@@ -659,13 +659,13 @@ export function mount(rootEl) {
     btnRead.type = 'button';
     btnRead.id = 'btn-choice-read-summary';
     btnRead.className =
-      'editorial-card flex items-center justify-between p-4 hover:border-[#6E6A63] dark:hover:border-[#A39E93] transition group cursor-pointer text-left tactile-spring bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]';
+      'editorial-card flex items-center justify-between p-4 hover:border-[#68655F] dark:hover:border-[#A39E93] transition group cursor-pointer text-left tactile-spring bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
     const leftR = document.createElement('div');
     leftR.className = 'flex items-center gap-3.5';
 
     const iconR = document.createElement('div');
     iconR.className =
-      'w-11 h-11 rounded-lg bg-[#EAE4DC] dark:bg-[#2C2926] text-[#1C1B18] dark:text-[#F4F1EA] flex items-center justify-center p-2.5 shrink-0 group-hover:scale-105 transition-transform';
+      'w-11 h-11 rounded-lg bg-[#EFECE6] dark:bg-[#2C2926] text-[#1C1B18] dark:text-[#F4F1EA] flex items-center justify-center p-2.5 shrink-0 group-hover:scale-105 transition-transform';
     iconR.innerHTML = BOOK_OPEN_SVG;
 
     const textR = document.createElement('div');
@@ -674,7 +674,7 @@ export function mount(rootEl) {
     titleR.textContent = 'Read the Summary';
 
     const descR = document.createElement('div');
-    descR.className = 'text-xs text-[#6E6A63] dark:text-[#A39E93]';
+    descR.className = 'text-xs text-[#68655F] dark:text-[#A39E93]';
     descR.textContent = 'Read all compiled chapters in chronological order';
 
     textR.appendChild(titleR);
@@ -716,13 +716,13 @@ export function mount(rootEl) {
     const sortedChapters = [...chapters].reverse();
 
     const backBar = document.createElement('div');
-    backBar.className = 'flex items-center justify-between pb-2 border-b border-[#E2DCD3] dark:border-[#33302C]';
+    backBar.className = 'flex items-center justify-between pb-2 border-b border-[#E6E4DF] dark:border-[#33302C]';
 
     const backBtn = document.createElement('button');
     backBtn.type = 'button';
     backBtn.id = 'btn-back-to-book-menu';
     backBtn.className =
-      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-lg text-xs font-semibold text-[#6E6A63] dark:text-[#A39E93] hover:text-[#C86D51] dark:hover:text-[#D97E63] hover:bg-[#EAE4DC] dark:hover:bg-[#2C2926] active:scale-95 transition-all cursor-pointer tactile-spring';
+      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-lg text-xs font-semibold text-[#68655F] dark:text-[#A39E93] hover:text-[#C86D51] dark:hover:text-[#D97E63] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] active:scale-95 transition-all cursor-pointer tactile-spring';
     backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>Back to Book Menu</span>`;
     backBtn.addEventListener('click', () => {
       currentView = 'book-menu';
@@ -755,7 +755,7 @@ export function mount(rootEl) {
 
     if (book.author) {
       const authorP = document.createElement('p');
-      authorP.className = 'text-xs text-[#6E6A63] dark:text-[#A39E93]';
+      authorP.className = 'text-xs text-[#68655F] dark:text-[#A39E93]';
       authorP.textContent = `by ${book.author}`;
       leftH.appendChild(authorP);
     }
@@ -771,18 +771,18 @@ export function mount(rootEl) {
 
     // Chapter Dropdown Card
     const dropdownCard = document.createElement('div');
-    dropdownCard.className = 'editorial-card flex flex-col gap-2 p-4 bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]';
+    dropdownCard.className = 'editorial-card flex flex-col gap-2 p-4 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
 
     const dropdownLabel = document.createElement('div');
     dropdownLabel.className = 'flex items-center justify-between';
 
     const labelEl = document.createElement('label');
     labelEl.htmlFor = 'chapter-select';
-    labelEl.className = 'text-xs font-bold uppercase tracking-wider text-[#6E6A63] dark:text-[#A39E93]';
+    labelEl.className = 'text-xs font-bold uppercase tracking-wider text-[#68655F] dark:text-[#A39E93]';
     labelEl.textContent = 'Select Chapter';
 
     const sortHint = document.createElement('span');
-    sortHint.className = 'text-[11px] text-zinc-400';
+    sortHint.className = 'text-[11px] text-[#68655F] dark:text-[#A39E93]';
     sortHint.textContent = 'Newest at top ↓ Oldest at bottom';
 
     dropdownLabel.appendChild(labelEl);
@@ -792,7 +792,7 @@ export function mount(rootEl) {
     const select = document.createElement('select');
     select.id = 'chapter-select';
     select.className =
-      'w-full min-h-[44px] px-3.5 py-2.5 text-base font-medium rounded-lg border border-[#E2DCD3] dark:border-[#33302C] bg-[#FAF8F5] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#4A607A] cursor-pointer';
+      'w-full min-h-[44px] px-3.5 py-2.5 text-base font-medium rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#4A607A] cursor-pointer';
     select.style.fontSize = '16px';
     const newOpt = document.createElement('option');
     newOpt.value = 'new';
@@ -826,13 +826,13 @@ export function mount(rootEl) {
 
     const editCard = document.createElement('div');
     editCard.className =
-      'editorial-card flex flex-col gap-4 p-5 bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]';
+      'editorial-card flex flex-col gap-4 p-5 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
 
     const titleValue = isNew ? newChapterTitle : currentChapter?.title || '';
     const contentValue = isNew ? newChapterContent : currentChapter?.content || '';
 
     const cardHeader = document.createElement('div');
-    cardHeader.className = 'flex items-center justify-between pb-2 border-b border-[#E2DCD3] dark:border-[#33302C]';
+    cardHeader.className = 'flex items-center justify-between pb-2 border-b border-[#E6E4DF] dark:border-[#33302C]';
 
     const modeTitle = document.createElement('span');
     modeTitle.className = 'text-sm font-serif font-semibold text-[#4A607A] dark:text-[#5E7796] inline-flex items-center gap-1.5';
@@ -840,7 +840,7 @@ export function mount(rootEl) {
 
     const statusSpan = document.createElement('span');
     statusSpan.id = 'chapter-save-status';
-    statusSpan.className = 'text-xs text-[#6E6A63] dark:text-[#A39E93] font-mono';
+    statusSpan.className = 'text-xs text-[#68655F] dark:text-[#A39E93] font-mono';
     statusSpan.textContent = chapterStatus;
 
     cardHeader.appendChild(modeTitle);
@@ -853,7 +853,7 @@ export function mount(rootEl) {
 
     const titleLabel = document.createElement('label');
     titleLabel.htmlFor = 'input-chapter-title';
-    titleLabel.className = 'text-xs font-semibold text-[#6E6A63] dark:text-[#A39E93]';
+    titleLabel.className = 'text-xs font-semibold text-[#68655F] dark:text-[#A39E93]';
     titleLabel.textContent = 'Chapter Title';
 
     const titleInput = document.createElement('input');
@@ -862,7 +862,7 @@ export function mount(rootEl) {
     titleInput.placeholder = `e.g. Chapter ${chapters.length + 1}: Key Principles`;
     titleInput.value = titleValue;
     titleInput.className =
-      'w-full min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E2DCD3] dark:border-[#33302C] bg-[#FAF8F5] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#6E6A63] focus:outline-none focus:ring-2 focus:ring-[#4A607A]';
+      'w-full min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F] focus:outline-none focus:ring-2 focus:ring-[#4A607A]';
     titleInput.style.fontSize = '16px';
     titleGroup.appendChild(titleLabel);
     titleGroup.appendChild(titleInput);
@@ -876,7 +876,7 @@ export function mount(rootEl) {
     contentHeader.className = 'flex items-center justify-between';
 
     const contentLabel = document.createElement('label');
-    contentLabel.className = 'text-xs font-semibold text-[#6E6A63] dark:text-[#A39E93]';
+    contentLabel.className = 'text-xs font-semibold text-[#68655F] dark:text-[#A39E93]';
     contentLabel.textContent = 'Summary & Takeaways';
 
     const toolbar = document.createElement('div');
@@ -887,7 +887,7 @@ export function mount(rootEl) {
     bulletBtn.id = 'btn-chapter-bullet';
     bulletBtn.title = 'Insert Bullet list';
     bulletBtn.className =
-      'btn-secondary-surface min-h-[44px] px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold border border-[#E2DCD3] dark:border-[#33302C] text-[#6E6A63] dark:text-[#A39E93] hover:text-[#4A607A] hover:border-[#4A607A] transition cursor-pointer inline-flex items-center gap-1.5 active:scale-95 tactile-spring';
+      'btn-secondary-surface min-h-[44px] px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold border border-[#E6E4DF] dark:border-[#33302C] text-[#68655F] dark:text-[#A39E93] hover:text-[#4A607A] hover:border-[#4A607A] transition cursor-pointer inline-flex items-center gap-1.5 active:scale-95 tactile-spring';
     bulletBtn.innerHTML = `${LIST_BULLET_SVG} <span>Bullet</span>`;
 
     const numberBtn = document.createElement('button');
@@ -895,7 +895,7 @@ export function mount(rootEl) {
     numberBtn.id = 'btn-chapter-number';
     numberBtn.title = 'Insert Numbered list';
     numberBtn.className =
-      'btn-secondary-surface min-h-[44px] px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold border border-[#E2DCD3] dark:border-[#33302C] text-[#6E6A63] dark:text-[#A39E93] hover:text-[#4A607A] hover:border-[#4A607A] transition cursor-pointer inline-flex items-center gap-1.5 active:scale-95 tactile-spring';
+      'btn-secondary-surface min-h-[44px] px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold border border-[#E6E4DF] dark:border-[#33302C] text-[#68655F] dark:text-[#A39E93] hover:text-[#4A607A] hover:border-[#4A607A] transition cursor-pointer inline-flex items-center gap-1.5 active:scale-95 tactile-spring';
     numberBtn.innerHTML = `${LIST_NUMBER_SVG} <span>Numbered</span>`;
     toolbar.appendChild(bulletBtn);
     toolbar.appendChild(numberBtn);
@@ -908,7 +908,7 @@ export function mount(rootEl) {
     contentEditor.setAttribute('role', 'textbox');
     contentEditor.setAttribute('aria-multiline', 'true');
     contentEditor.className =
-      'rich-editor w-full min-h-[180px] p-3.5 text-base rounded-lg border border-[#E2DCD3] dark:border-[#33302C] bg-[#FAF8F5] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#4A607A] overflow-y-auto leading-relaxed outline-none [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-7 [&_ol]:my-2 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-7 [&_ul]:my-2 [&_ul]:space-y-1 [&_li]:pl-1 [&_li]:leading-relaxed [&_p]:my-1.5 [&_p]:leading-relaxed';
+      'rich-editor w-full min-h-[180px] p-3.5 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#4A607A] overflow-y-auto leading-relaxed outline-none [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-7 [&_ol]:my-2 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-7 [&_ul]:my-2 [&_ul]:space-y-1 [&_li]:pl-1 [&_li]:leading-relaxed [&_p]:my-1.5 [&_p]:leading-relaxed';
     contentGroup.appendChild(contentHeader);
     contentGroup.appendChild(contentEditor);
     editCard.appendChild(contentGroup);
@@ -919,7 +919,7 @@ export function mount(rootEl) {
 
     const wordCountEl = document.createElement('span');
     wordCountEl.id = 'chapter-word-count';
-    wordCountEl.className = 'text-xs text-[#6E6A63] dark:text-[#A39E93] font-mono';
+    wordCountEl.className = 'text-xs text-[#68655F] dark:text-[#A39E93] font-mono';
     wordCountEl.textContent = '0 words';
     footer.appendChild(wordCountEl);
 
@@ -984,7 +984,7 @@ export function mount(rootEl) {
       viewCompiledBtn.type = 'button';
       viewCompiledBtn.id = 'btn-view-compiled-reader';
       viewCompiledBtn.className =
-        'btn-secondary-surface min-h-[44px] px-4 py-2 text-xs font-mono font-semibold rounded-lg transition cursor-pointer inline-flex items-center gap-1.5 tactile-spring';
+        'btn-secondary-surface min-h-[44px] px-4 py-2 text-xs font-mono font-semibold rounded-lg border border-[#E6E4DF] dark:border-[#33302C] transition cursor-pointer inline-flex items-center gap-1.5 tactile-spring';
       viewCompiledBtn.innerHTML = `${BOOK_OPEN_SVG} <span>Read Summary</span>`;
       viewCompiledBtn.addEventListener('click', () => {
         currentView = 'book-read';
@@ -1067,13 +1067,13 @@ export function mount(rootEl) {
     const chapters = await listBookChapters(book.id);
 
     const backBar = document.createElement('div');
-    backBar.className = 'flex items-center justify-between pb-2 border-b border-[#E2DCD3] dark:border-[#33302C]';
+    backBar.className = 'flex items-center justify-between pb-2 border-b border-[#E6E4DF] dark:border-[#33302C]';
 
     const backBtn = document.createElement('button');
     backBtn.type = 'button';
     backBtn.id = 'btn-back-from-read-to-menu';
     backBtn.className =
-      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-lg text-xs font-semibold text-[#6E6A63] dark:text-[#A39E93] hover:text-[#C86D51] dark:hover:text-[#D97E63] hover:bg-[#EAE4DC] dark:hover:bg-[#2C2926] active:scale-95 transition-all cursor-pointer tactile-spring';
+      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-lg text-xs font-semibold text-[#68655F] dark:text-[#A39E93] hover:text-[#C86D51] dark:hover:text-[#D97E63] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] active:scale-95 transition-all cursor-pointer tactile-spring';
     backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>Back to Book Menu</span>`;
     backBtn.addEventListener('click', () => {
       currentView = 'book-menu';
@@ -1100,14 +1100,14 @@ export function mount(rootEl) {
     const readerCard = document.createElement('article');
     readerCard.id = 'book-reader-card';
     readerCard.className =
-      'editorial-card flex flex-col gap-6 p-6 leading-relaxed bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]';
+      'editorial-card flex flex-col gap-6 p-6 leading-relaxed bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
     const totalWords = chapters.reduce((acc, c) => {
       const clean = htmlToText(c.content);
       return acc + (clean ? clean.split(/\s+/).filter(Boolean).length : 0);
     }, 0);
 
     const rHeader = document.createElement('header');
-    rHeader.className = 'pb-4 border-b border-[#E2DCD3] dark:border-[#33302C] flex flex-col gap-1';
+    rHeader.className = 'pb-4 border-b border-[#E6E4DF] dark:border-[#33302C] flex flex-col gap-1';
 
     const overline = document.createElement('span');
     overline.className = 'text-xs font-mono font-semibold uppercase tracking-widest text-[#4A607A] dark:text-[#5E7796]';
@@ -1122,25 +1122,25 @@ export function mount(rootEl) {
 
     if (book.author) {
       const authorP = document.createElement('p');
-      authorP.className = 'text-sm font-medium text-[#6E6A63] dark:text-[#A39E93]';
+      authorP.className = 'text-sm font-medium text-[#68655F] dark:text-[#A39E93]';
       authorP.textContent = `by ${book.author}`;
       rHeader.appendChild(authorP);
     }
 
     const metaDiv = document.createElement('div');
-    metaDiv.className = 'flex items-center gap-3 text-xs font-mono text-[#6E6A63] dark:text-[#A39E93] mt-2';
+    metaDiv.className = 'flex items-center gap-3 text-xs font-mono text-[#68655F] dark:text-[#A39E93] mt-2';
     metaDiv.textContent = `${chapters.length} Chapters Documented • ${totalWords} Total Words`;
     rHeader.appendChild(metaDiv);
     readerCard.appendChild(rHeader);
 
     if (chapters.length === 0) {
       const empty = document.createElement('p');
-      empty.className = 'text-sm text-zinc-400 italic py-4 text-center';
+      empty.className = 'text-sm text-[#68655F] dark:text-[#A39E93] italic py-4 text-center';
       empty.textContent = 'No chapters summarized yet. Tap "Continue Summary" to write your first chapter.';
       readerCard.appendChild(empty);
     } else {
       const chaptersList = document.createElement('div');
-      chaptersList.className = 'flex flex-col gap-6 divide-y divide-zinc-100 dark:divide-zinc-800/80';
+      chaptersList.className = 'flex flex-col gap-6 divide-y divide-[#E6E4DF] dark:divide-[#33302C]';
 
       chapters.forEach((ch, idx) => {
         const chEl = document.createElement('section');
@@ -1174,13 +1174,13 @@ export function mount(rootEl) {
     wrap.className = 'flex flex-col gap-4 animate-in fade-in duration-150';
 
     const backBar = document.createElement('div');
-    backBar.className = 'flex items-center justify-between pb-2 border-b border-[#E2DCD3] dark:border-[#33302C]';
+    backBar.className = 'flex items-center justify-between pb-2 border-b border-[#E6E4DF] dark:border-[#33302C]';
 
     const backBtn = document.createElement('button');
     backBtn.type = 'button';
     backBtn.id = 'btn-back-from-journal-to-activities';
     backBtn.className =
-      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-lg text-xs font-semibold text-[#6E6A63] dark:text-[#A39E93] hover:text-[#C86D51] dark:hover:text-[#D97E63] hover:bg-[#EAE4DC] dark:hover:bg-[#2C2926] active:scale-95 transition-all cursor-pointer tactile-spring';
+      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-lg text-xs font-semibold text-[#68655F] dark:text-[#A39E93] hover:text-[#C86D51] dark:hover:text-[#D97E63] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] active:scale-95 transition-all cursor-pointer tactile-spring';
     backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>Back to Activities</span>`;
     backBtn.addEventListener('click', () => {
       currentView = 'home';
@@ -1197,14 +1197,14 @@ export function mount(rootEl) {
     wrap.appendChild(backBar);
 
     const card = document.createElement('div');
-    card.className = 'editorial-card flex flex-col gap-4 p-5 bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]';
+    card.className = 'editorial-card flex flex-col gap-4 p-5 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
 
     const cardHeader = document.createElement('div');
-    cardHeader.className = 'flex items-center gap-2 pb-2 border-b border-zinc-100 dark:border-zinc-800';
+    cardHeader.className = 'flex items-center gap-2 pb-2 border-b border-[#E6E4DF] dark:border-[#33302C]';
 
     const iconJ = document.createElement('div');
     iconJ.className =
-      'w-10 h-10 rounded-lg bg-[#F7ECEC] dark:bg-[rgba(181,101,101,0.25)] text-[#B56565] dark:text-[#C67878] flex items-center justify-center p-1.5 shrink-0 border border-[#E2DCD3] dark:border-[#33302C] shadow-none';
+      'w-10 h-10 rounded-xl bg-[#FBF2F2] dark:bg-[rgba(181,101,101,0.25)] text-[#B56565] dark:text-[#C67878] flex items-center justify-center p-1.5 shrink-0 border border-[#E6E4DF] dark:border-[#33302C] shadow-none';
     iconJ.innerHTML = JOURNALING_LOGO_SVG;
 
     const titleWrap = document.createElement('div');
@@ -1213,7 +1213,7 @@ export function mount(rootEl) {
     h2.textContent = 'Daily Journal Reflection';
 
     const p = document.createElement('p');
-    p.className = 'text-xs text-[#6E6A63] dark:text-[#A39E93]';
+    p.className = 'text-xs text-[#68655F] dark:text-[#A39E93]';
     p.textContent = 'Personal thoughts, memories, and ideas for today';
 
     titleWrap.appendChild(h2);
@@ -1229,7 +1229,7 @@ export function mount(rootEl) {
     row.className = 'flex items-center justify-between';
 
     const label = document.createElement('label');
-    label.className = 'text-xs font-semibold text-zinc-500';
+    label.className = 'text-xs font-semibold text-[#68655F] dark:text-[#A39E93]';
     label.textContent = 'Reflections & Notes';
 
     const toolbar = document.createElement('div');
@@ -1240,7 +1240,7 @@ export function mount(rootEl) {
     bulletBtn.id = 'btn-journal-bullet';
     bulletBtn.title = 'Insert Bullet / Dot';
     bulletBtn.className =
-      'btn-secondary-surface min-h-[44px] px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold border border-[#E2DCD3] dark:border-[#33302C] text-[#6E6A63] dark:text-[#A39E93] hover:text-[#B56565] hover:border-[#B56565] transition cursor-pointer inline-flex items-center gap-1.5 active:scale-95 tactile-spring';
+      'btn-secondary-surface min-h-[44px] px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold border border-[#E6E4DF] dark:border-[#33302C] text-[#68655F] dark:text-[#A39E93] hover:text-[#B56565] hover:border-[#B56565] transition cursor-pointer inline-flex items-center gap-1.5 active:scale-95 tactile-spring';
     bulletBtn.innerHTML = `${LIST_BULLET_SVG} <span>Bullet</span>`;
 
     const numberBtn = document.createElement('button');
@@ -1248,7 +1248,7 @@ export function mount(rootEl) {
     numberBtn.id = 'btn-journal-number';
     numberBtn.title = 'Insert Numbered list';
     numberBtn.className =
-      'btn-secondary-surface min-h-[44px] px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold border border-[#E2DCD3] dark:border-[#33302C] text-[#6E6A63] dark:text-[#A39E93] hover:text-[#B56565] hover:border-[#B56565] transition cursor-pointer inline-flex items-center gap-1.5 active:scale-95 tactile-spring';
+      'btn-secondary-surface min-h-[44px] px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold border border-[#E6E4DF] dark:border-[#33302C] text-[#68655F] dark:text-[#A39E93] hover:text-[#B56565] hover:border-[#B56565] transition cursor-pointer inline-flex items-center gap-1.5 active:scale-95 tactile-spring';
     numberBtn.innerHTML = `${LIST_NUMBER_SVG} <span>Numbered</span>`;
     toolbar.appendChild(bulletBtn);
     toolbar.appendChild(numberBtn);
@@ -1261,20 +1261,20 @@ export function mount(rootEl) {
     jEditor.setAttribute('role', 'textbox');
     jEditor.setAttribute('aria-multiline', 'true');
     jEditor.className =
-      'rich-editor w-full min-h-[200px] p-3.5 text-base rounded-lg border border-[#E2DCD3] dark:border-[#33302C] bg-[#FAF8F5] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#B56565] overflow-y-auto leading-relaxed outline-none [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-7 [&_ol]:my-2 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-7 [&_ul]:my-2 [&_ul]:space-y-1 [&_li]:pl-1 [&_li]:leading-relaxed [&_p]:my-1.5 [&_p]:leading-relaxed';
+      'rich-editor w-full min-h-[200px] p-3.5 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#B56565] overflow-y-auto leading-relaxed outline-none [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-7 [&_ol]:my-2 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-7 [&_ul]:my-2 [&_ul]:space-y-1 [&_li]:pl-1 [&_li]:leading-relaxed [&_p]:my-1.5 [&_p]:leading-relaxed';
     formGroup.appendChild(row);
     formGroup.appendChild(jEditor);
     card.appendChild(formGroup);
 
     const footer = document.createElement('div');
-    footer.className = 'flex items-center justify-between text-xs text-[#6E6A63] dark:text-[#A39E93]';
+    footer.className = 'flex items-center justify-between text-xs text-[#68655F] dark:text-[#A39E93]';
 
     const note = document.createElement('span');
     note.textContent = 'Always editable';
 
     const jWordCount = document.createElement('span');
     jWordCount.id = 'journal-word-count';
-    jWordCount.className = 'font-mono text-xs text-[#6E6A63] dark:text-[#A39E93]';
+    jWordCount.className = 'font-mono text-xs text-[#68655F] dark:text-[#A39E93]';
     jWordCount.textContent = '0 words';
 
     footer.appendChild(note);

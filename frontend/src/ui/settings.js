@@ -86,19 +86,19 @@ export function mount(el) {
       </header>
 
       <!-- Section 1: Sync -->
-      <section id="settings-sync" class="editorial-card p-4 sm:p-5 space-y-4 bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]" aria-labelledby="heading-sync">
-        <div class="flex items-center justify-between border-b border-[#E2DCD3] dark:border-[#33302C] pb-3">
+      <section id="settings-sync" class="editorial-card p-4 sm:p-5 space-y-4 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]" aria-labelledby="heading-sync">
+        <div class="flex items-center justify-between border-b border-[#E6E4DF] dark:border-[#33302C] pb-3">
           <h2 id="heading-sync" class="text-base font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]">Sync</h2>
         </div>
 
         <!-- Live Sync Status Row -->
-        <div id="sync-status-row" class="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-[#FAF8F5] dark:bg-[#161514] border border-[#E2DCD3] dark:border-[#33302C] text-xs sm:text-sm font-mono">
+        <div id="sync-status-row" class="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-[#F6F5F2] dark:bg-[#161514] border border-[#E6E4DF] dark:border-[#33302C] text-xs sm:text-sm font-mono">
           <div class="flex items-center gap-2">
             <span id="sync-status-dot" class="w-2.5 h-2.5 rounded-full shrink-0 transition-colors bg-zinc-400 dark:bg-zinc-600"></span>
             <span id="sync-status-text" class="font-medium text-[#1C1B18] dark:text-[#F4F1EA]">Checking...</span>
             <span id="sync-pending-badge" class="hidden px-2 py-0.5 rounded-full text-xs font-semibold font-mono badge-ochre">0 pending</span>
           </div>
-          <div class="text-xs text-[#6E6A63] dark:text-[#A39E93] font-mono">
+          <div class="text-xs text-[#68655F] dark:text-[#A39E93] font-mono">
             Last synced: <span id="sync-last-synced" class="font-medium text-[#1C1B18] dark:text-[#F4F1EA]">Never</span>
           </div>
         </div>
@@ -106,7 +106,7 @@ export function mount(el) {
         <!-- Credentials Form -->
         <div class="space-y-3">
           <div class="space-y-1">
-            <label for="sync-gas-url" class="block text-xs font-medium text-[#6E6A63] dark:text-[#A39E93] font-mono">
+            <label for="sync-gas-url" class="block text-xs font-medium text-[#68655F] dark:text-[#A39E93] font-mono">
               Web App URL
             </label>
             <input
@@ -114,12 +114,12 @@ export function mount(el) {
               type="url"
               placeholder="https://script.google.com/macros/s/.../exec"
               value="${escapeHtml(currentConfig.gasUrl)}"
-              class="w-full min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E2DCD3] dark:border-[#33302C] bg-[#FAF8F5] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#6E6A63] focus:outline-none focus:ring-2 focus:ring-[#C86D51]"
+              class="w-full min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F] focus:outline-none focus:ring-2 focus:ring-[#C86D51]"
             />
           </div>
 
           <div class="space-y-1">
-            <label for="sync-pin" class="block text-xs font-medium text-[#6E6A63] dark:text-[#A39E93] font-mono">
+            <label for="sync-pin" class="block text-xs font-medium text-[#68655F] dark:text-[#A39E93] font-mono">
               Access PIN
             </label>
             <input
@@ -127,7 +127,7 @@ export function mount(el) {
               type="password"
               placeholder="Enter PIN"
               value="${escapeHtml(currentConfig.pin)}"
-              class="w-full min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E2DCD3] dark:border-[#33302C] bg-[#FAF8F5] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#6E6A63] focus:outline-none focus:ring-2 focus:ring-[#C86D51]"
+              class="w-full min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F] focus:outline-none focus:ring-2 focus:ring-[#C86D51]"
             />
           </div>
         </div>
@@ -144,14 +144,14 @@ export function mount(el) {
           <button
             id="btn-test-connection"
             type="button"
-            class="btn-secondary-surface min-h-[44px] px-4 py-2 text-sm font-medium rounded-lg border border-[#E2DCD3] dark:border-[#33302C] transition cursor-pointer select-none tactile-spring"
+            class="btn-secondary-surface min-h-[44px] px-4 py-2 text-sm font-medium rounded-lg border border-[#E6E4DF] dark:border-[#33302C] transition cursor-pointer select-none tactile-spring"
           >
             Test Connection
           </button>
           <button
             id="btn-sync-now"
             type="button"
-            class="btn-secondary-surface min-h-[44px] px-4 py-2 text-sm font-medium rounded-lg border border-[#E2DCD3] dark:border-[#33302C] transition cursor-pointer select-none tactile-spring"
+            class="btn-secondary-surface min-h-[44px] px-4 py-2 text-sm font-medium rounded-lg border border-[#E6E4DF] dark:border-[#33302C] transition cursor-pointer select-none tactile-spring"
           >
             Sync Now
           </button>
@@ -159,8 +159,8 @@ export function mount(el) {
       </section>
 
       <!-- Section 2: Manage Habits -->
-      <section id="settings-habits" class="editorial-card p-4 sm:p-5 space-y-4 bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]" aria-labelledby="heading-habits">
-        <div class="flex items-center justify-between border-b border-[#E2DCD3] dark:border-[#33302C] pb-3">
+      <section id="settings-habits" class="editorial-card p-4 sm:p-5 space-y-4 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]" aria-labelledby="heading-habits">
+        <div class="flex items-center justify-between border-b border-[#E6E4DF] dark:border-[#33302C] pb-3">
           <h2 id="heading-habits" class="text-base font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]">Manage Habits</h2>
         </div>
 
@@ -172,11 +172,11 @@ export function mount(el) {
             maxlength="60"
             placeholder="New habit name..."
             aria-label="New habit name"
-            class="flex-1 min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E2DCD3] dark:border-[#33302C] bg-[#FAF8F5] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#6E6A63] focus:outline-none focus:ring-2 focus:ring-[#C86D51]"
+            class="flex-1 min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F] focus:outline-none focus:ring-2 focus:ring-[#C86D51]"
           />
           <select
             id="select-habit-linked-activity"
-            class="min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E2DCD3] dark:border-[#33302C] bg-[#FAF8F5] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]"
+            class="min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]"
           >
             <option value="">No Activity Link</option>
             <option value="book_summary">Link: Book Summary 📖</option>
@@ -193,7 +193,7 @@ export function mount(el) {
 
         <!-- Active Habits List -->
         <div class="space-y-2">
-          <div class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          <div class="text-xs font-semibold uppercase tracking-wider text-[#68655F] dark:text-[#A39E93]">
             Active Habits
           </div>
           <div id="active-habits-list" class="space-y-2">
@@ -202,13 +202,13 @@ export function mount(el) {
         </div>
 
         <!-- Archived Habits Section -->
-        <div class="pt-2 border-t border-[#E2DCD3] dark:border-[#33302C]">
+        <div class="pt-2 border-t border-[#E6E4DF] dark:border-[#33302C]">
           <button
             id="btn-toggle-archived"
             type="button"
             aria-expanded="false"
             aria-pressed="false"
-            class="flex items-center justify-between w-full min-h-[44px] px-3 py-2 text-xs font-semibold uppercase tracking-wider text-[#6E6A63] dark:text-[#A39E93] bg-[#FAF8F5] dark:bg-[#161514] hover:bg-[#EAE4DC] dark:hover:bg-[#2C2926] rounded-lg transition cursor-pointer select-none border border-[#E2DCD3] dark:border-[#33302C]"
+            class="flex items-center justify-between w-full min-h-[44px] px-3 py-2 text-xs font-semibold uppercase tracking-wider text-[#68655F] dark:text-[#A39E93] bg-[#F6F5F2] dark:bg-[#161514] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] rounded-lg transition cursor-pointer select-none border border-[#E6E4DF] dark:border-[#33302C]"
           >
             <span>Archived Habits (<span id="archived-habits-count">0</span>)</span>
             <span id="archived-toggle-icon" class="text-xs transition-transform pointer-events-none">▼</span>
@@ -220,35 +220,35 @@ export function mount(el) {
       </section>
 
       <!-- Section 3: Reminder -->
-      <section id="settings-reminder" class="editorial-card p-4 sm:p-5 space-y-4 bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]" aria-labelledby="heading-reminder">
-        <div class="flex items-center justify-between border-b border-[#E2DCD3] dark:border-[#33302C] pb-3">
+      <section id="settings-reminder" class="editorial-card p-4 sm:p-5 space-y-4 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]" aria-labelledby="heading-reminder">
+        <div class="flex items-center justify-between border-b border-[#E6E4DF] dark:border-[#33302C] pb-3">
           <h2 id="heading-reminder" class="text-base font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]">Reminder</h2>
         </div>
 
         <!-- Time Picker -->
         <div class="space-y-1.5">
-          <label for="setting-reminder-time" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300">
+          <label for="setting-reminder-time" class="block text-xs font-medium text-[#68655F] dark:text-[#A39E93]">
             Daily Reminder Time (Asia/Jakarta)
           </label>
-          <p class="text-xs text-zinc-500 dark:text-zinc-400">
+          <p class="text-xs text-[#68655F] dark:text-[#A39E93]">
             Reminds you if there are active habits without check-ins or no journal entry today.
           </p>
           <input
             id="setting-reminder-time"
             type="time"
             value="20:00"
-            class="w-full sm:w-48 min-h-[44px] px-3.5 py-2 text-base font-mono rounded-lg border border-[#E2DCD3] dark:border-[#33302C] bg-[#FAF8F5] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]"
+            class="w-full sm:w-48 min-h-[44px] px-3.5 py-2 text-base font-mono rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]"
           />
 
         <!-- Web Push Card -->
-        <div class="p-3.5 rounded-lg bg-[#FAF8F5] dark:bg-[#161514] border border-[#E2DCD3] dark:border-[#33302C] space-y-3">
+        <div class="p-3.5 rounded-lg bg-[#F6F5F2] dark:bg-[#161514] border border-[#E6E4DF] dark:border-[#33302C] space-y-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <span class="text-xs sm:text-sm font-medium">Notification Status</span>
-            <span id="push-status-badge" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold font-mono bg-[#EAE4DC] text-[#6E6A63] dark:bg-[#2C2926] dark:text-[#A39E93]">
+            <span id="push-status-badge" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold font-mono bg-[#EFECE6] text-[#68655F] dark:bg-[#2C2926] dark:text-[#A39E93]">
               Checking...
             </span>
           </div>
-          <p id="push-status-helper" class="text-xs text-zinc-500 dark:text-zinc-400"></p>
+          <p id="push-status-helper" class="text-xs text-[#68655F] dark:text-[#A39E93]"></p>
           <div class="flex flex-wrap items-center gap-2 pt-1">
             <button
               id="btn-enable-push"
@@ -260,7 +260,7 @@ export function mount(el) {
             <button
               id="btn-test-push"
               type="button"
-              class="btn-secondary-surface min-h-[44px] px-4 py-2 text-sm font-medium rounded-lg border border-[#E2DCD3] dark:border-[#33302C] transition cursor-pointer select-none disabled:opacity-50 disabled:cursor-not-allowed tactile-spring"
+              class="btn-secondary-surface min-h-[44px] px-4 py-2 text-sm font-medium rounded-lg border border-[#E6E4DF] dark:border-[#33302C] transition cursor-pointer select-none disabled:opacity-50 disabled:cursor-not-allowed tactile-spring"
             >
               Send Test Notification
             </button>
@@ -269,8 +269,8 @@ export function mount(el) {
       </section>
 
       <!-- Section 4: Install App -->
-      <section id="settings-install" class="editorial-card p-4 sm:p-5 space-y-3 bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]" aria-labelledby="heading-install">
-        <div class="flex items-center justify-between border-b border-[#E2DCD3] dark:border-[#33302C] pb-3">
+      <section id="settings-install" class="editorial-card p-4 sm:p-5 space-y-3 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]" aria-labelledby="heading-install">
+        <div class="flex items-center justify-between border-b border-[#E6E4DF] dark:border-[#33302C] pb-3">
           <h2 id="heading-install" class="text-base font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]">Install App</h2>
         </div>
         <div id="install-app-container" class="space-y-3">
@@ -279,8 +279,8 @@ export function mount(el) {
       </section>
 
       <!-- Section 5: About -->
-      <section id="settings-about" class="editorial-card p-4 sm:p-5 space-y-2 bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]" aria-labelledby="heading-about">
-        <div class="flex items-center justify-between border-b border-[#E2DCD3] dark:border-[#33302C] pb-3">
+      <section id="settings-about" class="editorial-card p-4 sm:p-5 space-y-2 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]" aria-labelledby="heading-about">
+        <div class="flex items-center justify-between border-b border-[#E6E4DF] dark:border-[#33302C] pb-3">
           <h2 id="heading-about" class="text-base font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]">About</h2>
         </div>
         <div class="space-y-1.5 text-xs sm:text-sm text-zinc-600 dark:text-zinc-400">
@@ -458,7 +458,7 @@ export function mount(el) {
 
           const row = document.createElement('div');
           row.className =
-            'habit-row editorial-card flex items-center justify-between gap-2 p-2.5 bg-[#FAF8F5] dark:bg-[#161514] border-[#E2DCD3] dark:border-[#33302C]';
+            'habit-row editorial-card flex items-center justify-between gap-2 p-2.5 bg-[#FFFFFF] dark:bg-[#161514] border-[#E6E4DF] dark:border-[#33302C]';
           row.dataset.habitId = habit.id;
 
           // Habit name & inline rename trigger
@@ -504,12 +504,12 @@ export function mount(el) {
             input.maxLength = 60;
             input.value = habit.name;
             input.className =
-              'rename-input input-rename flex-1 min-h-[44px] px-3 py-1.5 text-base rounded-lg border-2 border-[#C86D51] bg-[#FAF8F5] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none';
+              'rename-input input-rename flex-1 min-h-[44px] px-3 py-1.5 text-base rounded-lg border-2 border-[#C86D51] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none';
             input.setAttribute('aria-label', `New name for ${habit.name}`);
 
             const select = document.createElement('select');
             select.className =
-              'select-edit-linked-activity min-h-[44px] px-2.5 py-1.5 text-xs rounded-lg border border-[#E2DCD3] dark:border-[#33302C] bg-[#FAF8F5] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
+              'select-edit-linked-activity min-h-[44px] px-2.5 py-1.5 text-xs rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
             select.setAttribute('aria-label', `Linked activity for ${habit.name}`);
 
             const optNone = document.createElement('option');
@@ -596,7 +596,7 @@ export function mount(el) {
           const upBtn = document.createElement('button');
           upBtn.type = 'button';
           upBtn.className =
-            'btn-move-up min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg border border-[#E2DCD3] dark:border-[#33302C] text-[#6E6A63] dark:text-[#A39E93] hover:bg-[#EAE4DC] dark:hover:bg-[#2C2926] disabled:opacity-30 disabled:cursor-not-allowed select-none transition tactile-spring';
+            'btn-move-up min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg border border-[#E6E4DF] dark:border-[#33302C] text-[#68655F] dark:text-[#A39E93] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] disabled:opacity-30 disabled:cursor-not-allowed select-none transition tactile-spring';
           upBtn.setAttribute('aria-label', 'Move up');
           upBtn.title = 'Move up';
           upBtn.textContent = '▲';
@@ -613,7 +613,7 @@ export function mount(el) {
           const downBtn = document.createElement('button');
           downBtn.type = 'button';
           downBtn.className =
-            'btn-move-down min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg border border-[#E2DCD3] dark:border-[#33302C] text-[#6E6A63] dark:text-[#A39E93] hover:bg-[#EAE4DC] dark:hover:bg-[#2C2926] disabled:opacity-30 disabled:cursor-not-allowed select-none transition tactile-spring';
+            'btn-move-down min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg border border-[#E6E4DF] dark:border-[#33302C] text-[#68655F] dark:text-[#A39E93] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] disabled:opacity-30 disabled:cursor-not-allowed select-none transition tactile-spring';
           downBtn.setAttribute('aria-label', 'Move down');
           downBtn.title = 'Move down';
           downBtn.textContent = '▼';
@@ -679,7 +679,7 @@ export function mount(el) {
           const restoreBtn = document.createElement('button');
           restoreBtn.type = 'button';
           restoreBtn.className =
-            'btn-restore min-h-[44px] px-3.5 text-xs font-mono font-semibold rounded-lg text-[#4A6B5D] dark:text-[#5F8776] hover:bg-[#E8F0EC] dark:hover:bg-[rgba(74,107,93,0.22)] border border-[rgba(74,107,93,0.3)] transition cursor-pointer select-none tactile-spring';
+            'btn-restore min-h-[44px] px-3.5 text-xs font-mono font-semibold rounded-lg text-[#3D6B58] dark:text-[#5F8776] hover:bg-[#EEF5F2] dark:hover:bg-[rgba(61,107,88,0.22)] border border-[rgba(61,107,88,0.3)] transition cursor-pointer select-none tactile-spring';
           restoreBtn.setAttribute('aria-label', `Restore ${habit.name}`);
           restoreBtn.textContent = 'Restore';
           restoreBtn.addEventListener('click', async () => {

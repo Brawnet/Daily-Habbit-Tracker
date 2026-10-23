@@ -23,6 +23,7 @@ import {
   computeWordCount,
   hasNonEmptyJournalAnswers,
 } from './journal.js';
+import { extractDriveFolderId, buildDriveFolderUrl } from './drive.js';
 
 describe('domain/day', () => {
   describe('toDay and today', () => {
@@ -648,5 +649,55 @@ describe('domain/journal', () => {
     expect(hasNonEmptyJournalAnswers({ p1: '<p><br></p>' }, '   ')).toBe(false);
     expect(hasNonEmptyJournalAnswers({ p1: 'Hello' }, '')).toBe(true);
     expect(hasNonEmptyJournalAnswers({}, 'Notes exist')).toBe(true);
+  });
+});
+
+describe('domain/drive', () => {
+  describe('extractDriveFolderId', () => {
+    it('extracts folder ID from full Drive URL with query params', () => {
+      const url = 'https://drive.google.com/drive/folders/1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC?hl=ID';
+      expect(extractDriveFolderId(url)).toBe('1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC');
+    });
+
+    it('extracts folder ID from user profile Drive URL', () => {
+      const url = 'https://drive.google.com/drive/u/0/folders/1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC';
+      expect(extractDriveFolderId(url)).toBe('1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC');
+    });
+
+    it('extracts folder ID from trailing slash URL', () => {
+      const url = 'https://drive.google.com/drive/folders/1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC/';
+      expect(extractDriveFolderId(url)).toBe('1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC');
+    });
+
+    it('extracts clean folder ID from raw folder ID string', () => {
+      expect(extractDriveFolderId('1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC')).toBe('1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC');
+      expect(extractDriveFolderId('  1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC  ')).toBe('1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC');
+    });
+
+    it('extracts folder ID if user pasted raw ID with query string', () => {
+      expect(extractDriveFolderId('1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC?hl=ID')).toBe('1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC');
+    });
+
+    it('returns empty string for blank or invalid inputs', () => {
+      expect(extractDriveFolderId('')).toBe('');
+      expect(extractDriveFolderId('   ')).toBe('');
+      expect(extractDriveFolderId(null)).toBe('');
+      expect(extractDriveFolderId(undefined)).toBe('');
+      expect(extractDriveFolderId('https://example.com/not-drive')).toBe('');
+    });
+  });
+
+  describe('buildDriveFolderUrl', () => {
+    it('builds canonical Drive folder URL from valid ID', () => {
+      expect(buildDriveFolderUrl('1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC')).toBe(
+        'https://drive.google.com/drive/folders/1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC'
+      );
+    });
+
+    it('returns empty string when folder ID is empty or blank', () => {
+      expect(buildDriveFolderUrl('')).toBe('');
+      expect(buildDriveFolderUrl('   ')).toBe('');
+      expect(buildDriveFolderUrl(null)).toBe('');
+    });
   });
 });

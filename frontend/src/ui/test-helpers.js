@@ -102,6 +102,28 @@ export class MockElement {
       unregister(child);
     }
     this.children = [];
+
+    if (this._innerHTML.includes('<')) {
+      const tagMatchRegex = /<([a-zA-Z0-9-]+)([^>]*)>/g;
+      let match;
+      while ((match = tagMatchRegex.exec(this._innerHTML)) !== null) {
+        const tagName = match[1];
+        if (tagName.startsWith('/')) continue;
+        const attrStr = match[2];
+        const child = new MockElement(tagName, this.doc);
+        const attrRegex = /([a-zA-Z0-9_-]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
+        let attrMatch;
+        while ((attrMatch = attrRegex.exec(attrStr)) !== null) {
+          const attrName = attrMatch[1];
+          const attrVal = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? '';
+          child.setAttribute(attrName, attrVal);
+          if (attrName === 'class') {
+            child.className = attrVal;
+          }
+        }
+        this.appendChild(child);
+      }
+    }
   }
 
   setAttribute(name, val) {

@@ -142,7 +142,7 @@ export function mount(el) {
                 href="#"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="hidden text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                class="hidden inline-flex items-center text-xs text-indigo-600 dark:text-indigo-400 hover:underline min-h-[44px] px-2 focus:outline-none"
               >
                 Open in Drive ↗
               </a>
@@ -409,19 +409,10 @@ export function mount(el) {
     }
   }
 
-  btnSaveCredentials?.addEventListener('click', async () => {
+  btnSaveCredentials?.addEventListener('click', () => {
     const gasUrl = syncGasUrlInput ? syncGasUrlInput.value.trim() : '';
     const pin = syncPinInput ? syncPinInput.value.trim() : '';
     setConfig({ gasUrl, pin });
-    if (syncDiaryFolderInput) {
-      const raw = (syncDiaryFolderInput.value || '').trim();
-      const cleanId = extractDriveFolderId(raw);
-      syncDiaryFolderInput.value = cleanId;
-      updateDiaryFolderLink(cleanId);
-      try {
-        await setSetting('diaryFolderId', cleanId);
-      } catch {}
-    }
     showToast('Credentials saved');
   });
 
@@ -453,25 +444,40 @@ export function mount(el) {
     }
   }
 
-  syncDiaryFolderInput?.addEventListener('change', async () => {
+  async function saveDiaryFolder(rawInput) {
     if (!syncDiaryFolderInput) return;
-    const raw = (syncDiaryFolderInput.value || '').trim();
-    const cleanId = extractDriveFolderId(raw);
-    if (raw && !cleanId) {
-      showToast('Invalid Google Drive folder link or ID');
+    const raw = (rawInput ?? '').trim();
+    if (!raw) {
       syncDiaryFolderInput.value = '';
       updateDiaryFolderLink('');
-      await setSetting('diaryFolderId', '');
+      try {
+        await setSetting('diaryFolderId', '');
+        showToast('Drive folder reset to default');
+      } catch (err) {
+        showToast(err.message || 'Failed to reset Drive folder');
+      }
       return;
     }
+
+    const cleanId = extractDriveFolderId(raw);
+    if (!cleanId) {
+      showToast('Invalid Google Drive folder link or ID');
+      await loadDiaryFolderSetting();
+      return;
+    }
+
     syncDiaryFolderInput.value = cleanId;
     updateDiaryFolderLink(cleanId);
     try {
       await setSetting('diaryFolderId', cleanId);
-      showToast(cleanId ? 'Drive folder saved' : 'Drive folder reset to default');
+      showToast('Drive folder saved');
     } catch (err) {
       showToast(err.message || 'Failed to save Drive folder');
     }
+  }
+
+  syncDiaryFolderInput?.addEventListener('change', () => {
+    saveDiaryFolder(syncDiaryFolderInput.value);
   });
 
   btnTestConnection?.addEventListener('click', async () => {

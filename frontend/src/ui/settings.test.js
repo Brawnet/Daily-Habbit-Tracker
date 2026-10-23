@@ -133,4 +133,24 @@ describe('ui/settings.js Drive folder destination setting', () => {
     expect(link.classList.contains('hidden')).toBe(true);
     cleanup?.();
   });
+
+  it('rejects invalid input, toasts error, and restores previous valid setting without erasing DB', async () => {
+    settingsStore['diaryFolderId'] = '1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC';
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 20));
+
+    const folderInput = root.querySelector('#sync-diary-folder');
+    expect(folderInput.value).toBe('1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC');
+
+    repoModule.setSetting.mockClear();
+    folderInput.value = 'https://invalid-not-drive.com/something';
+    folderInput.dispatchEvent({ type: 'change' });
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(shellModule.showToast).toHaveBeenCalledWith('Invalid Google Drive folder link or ID');
+    expect(repoModule.setSetting).not.toHaveBeenCalled();
+    expect(folderInput.value).toBe('1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC');
+    cleanup?.();
+  });
 });

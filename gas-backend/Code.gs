@@ -799,6 +799,30 @@ function handleTestPush(ss, deviceId, props) {
 // Diary Helpers
 // ==========================================
 
+function ensureFileInFolder(file, folder) {
+  if (!file || !folder) return;
+  try {
+    const parents = file.getParents ? file.getParents() : null;
+    let alreadyInFolder = false;
+    if (parents && parents.hasNext) {
+      while (parents.hasNext()) {
+        const p = parents.next();
+        if (p && p.getId && p.getId() === folder.getId()) {
+          alreadyInFolder = true;
+          break;
+        }
+      }
+    }
+    if (!alreadyInFolder && file.moveTo) {
+      file.moveTo(folder);
+    }
+  } catch (e) {
+    if (typeof Logger !== 'undefined') {
+      Logger.log('Could not verify/move file to folder: ' + e.message);
+    }
+  }
+}
+
 function getOrCreateDiaryDoc(folder, year, props) {
   const propKey = 'DIARY_DOC_' + year;
   const docId = props.getProperty(propKey);
@@ -823,28 +847,7 @@ function getOrCreateDiaryDoc(folder, year, props) {
       props.setProperty(propKey, doc.getId());
     }
   } else {
-    // Ensure document is located in the target folder (relocate if user changed destination)
-    try {
-      const file = DriveApp.getFileById(doc.getId());
-      const parents = file.getParents ? file.getParents() : null;
-      let alreadyInFolder = false;
-      if (parents && parents.hasNext) {
-        while (parents.hasNext()) {
-          const p = parents.next();
-          if (p && p.getId && p.getId() === folder.getId()) {
-            alreadyInFolder = true;
-            break;
-          }
-        }
-      }
-      if (!alreadyInFolder && file.moveTo) {
-        file.moveTo(folder);
-      }
-    } catch (e) {
-      if (typeof Logger !== 'undefined') {
-        Logger.log('Could not verify/move doc to folder: ' + e.message);
-      }
-    }
+    ensureFileInFolder(DriveApp.getFileById(doc.getId()), folder);
   }
   return doc;
 }
@@ -1236,6 +1239,8 @@ function syncDiaryEntries(ss, props, options) {
 
   try {
     const includeToday = options && options.includeToday !== undefined ? options.includeToday : true;
+    const forceToday = options && options.forceToday === true;
+
     // 1. Resolve folder: check Settings sheet first, then Script Properties, then default
     let folderId = '';
     const settingsSheet = ss.getSheetByName('Settings');
@@ -1246,29 +1251,24 @@ function syncDiaryEntries(ss, props, options) {
         folderId = String(customSetting.value).trim();
       }
     }
-    if (!folderId) {
-      folderId = props.getProperty('DIARY_FOLDER_ID') || '';
-    }
 
-    let folder = null;
-    if (folderId) {
+    function resolveDriveFolderById(id) {
+      if (!id) return null;
       try {
-        folder = DriveApp.getFolderById(folderId);
+        return DriveApp.getFolderById(id);
       } catch (err) {
-        if (typeof Logger !== 'undefined') Logger.log('Failed to access folder ID ' + folderId + ': ' + err.message);
-        folder = null;
+        if (typeof Logger !== 'undefined') Logger.log('Failed to access folder ID ' + id + ': ' + err.message);
+        return null;
       }
     }
 
+    let folder = resolveDriveFolderById(folderId);
+
     // Fallback: If custom folder failed or was empty, check default DIARY_FOLDER_ID in props
     if (!folder) {
-      const defaultFolderId = props.getProperty('DIARY_FOLDER_ID');
-      if (defaultFolderId && defaultFolderId !== folderId) {
-        try {
-          folder = DriveApp.getFolderById(defaultFolderId);
-        } catch (e) {
-          folder = null;
-        }
+      const defaultFolderId = props.getProperty('DIARY_FOLDER_ID') || '';
+      if (defaultFolderId !== folderId) {
+        folder = resolveDriveFolderById(defaultFolderId);
       }
     }
 
@@ -1289,6 +1289,19 @@ function syncDiaryEntries(ss, props, options) {
       return;
     }
 
+    // Relocate any existing yearly diary files to the active folder if destination changed
+    const allProps = props.getProperties ? props.getProperties() : {};
+    for (const key of Object.keys(allProps)) {
+      if (key.startsWith('DIARY_DOC_')) {
+        const docId = allProps[key];
+        if (docId) {
+          try {
+            ensureFileInFolder(DriveApp.getFileById(docId), folder);
+          } catch (e) {}
+        }
+      }
+    }
+
     const sheet = ss.getSheetByName('Journal_Entries');
     if (!sheet) return;
 
@@ -1297,8 +1310,11 @@ function syncDiaryEntries(ss, props, options) {
     const toExport = entries.filter(e => {
       if (e.day > todayJakarta) return false;
       if (!includeToday && e.day === todayJakarta) return false;
-      const notPrinted = !e.printedToDiaryAt || String(e.printedToDiaryAt).trim() === '';
       const hasContent = e.content && String(e.content).trim() !== '';
+      if (forceToday && e.day === todayJakarta) {
+        return hasContent;
+      }
+      const notPrinted = !e.printedToDiaryAt || String(e.printedToDiaryAt).trim() === '';
       if (notPrinted) {
         return hasContent;
       }
@@ -1352,7 +1368,7 @@ function exportDiaryNow() {
   if (typeof Logger !== 'undefined') {
     Logger.log('Starting manual exportDiaryNow()...');
   }
-  syncDiaryEntries(ss, props, { includeToday: true });
+  syncDiaryEntries(ss, props, { includeToday: true, forceToday: true });
   if (typeof Logger !== 'undefined') {
     Logger.log('exportDiaryNow() completed.');
   }

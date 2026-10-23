@@ -27,7 +27,7 @@ export function extractDriveFolderId(input) {
 
   // 2. Match raw folder ID (may contain query params like ?hl=ID or trailing slash)
   const candidate = trimmed.split('?')[0].split('#')[0].replace(/\/+$/, '').trim();
-  if (/^[a-zA-Z0-9_-]{10,}$/.test(candidate)) {
+  if (/^[a-zA-Z0-9_-]+$/.test(candidate)) {
     return candidate;
   }
 

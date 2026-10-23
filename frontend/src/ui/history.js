@@ -116,7 +116,7 @@ export function mount(el) {
   const activeHabitsSection = document.createElement('section');
   activeHabitsSection.className = 'active-habits-section flex flex-col gap-3';
   const activeHeading = document.createElement('h2');
-  activeHeading.className = 'text-lg font-display font-bold tracking-tight text-slate-900 dark:text-slate-100';
+  activeHeading.className = 'text-lg font-serif font-semibold tracking-tight text-[#1C1B18] dark:text-[#F4F1EA]';
   activeHeading.textContent = 'Habits';
   activeHabitsSection.appendChild(activeHeading);
 
@@ -127,10 +127,10 @@ export function mount(el) {
 
   // --- 2. Archived Habits Section (Collapsible) ---
   const archivedDetails = document.createElement('details');
-  archivedDetails.className = 'group boutique-card p-4 transition-colors';
+  archivedDetails.className = 'group editorial-card p-4 transition-colors bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]';
 
   const archivedSummary = document.createElement('summary');
-  archivedSummary.className = 'font-display font-bold text-sm text-slate-700 dark:text-slate-300 cursor-pointer select-none py-1';
+  archivedSummary.className = 'font-serif font-semibold text-sm text-[#1C1B18] dark:text-[#F4F1EA] cursor-pointer select-none py-1';
   archivedSummary.textContent = 'Archived Habits (0)';
   archivedDetails.appendChild(archivedSummary);
 
@@ -144,7 +144,7 @@ export function mount(el) {
   journalSection.className = 'journal-history-section flex flex-col gap-3';
 
   const journalHeading = document.createElement('h2');
-  journalHeading.className = 'text-lg font-display font-bold tracking-tight text-slate-900 dark:text-slate-100';
+  journalHeading.className = 'text-lg font-serif font-semibold tracking-tight text-[#1C1B18] dark:text-[#F4F1EA]';
   journalHeading.textContent = 'Journal History';
   journalSection.appendChild(journalHeading);
 
@@ -156,7 +156,7 @@ export function mount(el) {
   searchInput.type = 'search';
   searchInput.placeholder = 'Search entries by keyword or date...';
   searchInput.setAttribute('aria-label', 'Search entries by keyword or date...');
-  searchInput.className = 'journal-search-input w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0052FF] text-base';
+  searchInput.className = 'journal-search-input w-full px-4 py-2.5 rounded-lg border border-[#E2DCD3] dark:border-[#33302C] bg-[#FAF8F5] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#6E6A63] focus:outline-none focus:ring-2 focus:ring-[#C86D51] text-base';
   searchInput.style.fontSize = '16px';
   searchWrapper.appendChild(searchInput);
   journalSection.appendChild(searchWrapper);
@@ -203,7 +203,7 @@ export function mount(el) {
     backdrop.setAttribute('aria-label', `Journal entry for ${formatShort(entry.day)}`);
 
     const dialog = document.createElement('div');
-    dialog.className = 'reader-dialog boutique-card bg-white dark:bg-slate-900 max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden';
+    dialog.className = 'reader-dialog editorial-card bg-[#FAF8F5] dark:bg-[#161514] max-w-lg w-full max-h-[85vh] flex flex-col shadow-xl border border-[#E2DCD3] dark:border-[#33302C] overflow-hidden';
 
     // Header
     const header = document.createElement('div');
@@ -211,10 +211,10 @@ export function mount(el) {
 
     const titleWrap = document.createElement('div');
     const title = document.createElement('h3');
-    title.className = 'font-display font-bold text-base text-slate-900 dark:text-slate-100';
+    title.className = 'font-serif font-semibold text-base text-[#1C1B18] dark:text-[#F4F1EA]';
     title.textContent = formatLong(entry.day);
     const subtitle = document.createElement('p');
-    subtitle.className = 'text-xs font-mono text-slate-500 dark:text-slate-400';
+    subtitle.className = 'text-xs font-mono text-[#6E6A63] dark:text-[#A39E93]';
     subtitle.textContent = formatShort(entry.day);
     titleWrap.appendChild(title);
     titleWrap.appendChild(subtitle);
@@ -249,7 +249,7 @@ export function mount(el) {
     if (isToday) {
       const editBtn = document.createElement('button');
       editBtn.type = 'button';
-      editBtn.className = 'btn-edit-today btn-boutique-gradient px-4 py-2 text-sm font-bold text-white rounded-xl transition cursor-pointer min-h-[44px] flex items-center justify-center tactile-spring';
+      editBtn.className = 'btn-edit-today btn-terracotta px-4 py-2 text-sm font-semibold rounded-lg transition cursor-pointer min-h-[44px] flex items-center justify-center tactile-spring';
       editBtn.textContent = 'Edit in Today';
       editBtn.addEventListener('click', () => {
         closeReaderView();
@@ -260,7 +260,7 @@ export function mount(el) {
 
     const closeBtn = document.createElement('button');
     closeBtn.type = 'button';
-    closeBtn.className = 'btn-close px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 rounded-xl transition cursor-pointer min-h-[44px] flex items-center justify-center tactile-spring';
+    closeBtn.className = 'btn-close btn-secondary-surface px-4 py-2 text-sm font-medium rounded-lg transition cursor-pointer min-h-[44px] flex items-center justify-center tactile-spring';
     closeBtn.textContent = 'Close';
     closeBtn.addEventListener('click', closeReaderView);
     footer.appendChild(closeBtn);
@@ -300,7 +300,7 @@ export function mount(el) {
    */
   function renderHabitCard(habit, checkInDays, isArchived) {
     const card = document.createElement('div');
-    card.className = 'habit-card boutique-card p-4 shadow-xs flex flex-col gap-3';
+    card.className = 'habit-card editorial-card p-4 shadow-none flex flex-col gap-3 bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]';
     card.dataset.habitId = habit.id;
     card.dataset.archived = isArchived ? 'true' : 'false';
 
@@ -309,12 +309,12 @@ export function mount(el) {
     header.className = 'flex items-center justify-between gap-2';
 
     const name = document.createElement('h3');
-    name.className = 'text-base font-display font-bold text-slate-900 dark:text-slate-100 truncate';
+    name.className = 'text-base font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA] truncate';
     name.textContent = habit.name;
 
     if (isArchived) {
       const badge = document.createElement('span');
-      badge.className = 'text-[10px] font-mono font-semibold uppercase px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 shrink-0';
+      badge.className = 'text-[10px] font-mono font-semibold uppercase px-2 py-0.5 rounded-full bg-[#EAE4DC] dark:bg-[#2C2926] text-[#6E6A63] dark:text-[#A39E93] shrink-0';
       badge.textContent = 'Archived';
       header.appendChild(badge);
     }
@@ -328,7 +328,7 @@ export function mount(el) {
     const ratePct = `${Math.round(rate * 100)}%`;
 
     const statsRow = document.createElement('div');
-    statsRow.className = 'stats-row flex flex-wrap items-center gap-3 text-xs font-mono font-semibold text-slate-600 dark:text-slate-400';
+    statsRow.className = 'stats-row flex flex-wrap items-center gap-3 text-xs font-mono font-semibold text-[#6E6A63] dark:text-[#A39E93]';
 
     const curStreakSpan = document.createElement('span');
     curStreakSpan.className = 'stat-current-streak flex items-center gap-1';
@@ -375,8 +375,8 @@ export function mount(el) {
           btn.type = 'button';
           btn.className = `heatmap-cell editable w-7 h-7 min-w-[28px] min-h-[28px] rounded flex items-center justify-center text-[10px] font-medium transition cursor-pointer select-none ${
             cell.done
-              ? 'bg-emerald-500 dark:bg-emerald-600 text-white ring-2 ring-offset-1 ring-emerald-500 dark:ring-emerald-400 dark:ring-offset-zinc-900'
-              : 'bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 ring-2 ring-offset-1 ring-zinc-400 dark:ring-zinc-500 dark:ring-offset-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+              ? 'bg-[#4A6B5D] dark:bg-[#5F8776] text-[#FAF8F5] ring-2 ring-offset-1 ring-[#4A6B5D] dark:ring-[#5F8776] dark:ring-offset-[#22201E]'
+              : 'bg-[#FAF8F5] dark:bg-[#161514] border border-[#E2DCD3] dark:border-[#33302C] ring-2 ring-offset-1 ring-[#6E6A63] dark:ring-[#A39E93] dark:ring-offset-[#22201E] hover:bg-[#EAE4DC] dark:hover:bg-[#2C2926]'
           }`;
           btn.style.width = '28px';
           btn.style.height = '28px';
@@ -405,9 +405,7 @@ export function mount(el) {
           const cellDiv = document.createElement('div');
           let cellColorClass = 'bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/60';
           if (cell.done) {
-            cellColorClass = 'bg-emerald-500 dark:bg-emerald-600 text-white';
-          } else if (cell.future) {
-            cellColorClass = 'bg-zinc-50/50 dark:bg-zinc-900/40 border border-dashed border-zinc-200 dark:border-zinc-800 opacity-30 pointer-events-none';
+            cellColorClass = 'bg-[#4A6B5D] dark:bg-[#5F8776] text-[#FAF8F5]';
           }
           cellDiv.className = `heatmap-cell w-7 h-7 min-w-[28px] min-h-[28px] rounded flex items-center justify-center text-[10px] select-none ${cellColorClass}`;
           cellDiv.style.width = '28px';
@@ -460,14 +458,14 @@ export function mount(el) {
       const { entry, highlights } = item;
       const entryBtn = document.createElement('button');
       entryBtn.type = 'button';
-      entryBtn.className = 'journal-entry-item boutique-card group text-left w-full p-3.5 hover:border-[#0052FF] dark:hover:border-[#0052FF] hover:shadow-md transition-all flex flex-col gap-1.5 cursor-pointer tactile-spring';
+      entryBtn.className = 'journal-entry-item editorial-card group text-left w-full p-3.5 hover:border-[#6E6A63] dark:hover:border-[#A39E93] transition flex flex-col gap-1.5 cursor-pointer tactile-spring bg-[#F3EFEA] dark:bg-[#22201E] border-[#E2DCD3] dark:border-[#33302C]';
       entryBtn.dataset.day = entry.day;
       entryBtn.setAttribute('aria-label', `Read journal entry for ${formatShort(entry.day)}`);
 
       const dateHeader = document.createElement('div');
       dateHeader.className = 'flex items-center justify-between w-full';
       const dateText = document.createElement('span');
-      dateText.className = 'text-xs font-display font-bold text-slate-700 dark:text-slate-300 group-hover:text-[#0052FF] transition-colors';
+      dateText.className = 'text-xs font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA] group-hover:text-[#C86D51] transition-colors';
       dateText.textContent = formatShort(entry.day);
       dateHeader.appendChild(dateText);
       entryBtn.appendChild(dateHeader);

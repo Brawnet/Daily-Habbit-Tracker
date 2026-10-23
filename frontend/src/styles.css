@@ -7,20 +7,60 @@
   --sar: env(safe-area-inset-right, 0px);
   --app-height: 100dvh;
 
-  /* SaaS Mobile (High-Tech Boutique) Design System Tokens */
-  --font-display: 'Calistoga', Georgia, serif;
-  --font-body: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Warm Editorial Minimalism Tokens (SPEC & 60-30-10 Rule) */
+  --font-serif: 'Newsreader', 'Instrument Serif', 'Playfair Display', Georgia, serif;
+  --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  --color-electric-blue: #0052FF;
-  --color-electric-gradient-end: #4D7CFF;
-  --color-bg-light: #FAFAFA;
-  --color-bg-dark: #090D16;
-  --color-card-light: #FFFFFF;
-  --color-card-dark: #0F172A;
-  --color-border-light: #E2E8F0;
-  --color-border-dark: #1E293B;
-  --radius-boutique: 16px;
+  /* 60% Primary Canvas & 30% Structural Surfaces */
+  --bg-canvas: #FAF8F5;          /* Warm Ivory */
+  --surface-card: #F3EFEA;       /* Soft Sand */
+  --surface-hover: #EAE4DC;      /* Muted Linen */
+  --text-primary: #1C1B18;       /* Charcoal Ink */
+  --text-secondary: #6E6A63;     /* Warm Umber */
+  --border-hairline: #E2DCD3;    /* Subtle Parchment */
+
+  /* 10% Earthy Semantic Accent Tokens */
+  --accent-terracotta: #C86D51;  /* Primary CTA & Active State */
+  --accent-terracotta-soft: #F9EBE6;
+  --accent-sage: #4A6B5D;        /* Habits / To-Do & Completion */
+  --accent-sage-soft: #E8F0EC;
+  --accent-ochre: #D49A45;       /* Daily Schedule & Timeline */
+  --accent-ochre-soft: #FBF3E4;
+  --accent-rose: #B56565;        /* Journaling & Reflection */
+  --accent-rose-soft: #F7ECEC;
+  --accent-slate: #4A607A;       /* Book Summary & Insights */
+  --accent-slate-soft: #EBF0F5;
+
+  /* Geometry & Shadows */
+  --radius-card: 12px;
+  --radius-btn: 8px;
+  --radius-pill: 9999px;
+  --shadow-soft: 0 8px 24px -4px rgba(28, 27, 24, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-canvas: #161514;          /* Warm Obsidian */
+    --surface-card: #22201E;       /* Dark Espresso */
+    --surface-hover: #2C2926;      /* Warm Slate */
+    --text-primary: #F4F1EA;       /* Warm Alabaster */
+    --text-secondary: #A39E93;     /* Muted Stone */
+    --border-hairline: #33302C;    /* Charcoal Line */
+
+    --accent-terracotta: #D97E63;
+    --accent-terracotta-soft: rgba(200, 109, 81, 0.22);
+    --accent-sage: #5F8776;
+    --accent-sage-soft: rgba(74, 107, 93, 0.22);
+    --accent-ochre: #E0A653;
+    --accent-ochre-soft: rgba(212, 154, 69, 0.22);
+    --accent-rose: #C67878;
+    --accent-rose-soft: rgba(181, 101, 101, 0.22);
+    --accent-slate: #5E7796;
+    --accent-slate-soft: rgba(74, 96, 122, 0.22);
+
+    --shadow-soft: 0 8px 24px -4px rgba(0, 0, 0, 0.4);
+  }
 }
 
 @media all and (display-mode: standalone) {
@@ -38,13 +78,16 @@ html, body {
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
-  background-color: #FAFAFA;
-  font-family: var(--font-body);
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  line-height: 1.65;
 }
 
 @media (prefers-color-scheme: dark) {
   html, body {
-    background-color: #090D16;
+    background-color: var(--bg-canvas);
+    color: var(--text-primary);
   }
 }
 
@@ -78,90 +121,143 @@ button, a, input, select, textarea, [role="button"], [role="tab"] {
 
 /* Clear visible focus indicator (SPEC §8) */
 :focus-visible {
-  outline: 2px solid #0052FF;
+  outline: 2px solid var(--accent-terracotta);
   outline-offset: 2px;
 }
 
 /* SaaS Mobile (High-Tech Boutique) Typography & Utilities */
-.font-display {
-  font-family: var(--font-display);
+.font-serif {
+  font-family: var(--font-serif);
+  letter-spacing: -0.02em;
+}
+
+.font-sans {
+  font-family: var(--font-sans);
 }
 
 .font-mono {
   font-family: var(--font-mono);
 }
 
-.font-body {
-  font-family: var(--font-body);
+/* Editorial Structural Surfaces */
+.editorial-header {
+  background-color: rgba(243, 239, 234, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-hairline);
 }
 
-/* Glassmorphism Navigation Bars */
-.glass-header {
-  background: rgba(250, 250, 250, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
-}
-
-.glass-nav {
-  background: rgba(250, 250, 250, 0.88);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-top: 1px solid rgba(226, 232, 240, 0.8);
+.editorial-nav {
+  background-color: rgba(243, 239, 234, 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border-hairline);
 }
 
 @media (prefers-color-scheme: dark) {
-  .glass-header {
-    background: rgba(9, 13, 22, 0.85);
-    border-bottom: 1px solid rgba(30, 41, 59, 0.8);
+  .editorial-header {
+    background-color: rgba(34, 32, 30, 0.92);
+    border-bottom: 1px solid var(--border-hairline);
   }
-  .glass-nav {
-    background: rgba(9, 13, 22, 0.88);
-    border-top: 1px solid rgba(30, 41, 59, 0.8);
+  .editorial-nav {
+    background-color: rgba(34, 32, 30, 0.94);
+    border-top: 1px solid var(--border-hairline);
   }
 }
 
-/* High-Tech Boutique Gradient Buttons */
-.btn-boutique-gradient {
-  background: linear-gradient(135deg, #0052FF 0%, #4D7CFF 100%);
-  color: #ffffff;
-  box-shadow: 0 4px 14px -1px rgba(0, 82, 255, 0.35);
-  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease, opacity 0.15s ease;
+/* 12px Rounded Paper Cards with 1px Hairline Border */
+.editorial-card {
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-card);
+  box-shadow: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
 }
 
-.btn-boutique-gradient:hover:not(:disabled) {
-  box-shadow: 0 6px 20px -2px rgba(0, 82, 255, 0.5);
+/* Primary Burnt Terracotta Button */
+.btn-terracotta {
+  background-color: var(--accent-terracotta);
+  color: #FAF8F5;
+  border-radius: var(--radius-btn);
+  font-weight: 600;
+  box-shadow: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
-.btn-boutique-gradient:active:not(:disabled) {
-  transform: scale(0.96);
-  box-shadow: 0 2px 8px -1px rgba(0, 82, 255, 0.25);
+.btn-terracotta:hover:not(:disabled) {
+  opacity: 0.92;
 }
 
-/* Tactile Spring Press for Interactive Cards & Controls */
+.btn-terracotta:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Secondary Soft Sand Surface Button */
+.btn-secondary-surface {
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-primary);
+  border-radius: var(--radius-btn);
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.btn-secondary-surface:hover:not(:disabled) {
+  background-color: var(--surface-hover);
+}
+
+.btn-secondary-surface:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Tactile Spring Press */
 .tactile-spring {
-  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease, border-color 0.15s ease;
+  transition: transform 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
 }
 
 .tactile-spring:active:not(:disabled) {
   transform: scale(0.97);
 }
-
-/* Bento Card Style */
-.boutique-card {
-  background: #ffffff;
-  border: 1px solid rgba(226, 232, 240, 0.85);
-  border-radius: 16px;
-  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.02);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+/* Active Bottom Navigation Tab */
+button[role="tab"][aria-selected="true"] {
+  color: var(--accent-terracotta) !important;
+  font-weight: 600;
 }
 
-@media (prefers-color-scheme: dark) {
-  .boutique-card {
-    background: #0F172A;
-    border-color: rgba(30, 41, 59, 0.85);
-    box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.4);
-  }
+button[role="tab"][aria-selected="true"] .tab-icon {
+  transform: translateY(-1px);
+  transition: transform 0.15s ease;
+}
+
+
+/* Semantic Badge Pills */
+.badge-sage {
+  background-color: var(--accent-sage-soft);
+  color: var(--accent-sage);
+  border: 1px solid rgba(74, 107, 93, 0.25);
+}
+
+.badge-terracotta {
+  background-color: var(--accent-terracotta-soft);
+  color: var(--accent-terracotta);
+  border: 1px solid rgba(200, 109, 81, 0.25);
+}
+
+.badge-rose {
+  background-color: var(--accent-rose-soft);
+  color: var(--accent-rose);
+  border: 1px solid rgba(181, 101, 101, 0.25);
+}
+
+.badge-slate {
+  background-color: var(--accent-slate-soft);
+  color: var(--accent-slate);
+  border: 1px solid rgba(74, 96, 122, 0.25);
+}
+
+.badge-ochre {
+  background-color: var(--accent-ochre-soft);
+  color: var(--accent-ochre);
+  border: 1px solid rgba(212, 154, 69, 0.25);
 }
 
 /* Pulsing Status Dot */
@@ -169,24 +265,22 @@ button, a, input, select, textarea, [role="button"], [role="tab"] {
   0%, 100% {
     transform: scale(1);
     opacity: 1;
-    box-shadow: 0 0 0 0 rgba(0, 82, 255, 0.45);
   }
   50% {
-    transform: scale(1.1);
-    opacity: 0.85;
-    box-shadow: 0 0 0 5px rgba(0, 82, 255, 0);
+    transform: scale(1.15);
+    opacity: 0.8;
   }
 }
 
 .pulse-dot-active {
-  animation: pulseDot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: pulseDot 2s ease-in-out infinite;
 }
 
 /* Staggered Screen Mount Entrance */
-@keyframes fadeInUpBoutique {
+@keyframes fadeInUpWarm {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -195,7 +289,7 @@ button, a, input, select, textarea, [role="button"], [role="tab"] {
 }
 
 .animate-stagger-in {
-  animation: fadeInUpBoutique 0.25s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation: fadeInUpWarm 0.2s ease-out backwards;
 }
 
 /* Respect prefers-reduced-motion (SPEC §8) */

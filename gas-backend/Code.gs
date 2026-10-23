@@ -822,6 +822,29 @@ function getOrCreateDiaryDoc(folder, year, props) {
       DriveApp.getFileById(doc.getId()).moveTo(folder);
       props.setProperty(propKey, doc.getId());
     }
+  } else {
+    // Ensure document is located in the target folder (relocate if user changed destination)
+    try {
+      const file = DriveApp.getFileById(doc.getId());
+      const parents = file.getParents ? file.getParents() : null;
+      let alreadyInFolder = false;
+      if (parents && parents.hasNext) {
+        while (parents.hasNext()) {
+          const p = parents.next();
+          if (p && p.getId && p.getId() === folder.getId()) {
+            alreadyInFolder = true;
+            break;
+          }
+        }
+      }
+      if (!alreadyInFolder && file.moveTo) {
+        file.moveTo(folder);
+      }
+    } catch (e) {
+      if (typeof Logger !== 'undefined') {
+        Logger.log('Could not verify/move doc to folder: ' + e.message);
+      }
+    }
   }
   return doc;
 }
@@ -1213,19 +1236,58 @@ function syncDiaryEntries(ss, props, options) {
 
   try {
     const includeToday = options && options.includeToday !== undefined ? options.includeToday : true;
-    const folderId = props.getProperty('DIARY_FOLDER_ID');
+    // 1. Resolve folder: check Settings sheet first, then Script Properties, then default
+    let folderId = '';
+    const settingsSheet = ss.getSheetByName('Settings');
+    if (settingsSheet) {
+      const settings = readAllSettings(settingsSheet);
+      const customSetting = settings.find(s => s.key === 'diaryFolderId');
+      if (customSetting && customSetting.value && String(customSetting.value).trim() !== '') {
+        folderId = String(customSetting.value).trim();
+      }
+    }
     if (!folderId) {
-      if (typeof Logger !== 'undefined') Logger.log('DIARY_FOLDER_ID not set');
-      return;
+      folderId = props.getProperty('DIARY_FOLDER_ID') || '';
     }
+
     let folder = null;
-    try {
-      folder = DriveApp.getFolderById(folderId);
-    } catch (err) {
-      if (typeof Logger !== 'undefined') Logger.log('Failed to access DIARY_FOLDER_ID: ' + err.message);
+    if (folderId) {
+      try {
+        folder = DriveApp.getFolderById(folderId);
+      } catch (err) {
+        if (typeof Logger !== 'undefined') Logger.log('Failed to access folder ID ' + folderId + ': ' + err.message);
+        folder = null;
+      }
+    }
+
+    // Fallback: If custom folder failed or was empty, check default DIARY_FOLDER_ID in props
+    if (!folder) {
+      const defaultFolderId = props.getProperty('DIARY_FOLDER_ID');
+      if (defaultFolderId && defaultFolderId !== folderId) {
+        try {
+          folder = DriveApp.getFolderById(defaultFolderId);
+        } catch (e) {
+          folder = null;
+        }
+      }
+    }
+
+    // Final fallback: search for 'Habbit Diary' folder by name
+    if (!folder) {
+      try {
+        const folders = DriveApp.getFoldersByName('Habbit Diary');
+        if (folders.hasNext()) {
+          folder = folders.next();
+        }
+      } catch (e) {
+        folder = null;
+      }
+    }
+
+    if (!folder) {
+      if (typeof Logger !== 'undefined') Logger.log('No valid Drive folder found for Diary export');
       return;
     }
-    if (!folder) return;
 
     const sheet = ss.getSheetByName('Journal_Entries');
     if (!sheet) return;
@@ -1282,6 +1344,18 @@ function printDiary() {
   const props = PropertiesService.getScriptProperties();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   syncDiaryEntries(ss, props, { includeToday: false });
+}
+
+function exportDiaryNow() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const props = PropertiesService.getScriptProperties();
+  if (typeof Logger !== 'undefined') {
+    Logger.log('Starting manual exportDiaryNow()...');
+  }
+  syncDiaryEntries(ss, props, { includeToday: true });
+  if (typeof Logger !== 'undefined') {
+    Logger.log('exportDiaryNow() completed.');
+  }
 }
 
 function checkReminder() {
@@ -1435,6 +1509,7 @@ if (typeof module !== 'undefined' && module.exports) {
     setup,
     printDiary,
     checkReminder,
-    syncDiaryEntries
+    syncDiaryEntries,
+    exportDiaryNow,
   };
 }

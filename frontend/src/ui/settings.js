@@ -20,6 +20,7 @@ import { getInstallState, promptInstall, onInstallStateChange } from '../pwa/ins
 import { getPushState, enablePush, sendTestPush } from '../pwa/push.js';
 import { showToast } from './shell.js';
 import { LINKED_ACTIVITIES } from '../shared/contracts.js';
+import { extractDriveFolderId, buildDriveFolderUrl } from '../domain/drive.js';
 
 /**
  * Escapes characters for HTML text insertion
@@ -129,6 +130,32 @@ export function mount(el) {
               value="${escapeHtml(currentConfig.pin)}"
               class="w-full min-h-[44px] px-3 py-2 text-base rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
+          </div>
+
+          <div class="space-y-1">
+            <div class="flex items-center justify-between">
+              <label for="sync-diary-folder" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                Diary Google Drive Folder
+              </label>
+              <a
+                id="link-open-diary-folder"
+                href="#"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="hidden text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+              >
+                Open in Drive ↗
+              </a>
+            </div>
+            <input
+              id="sync-diary-folder"
+              type="text"
+              placeholder="https://drive.google.com/drive/folders/... or Folder ID"
+              class="w-full min-h-[44px] px-3 py-2 text-base rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <p class="text-[11px] text-zinc-500 dark:text-zinc-400">
+              Paste full Google Drive folder link or folder ID. Leave blank to use default &quot;Habbit Diary&quot; folder.
+            </p>
           </div>
         </div>
 
@@ -298,6 +325,8 @@ export function mount(el) {
   // DOM references
   const syncGasUrlInput = el.querySelector('#sync-gas-url');
   const syncPinInput = el.querySelector('#sync-pin');
+  const syncDiaryFolderInput = el.querySelector('#sync-diary-folder');
+  const linkOpenDiaryFolder = el.querySelector('#link-open-diary-folder');
   const btnSaveCredentials = el.querySelector('#btn-save-credentials');
   const btnTestConnection = el.querySelector('#btn-test-connection');
   const btnSyncNow = el.querySelector('#btn-sync-now');
@@ -380,11 +409,69 @@ export function mount(el) {
     }
   }
 
-  btnSaveCredentials?.addEventListener('click', () => {
+  btnSaveCredentials?.addEventListener('click', async () => {
     const gasUrl = syncGasUrlInput ? syncGasUrlInput.value.trim() : '';
     const pin = syncPinInput ? syncPinInput.value.trim() : '';
     setConfig({ gasUrl, pin });
+    if (syncDiaryFolderInput) {
+      const raw = (syncDiaryFolderInput.value || '').trim();
+      const cleanId = extractDriveFolderId(raw);
+      syncDiaryFolderInput.value = cleanId;
+      updateDiaryFolderLink(cleanId);
+      try {
+        await setSetting('diaryFolderId', cleanId);
+      } catch {}
+    }
     showToast('Credentials saved');
+  });
+
+  function updateDiaryFolderLink(folderId) {
+    if (!linkOpenDiaryFolder) return;
+    const url = buildDriveFolderUrl(folderId);
+    if (url) {
+      linkOpenDiaryFolder.setAttribute('href', url);
+      linkOpenDiaryFolder.classList.remove('hidden');
+    } else {
+      linkOpenDiaryFolder.classList.add('hidden');
+      linkOpenDiaryFolder.removeAttribute('href');
+    }
+  }
+
+  async function loadDiaryFolderSetting() {
+    if (!isMounted || !syncDiaryFolderInput) return;
+    if (typeof document !== 'undefined' && document.activeElement === syncDiaryFolderInput) {
+      return;
+    }
+    try {
+      const val = await getSetting('diaryFolderId');
+      if (!isMounted) return;
+      syncDiaryFolderInput.value = val || '';
+      updateDiaryFolderLink(val || '');
+    } catch {
+      syncDiaryFolderInput.value = '';
+      updateDiaryFolderLink('');
+    }
+  }
+
+  syncDiaryFolderInput?.addEventListener('change', async () => {
+    if (!syncDiaryFolderInput) return;
+    const raw = (syncDiaryFolderInput.value || '').trim();
+    const cleanId = extractDriveFolderId(raw);
+    if (raw && !cleanId) {
+      showToast('Invalid Google Drive folder link or ID');
+      syncDiaryFolderInput.value = '';
+      updateDiaryFolderLink('');
+      await setSetting('diaryFolderId', '');
+      return;
+    }
+    syncDiaryFolderInput.value = cleanId;
+    updateDiaryFolderLink(cleanId);
+    try {
+      await setSetting('diaryFolderId', cleanId);
+      showToast(cleanId ? 'Drive folder saved' : 'Drive folder reset to default');
+    } catch (err) {
+      showToast(err.message || 'Failed to save Drive folder');
+    }
   });
 
   btnTestConnection?.addEventListener('click', async () => {
@@ -940,6 +1027,7 @@ export function mount(el) {
   updateSyncStatusRow(getSyncStatus());
   renderInstallSection(getInstallState());
   renderHabits();
+  loadDiaryFolderSetting();
   loadReminderSetting();
   updatePushUi();
 
@@ -952,6 +1040,7 @@ export function mount(el) {
   const unsubChange = onChange(async () => {
     if (!isMounted) return;
     await renderHabits();
+    await loadDiaryFolderSetting();
     await loadReminderSetting();
   });
 

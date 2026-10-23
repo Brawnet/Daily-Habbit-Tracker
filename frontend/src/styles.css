@@ -6,6 +6,21 @@
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
   --app-height: 100dvh;
+
+  /* SaaS Mobile (High-Tech Boutique) Design System Tokens */
+  --font-display: 'Calistoga', Georgia, serif;
+  --font-body: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --color-electric-blue: #0052FF;
+  --color-electric-gradient-end: #4D7CFF;
+  --color-bg-light: #FAFAFA;
+  --color-bg-dark: #090D16;
+  --color-card-light: #FFFFFF;
+  --color-card-dark: #0F172A;
+  --color-border-light: #E2E8F0;
+  --color-border-dark: #1E293B;
+  --radius-boutique: 16px;
 }
 
 @media all and (display-mode: standalone) {
@@ -23,12 +38,13 @@ html, body {
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
-  background-color: #ffffff;
+  background-color: #FAFAFA;
+  font-family: var(--font-body);
 }
 
 @media (prefers-color-scheme: dark) {
   html, body {
-    background-color: #09090b;
+    background-color: #090D16;
   }
 }
 
@@ -62,8 +78,124 @@ button, a, input, select, textarea, [role="button"], [role="tab"] {
 
 /* Clear visible focus indicator (SPEC §8) */
 :focus-visible {
-  outline: 2px solid #6366f1;
+  outline: 2px solid #0052FF;
   outline-offset: 2px;
+}
+
+/* SaaS Mobile (High-Tech Boutique) Typography & Utilities */
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
+
+/* Glassmorphism Navigation Bars */
+.glass-header {
+  background: rgba(250, 250, 250, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.glass-nav {
+  background: rgba(250, 250, 250, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+@media (prefers-color-scheme: dark) {
+  .glass-header {
+    background: rgba(9, 13, 22, 0.85);
+    border-bottom: 1px solid rgba(30, 41, 59, 0.8);
+  }
+  .glass-nav {
+    background: rgba(9, 13, 22, 0.88);
+    border-top: 1px solid rgba(30, 41, 59, 0.8);
+  }
+}
+
+/* High-Tech Boutique Gradient Buttons */
+.btn-boutique-gradient {
+  background: linear-gradient(135deg, #0052FF 0%, #4D7CFF 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 14px -1px rgba(0, 82, 255, 0.35);
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.btn-boutique-gradient:hover:not(:disabled) {
+  box-shadow: 0 6px 20px -2px rgba(0, 82, 255, 0.5);
+}
+
+.btn-boutique-gradient:active:not(:disabled) {
+  transform: scale(0.96);
+  box-shadow: 0 2px 8px -1px rgba(0, 82, 255, 0.25);
+}
+
+/* Tactile Spring Press for Interactive Cards & Controls */
+.tactile-spring {
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.tactile-spring:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Bento Card Style */
+.boutique-card {
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.02);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  .boutique-card {
+    background: #0F172A;
+    border-color: rgba(30, 41, 59, 0.85);
+    box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* Pulsing Status Dot */
+@keyframes pulseDot {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(0, 82, 255, 0.45);
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.85;
+    box-shadow: 0 0 0 5px rgba(0, 82, 255, 0);
+  }
+}
+
+.pulse-dot-active {
+  animation: pulseDot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Staggered Screen Mount Entrance */
+@keyframes fadeInUpBoutique {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-stagger-in {
+  animation: fadeInUpBoutique 0.25s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
 /* Respect prefers-reduced-motion (SPEC §8) */

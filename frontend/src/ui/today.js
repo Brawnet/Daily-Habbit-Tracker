@@ -43,12 +43,13 @@ export function mount(el) {
 
   const dateEl = document.createElement('h1');
   dateEl.id = 'today-date';
-  dateEl.className = 'text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50';
+  dateEl.className = 'text-2xl sm:text-3xl font-display font-bold tracking-tight text-slate-900 dark:text-slate-50';
   dateEl.textContent = formatLong(today());
 
   const progressEl = document.createElement('p');
   progressEl.id = 'today-progress';
-  progressEl.className = 'text-sm font-medium text-zinc-500 dark:text-zinc-400';
+  progressEl.className =
+    'text-xs font-mono font-semibold tracking-wide text-[#0052FF] dark:text-[#4D7CFF] bg-blue-50 dark:bg-blue-950/60 border border-blue-200/60 dark:border-blue-900/50 px-2.5 py-1 rounded-full w-max flex items-center gap-1.5 mt-1';
   progressEl.textContent = '0/0 done';
 
   headerEl.appendChild(dateEl);
@@ -147,7 +148,7 @@ export function mount(el) {
       const emptyCard = document.createElement('div');
       emptyCard.id = 'habits-empty-state';
       emptyCard.className =
-        'flex flex-col items-center justify-center p-6 sm:p-8 text-center bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-700 gap-5';
+        'boutique-card flex flex-col items-center justify-center p-6 sm:p-8 text-center border-dashed gap-5';
 
       // Icon & Greeting
       const headerWrap = document.createElement('div');
@@ -155,9 +156,9 @@ export function mount(el) {
 
       const iconWrap = document.createElement('div');
       iconWrap.className =
-        'w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-1';
+        'w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#0052FF] to-[#4D7CFF] text-white flex items-center justify-center shadow-lg shadow-blue-500/25 mb-1';
       iconWrap.innerHTML = `
-        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
         </svg>
       `;
@@ -165,13 +166,13 @@ export function mount(el) {
 
       const titleEl = document.createElement('h3');
       titleEl.id = 'today-empty-title';
-      titleEl.className = 'text-base sm:text-lg font-semibold text-zinc-900 dark:text-zinc-100';
+      titleEl.className = 'text-lg sm:text-xl font-display font-bold text-slate-900 dark:text-slate-50';
       titleEl.textContent = 'Welcome to Habbit';
       headerWrap.appendChild(titleEl);
 
       const subtitleEl = document.createElement('p');
       subtitleEl.id = 'today-empty-subtitle';
-      subtitleEl.className = 'text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed';
+      subtitleEl.className = 'text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed';
       subtitleEl.textContent =
         'Start building your daily momentum. Your data stays on this Device.';
 
@@ -196,7 +197,7 @@ export function mount(el) {
       inputEl.type = 'text';
       inputEl.id = 'today-empty-add-input';
       inputEl.className =
-        'w-full min-h-[44px] min-w-[44px] px-3.5 py-2.5 text-base rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition-colors shadow-xs';
+        'w-full min-h-[44px] min-w-[44px] px-3.5 py-2.5 text-base rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#0052FF] transition-colors shadow-xs';
       inputEl.style.fontSize = '16px';
       inputEl.placeholder = 'e.g. Drink 2L water, Morning walk...';
 
@@ -204,7 +205,7 @@ export function mount(el) {
       addBtn.type = 'submit';
       addBtn.id = 'today-empty-add-btn';
       addBtn.className =
-        'min-h-[44px] min-w-[44px] px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-sm font-semibold rounded-xl shadow-xs transition-colors flex items-center justify-center cursor-pointer shrink-0';
+        'btn-boutique-gradient min-h-[44px] min-w-[44px] px-5 py-2.5 text-sm font-semibold rounded-xl flex items-center justify-center cursor-pointer shrink-0 tactile-spring';
       addBtn.textContent = 'Add Habit';
 
       let isSubmitting = false;
@@ -261,7 +262,7 @@ export function mount(el) {
         chipBtn.type = 'button';
         chipBtn.dataset.starterChip = starter;
         chipBtn.className =
-          'min-h-[44px] min-w-[44px] px-3.5 py-2 text-xs font-medium rounded-xl bg-white dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 border border-zinc-200 dark:border-zinc-700 shadow-2xs transition-colors cursor-pointer flex items-center justify-center';
+          'min-h-[44px] min-w-[44px] px-3.5 py-2 text-xs font-medium font-mono rounded-xl bg-white dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:border-[#0052FF] hover:text-[#0052FF] dark:hover:text-[#4D7CFF] border border-slate-200 dark:border-slate-700 shadow-2xs transition-all cursor-pointer flex items-center justify-center tactile-spring';
         chipBtn.textContent = `+ ${starter}`;
         chipBtn.addEventListener('click', () => {
           handleAddHabit(starter);
@@ -279,7 +280,7 @@ export function mount(el) {
       manageBtn.type = 'button';
       manageBtn.id = 'manage-habits-btn';
       manageBtn.className =
-        'min-h-[44px] min-w-[44px] px-4 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors cursor-pointer inline-flex items-center gap-1.5 focus:outline-none focus:underline';
+        'min-h-[44px] min-w-[44px] px-4 py-2 text-xs font-semibold text-slate-500 hover:text-[#0052FF] dark:text-slate-400 dark:hover:text-[#4D7CFF] transition-colors cursor-pointer inline-flex items-center gap-1.5 focus:outline-none focus:underline tactile-spring';
       manageBtn.textContent = 'Manage Habits in Settings →';
       manageBtn.addEventListener('click', () => {
         navigate('settings');
@@ -298,7 +299,7 @@ export function mount(el) {
       for (const { habit, isChecked, streak } of habitData) {
         const itemEl = document.createElement('li');
         itemEl.className =
-          'flex items-center justify-between p-3.5 bg-white dark:bg-zinc-800/90 rounded-2xl border border-zinc-100 dark:border-zinc-700/60 shadow-xs gap-3';
+          'boutique-card flex items-center justify-between p-3.5 gap-3 transition-all hover:border-slate-300 dark:hover:border-slate-700 tactile-spring';
         itemEl.dataset.habitId = habit.id;
 
         const leftWrap = document.createElement('div');
@@ -311,7 +312,7 @@ export function mount(el) {
         checkBtn.setAttribute('data-action', 'toggle-checkin');
         checkBtn.setAttribute('data-habit-id', habit.id);
         checkBtn.className =
-          'min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 cursor-pointer';
+          'min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0052FF] cursor-pointer tactile-spring';
         checkBtn.style.minWidth = '44px';
         checkBtn.style.minHeight = '44px';
         checkBtn.setAttribute('aria-pressed', isChecked ? 'true' : 'false');
@@ -323,7 +324,7 @@ export function mount(el) {
         const iconWrap = document.createElement('span');
         if (isChecked) {
           iconWrap.className =
-            'w-7 h-7 rounded-full bg-emerald-500 dark:bg-emerald-600 text-white flex items-center justify-center shadow-xs';
+            'w-7 h-7 rounded-full bg-gradient-to-tr from-[#0052FF] to-[#4D7CFF] text-white flex items-center justify-center shadow-md shadow-blue-500/30';
           iconWrap.innerHTML = `
             <svg class="w-4 h-4 stroke-[3]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="20 6 9 17 4 12"></polyline>
@@ -331,7 +332,7 @@ export function mount(el) {
           `;
         } else {
           iconWrap.className =
-            'w-7 h-7 rounded-full border-2 border-zinc-300 dark:border-zinc-600 hover:border-zinc-400 dark:hover:border-zinc-500 transition-colors';
+            'w-7 h-7 rounded-full border-2 border-slate-300 dark:border-slate-600 hover:border-[#0052FF] dark:hover:border-[#4D7CFF] transition-colors';
         }
         checkBtn.appendChild(iconWrap);
 
@@ -351,10 +352,10 @@ export function mount(el) {
 
         // Habit name
         const nameEl = document.createElement('span');
-        nameEl.className = `text-base font-medium truncate flex-1 ${
+        nameEl.className = `text-base font-semibold truncate flex-1 ${
           isChecked
-            ? 'text-zinc-400 dark:text-zinc-500 line-through'
-            : 'text-zinc-900 dark:text-zinc-100'
+            ? 'text-slate-400 dark:text-slate-500 line-through'
+            : 'text-slate-900 dark:text-slate-100'
         }`;
         nameEl.textContent = habit.name;
         if (habit.linkedActivity) {
@@ -365,7 +366,7 @@ export function mount(el) {
           const actBadge = document.createElement('button');
           actBadge.type = 'button';
           actBadge.className =
-            'habit-activity-link min-h-[44px] min-w-[44px] inline-flex items-center text-xs px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-medium hover:underline cursor-pointer ml-2 shrink-0';
+            'habit-activity-link min-h-[44px] min-w-[44px] inline-flex items-center text-xs px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 text-[#0052FF] dark:text-blue-400 border border-blue-200/60 dark:border-blue-900/60 font-mono font-medium hover:underline cursor-pointer ml-2 shrink-0 tactile-spring';
           actBadge.textContent = habit.linkedActivity === LINKED_ACTIVITIES.BOOK_SUMMARY ? '📖 Book Summary' : '✍️ Journal';
           actBadge.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -381,10 +382,10 @@ export function mount(el) {
         streakWrap.className = 'flex items-center shrink-0';
 
         const streakBadge = document.createElement('span');
-        streakBadge.className = `inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full ${
+        streakBadge.className = `inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold font-mono rounded-full ${
           streak > 0
             ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/50'
-            : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 border border-zinc-200 dark:border-zinc-700/50'
+            : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700/50'
         }`;
         streakBadge.textContent = `🔥 ${streak}`;
         streakWrap.appendChild(streakBadge);
@@ -413,7 +414,7 @@ export function mount(el) {
       triggerBtn.setAttribute('aria-controls', 'today-add-habit-control');
       triggerBtn.setAttribute('aria-label', '+ Add Habit');
       triggerBtn.className =
-        'min-h-[44px] min-w-[44px] w-full px-4 py-2.5 rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 hover:border-indigo-500 dark:hover:border-indigo-400 bg-white/50 dark:bg-zinc-800/40 text-zinc-600 dark:text-zinc-300 text-sm font-medium hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500';
+        'min-h-[44px] min-w-[44px] w-full px-4 py-3 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 hover:border-[#0052FF] dark:hover:border-[#4D7CFF] bg-white/60 dark:bg-slate-900/40 text-slate-600 dark:text-slate-300 text-sm font-semibold hover:text-[#0052FF] dark:hover:text-[#4D7CFF] transition-all cursor-pointer flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-[#0052FF] tactile-spring';
       triggerBtn.textContent = '+ Add Habit';
 
       triggerBtn.addEventListener('click', () => {
@@ -425,7 +426,7 @@ export function mount(el) {
       const formEl = document.createElement('form');
       formEl.id = 'today-add-habit-form';
       formEl.className =
-        'flex flex-col gap-2.5 p-3 bg-white dark:bg-zinc-800/90 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-xs';
+        'boutique-card flex flex-col gap-3 p-4 shadow-sm';
       formEl.setAttribute('role', 'form');
       formEl.setAttribute('aria-label', 'Add new habit');
 
@@ -433,16 +434,15 @@ export function mount(el) {
       inputEl.type = 'text';
       inputEl.id = 'today-add-habit-input';
       inputEl.className =
-        'w-full min-h-[44px] min-w-[44px] px-3.5 py-2.5 text-base rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition-colors shadow-xs';
-      inputEl.style.fontSize = '16px';
+        'w-full min-h-[44px] min-w-[44px] px-3.5 py-2.5 text-base rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#0052FF] transition-colors shadow-xs';
       inputEl.placeholder = 'e.g. Read 10 mins, Morning walk...';
       inputEl.setAttribute('aria-label', 'New habit name');
+      inputEl.style.fontSize = '16px';
 
       const selectActivityEl = document.createElement('select');
       selectActivityEl.id = 'today-add-habit-linked-activity';
       selectActivityEl.className =
-        'w-full min-h-[44px] px-3.5 py-2 text-base rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500';
-      selectActivityEl.style.fontSize = '16px';
+        'w-full min-h-[44px] px-3.5 py-2 text-base rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#0052FF]';
 
       const optNone = document.createElement('option');
       optNone.value = '';
@@ -476,7 +476,7 @@ export function mount(el) {
       cancelBtn.id = 'today-add-habit-cancel';
       cancelBtn.setAttribute('aria-label', 'Cancel adding habit');
       cancelBtn.className =
-        'min-h-[44px] min-w-[44px] px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 rounded-xl transition-colors cursor-pointer';
+        'min-h-[44px] min-w-[44px] px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 rounded-xl transition-colors cursor-pointer tactile-spring';
       cancelBtn.textContent = 'Cancel';
       cancelBtn.addEventListener('click', collapseAddControl);
 
@@ -485,7 +485,7 @@ export function mount(el) {
       submitBtn.id = 'today-add-habit-submit';
       submitBtn.setAttribute('aria-label', 'Add habit');
       submitBtn.className =
-        'min-h-[44px] min-w-[44px] px-5 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-sm font-semibold rounded-xl shadow-xs transition-colors flex items-center justify-center cursor-pointer';
+        'btn-boutique-gradient min-h-[44px] min-w-[44px] px-5 py-2 text-sm font-bold rounded-xl flex items-center justify-center cursor-pointer tactile-spring';
       submitBtn.textContent = 'Add';
 
       let isSubmitting = false;
@@ -553,7 +553,7 @@ export function mount(el) {
     manageLink.setAttribute('role', 'link');
     manageLink.setAttribute('aria-label', 'Manage and reorder habits in Settings');
     manageLink.className =
-      'min-h-[44px] min-w-[44px] px-4 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300 transition-colors cursor-pointer inline-flex items-center gap-1.5 focus:outline-none focus:underline';
+      'min-h-[44px] min-w-[44px] px-4 py-2 text-xs font-semibold text-slate-400 hover:text-[#0052FF] dark:text-slate-500 dark:hover:text-[#4D7CFF] transition-colors cursor-pointer inline-flex items-center gap-1.5 focus:outline-none focus:underline tactile-spring';
     manageLink.textContent = 'Manage & reorder in Settings →';
     manageLink.addEventListener('click', () => {
       navigate('settings');

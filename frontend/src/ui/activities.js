@@ -42,9 +42,9 @@ export const JOURNALING_LOGO_SVG = `
 <svg class="w-full h-full" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
   <defs>
     <style>
-      .act-logo-fill { fill: #ffffff; }
+      .act-logo-fill { fill: #FFFFFF; }
       @media (prefers-color-scheme: dark) {
-        .act-logo-fill { fill: #27272a; }
+        .act-logo-fill { fill: #22201E; }
       }
     </style>
   </defs>
@@ -74,9 +74,9 @@ export const BOOKS_SUMMARY_LOGO_SVG = `
 <svg class="w-full h-full" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
   <defs>
     <style>
-      .act-logo-fill { fill: #ffffff; }
+      .act-logo-fill { fill: #FFFFFF; }
       @media (prefers-color-scheme: dark) {
-        .act-logo-fill { fill: #27272a; }
+        .act-logo-fill { fill: #22201E; }
       }
     </style>
   </defs>
@@ -260,15 +260,15 @@ export function mount(rootEl) {
 
     const pill = document.createElement('span');
     pill.className =
-      'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200/60 dark:border-zinc-700/60';
-    pill.textContent = 'Activities Hub';
+      'badge-terracotta inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-semibold tracking-wider uppercase';
+    pill.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-[#C86D51] pulse-dot-active"></span> <span>Activities Hub</span>';
 
     const h1 = document.createElement('h1');
-    h1.className = 'text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50';
+    h1.className = 'text-2xl sm:text-3xl font-serif font-semibold tracking-tight text-[#1C1B18] dark:text-[#F4F1EA]';
     h1.textContent = 'Choose Activity';
 
     const sub = document.createElement('p');
-    sub.className = 'text-sm text-zinc-500 dark:text-zinc-400 max-w-xs';
+    sub.className = 'text-sm text-[#68655F] dark:text-[#A39E93] max-w-xs';
     sub.textContent = 'Pick what you want to focus on and document today';
 
     header.appendChild(pill);
@@ -283,25 +283,23 @@ export function mount(rootEl) {
     btnBooks.type = 'button';
     btnBooks.id = 'choice-books-summary';
     btnBooks.className =
-      'group flex items-center justify-between p-4 sm:p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md active:scale-[0.985] transition-all duration-150 cursor-pointer text-left w-full';
-
+      'editorial-card group flex items-center justify-between p-4 sm:p-5 hover:border-[#4A607A] dark:hover:border-[#5E7796] active:scale-[0.985] transition-all duration-150 cursor-pointer text-left w-full tactile-spring bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
     const leftB = document.createElement('div');
     leftB.className = 'flex items-center gap-4';
 
     const iconB = document.createElement('div');
     iconB.className =
-      'w-14 h-14 rounded-2xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center p-2 shrink-0 border border-zinc-200/80 dark:border-zinc-700/80 shadow-xs group-hover:scale-105 transition-transform';
+      'w-14 h-14 rounded-xl bg-[#F0F4F8] dark:bg-[rgba(74,96,122,0.25)] text-[#4A607A] dark:text-[#5E7796] flex items-center justify-center p-2.5 shrink-0 border border-[#E6E4DF] dark:border-[#33302C] shadow-none group-hover:scale-105 transition-transform';
     iconB.innerHTML = BOOKS_SUMMARY_LOGO_SVG;
 
     const textB = document.createElement('div');
     const titleB = document.createElement('div');
-    titleB.className = 'font-semibold text-base text-zinc-900 dark:text-zinc-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors';
+    titleB.className = 'font-serif font-semibold text-base text-[#1C1B18] dark:text-[#F4F1EA] group-hover:text-[#4A607A] dark:group-hover:text-[#5E7796] transition-colors';
     titleB.textContent = 'Books Summary';
 
     const descB = document.createElement('div');
-    descB.className = 'text-xs text-zinc-500 dark:text-zinc-400 leading-snug';
+    descB.className = 'text-xs text-[#68655F] dark:text-[#A39E93] leading-snug';
     descB.textContent = 'Document book chapters and key takeaways';
-
     textB.appendChild(titleB);
     textB.appendChild(descB);
     leftB.appendChild(iconB);
@@ -309,7 +307,7 @@ export function mount(rootEl) {
 
     const actionB = document.createElement('span');
     actionB.className =
-      'inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 group-hover:bg-indigo-50 group-hover:text-indigo-600 dark:group-hover:bg-indigo-950/60 dark:group-hover:text-indigo-400 transition-colors shrink-0';
+      'badge-slate inline-flex items-center gap-1 px-3.5 py-1.5 rounded-full text-xs font-mono font-semibold transition-all shrink-0';
     actionB.textContent = 'Open Books →';
     btnBooks.appendChild(leftB);
     btnBooks.appendChild(actionB);
@@ -325,25 +323,23 @@ export function mount(rootEl) {
     btnJournal.type = 'button';
     btnJournal.id = 'choice-journals';
     btnJournal.className =
-      'group flex items-center justify-between p-4 sm:p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md active:scale-[0.985] transition-all duration-150 cursor-pointer text-left w-full';
-
+      'editorial-card group flex items-center justify-between p-4 sm:p-5 hover:border-[#B56565] dark:hover:border-[#C67878] active:scale-[0.985] transition-all duration-150 cursor-pointer text-left w-full tactile-spring bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
     const leftJ = document.createElement('div');
     leftJ.className = 'flex items-center gap-4';
 
     const iconJ = document.createElement('div');
     iconJ.className =
-      'w-14 h-14 rounded-2xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center p-2 shrink-0 border border-zinc-200/80 dark:border-zinc-700/80 shadow-xs group-hover:scale-105 transition-transform';
+      'w-14 h-14 rounded-xl bg-[#FBF2F2] dark:bg-[rgba(181,101,101,0.25)] text-[#B56565] dark:text-[#C67878] flex items-center justify-center p-2.5 shrink-0 border border-[#E6E4DF] dark:border-[#33302C] shadow-none group-hover:scale-105 transition-transform';
     iconJ.innerHTML = JOURNALING_LOGO_SVG;
 
     const textJ = document.createElement('div');
     const titleJ = document.createElement('div');
-    titleJ.className = 'font-semibold text-base text-zinc-900 dark:text-zinc-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors';
+    titleJ.className = 'font-serif font-semibold text-base text-[#1C1B18] dark:text-[#F4F1EA] group-hover:text-[#B56565] dark:group-hover:text-[#C67878] transition-colors';
     titleJ.textContent = 'Journals';
 
     const descJ = document.createElement('div');
-    descJ.className = 'text-xs text-zinc-500 dark:text-zinc-400 leading-snug';
+    descJ.className = 'text-xs text-[#68655F] dark:text-[#A39E93] leading-snug';
     descJ.textContent = 'Daily personal reflections and memories';
-
     textJ.appendChild(titleJ);
     textJ.appendChild(descJ);
     leftJ.appendChild(iconJ);
@@ -353,11 +349,11 @@ export function mount(rootEl) {
     const isTodayJournalDone = Boolean(journalDraft && journalDraft.trim());
     if (isTodayJournalDone) {
       actionJ.className =
-        'inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60 transition-colors shrink-0';
+        'badge-sage inline-flex items-center gap-1 px-3.5 py-1.5 rounded-full text-xs font-mono font-semibold transition-colors shrink-0';
       actionJ.textContent = 'Done ✓';
     } else {
       actionJ.className =
-        'inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 group-hover:bg-indigo-50 group-hover:text-indigo-600 dark:group-hover:bg-indigo-950/60 dark:group-hover:text-indigo-400 transition-colors shrink-0';
+        'badge-rose inline-flex items-center gap-1 px-3.5 py-1.5 rounded-full text-xs font-mono font-semibold transition-all shrink-0';
       actionJ.textContent = 'Write Journal →';
     }
     btnJournal.appendChild(leftJ);
@@ -381,13 +377,13 @@ export function mount(rootEl) {
     wrap.className = 'flex flex-col gap-5';
 
     const header = document.createElement('div');
-    header.className = 'flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800';
+    header.className = 'flex items-center justify-between pb-2 border-b border-[#E6E4DF] dark:border-[#33302C]';
 
     const backBtn = document.createElement('button');
     backBtn.type = 'button';
     backBtn.id = 'btn-back-to-activities';
     backBtn.className =
-      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 active:scale-95 transition-all cursor-pointer';
+      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-lg text-xs font-semibold text-[#68655F] dark:text-[#A39E93] hover:text-[#C86D51] dark:hover:text-[#D97E63] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] active:scale-95 transition-all cursor-pointer tactile-spring';
     backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>Back to Activities</span>`;
     backBtn.addEventListener('click', () => {
       currentView = 'home';
@@ -398,12 +394,13 @@ export function mount(rootEl) {
     addBtn.type = 'button';
     addBtn.id = 'btn-toggle-add-book';
     addBtn.className =
-      'min-h-[44px] inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white cursor-pointer transition-all shadow-xs';
+      'btn-terracotta min-h-[44px] inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-all active:scale-95 tactile-spring';
     addBtn.innerHTML = isAddingBook ? '✕ Close' : `${PLUS_SVG} <span>Add New Book</span>`;
     addBtn.addEventListener('click', () => {
       isAddingBook = !isAddingBook;
       render();
     });
+    header.appendChild(backBtn);
     header.appendChild(addBtn);
     wrap.appendChild(header);
 
@@ -411,14 +408,12 @@ export function mount(rootEl) {
     titles.className = 'flex flex-col gap-1';
 
     const h1 = document.createElement('h1');
-    h1.className = 'text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50';
+    h1.className = 'text-2xl font-serif font-semibold tracking-tight text-[#1C1B18] dark:text-[#F4F1EA]';
     h1.textContent = 'Books Summary';
 
     const p = document.createElement('p');
-    p.className = 'text-sm text-zinc-500 dark:text-zinc-400';
+    p.className = 'text-sm text-[#68655F] dark:text-[#A39E93]';
     p.textContent = 'Select a book from your library';
-
-    titles.appendChild(h1);
     titles.appendChild(p);
     wrap.appendChild(titles);
 
@@ -427,10 +422,10 @@ export function mount(rootEl) {
       const addForm = document.createElement('div');
       addForm.id = 'form-add-book';
       addForm.className =
-        'p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex flex-col gap-3 shadow-xs';
+        'editorial-card p-4 flex flex-col gap-3 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
 
       const formTitle = document.createElement('div');
-      formTitle.className = 'text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-300';
+      formTitle.className = 'text-xs font-bold uppercase tracking-wider text-[#68655F] dark:text-[#A39E93]';
       formTitle.textContent = 'Add a New Book';
 
       const titleInput = document.createElement('input');
@@ -438,7 +433,7 @@ export function mount(rootEl) {
       titleInput.id = 'input-new-book-title';
       titleInput.placeholder = 'Book Title *';
       titleInput.className =
-        'w-full min-h-[44px] px-3.5 py-2 text-base rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100';
+        'w-full min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
       titleInput.style.fontSize = '16px';
 
       const authorInput = document.createElement('input');
@@ -446,7 +441,7 @@ export function mount(rootEl) {
       authorInput.id = 'input-new-book-author';
       authorInput.placeholder = 'Author (optional)';
       authorInput.className =
-        'w-full min-h-[44px] px-3.5 py-2 text-base rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100';
+        'w-full min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
       authorInput.style.fontSize = '16px';
 
       const formActions = document.createElement('div');
@@ -456,7 +451,7 @@ export function mount(rootEl) {
       saveBtn.type = 'button';
       saveBtn.id = 'btn-save-new-book';
       saveBtn.className =
-        'min-h-[44px] px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl cursor-pointer flex items-center justify-center';
+        'btn-terracotta min-h-[44px] px-4 py-2 text-xs font-semibold rounded-lg cursor-pointer flex items-center justify-center tactile-spring';
       saveBtn.textContent = 'Save Book';
       saveBtn.addEventListener('click', async () => {
         const title = titleInput.value.trim();
@@ -480,7 +475,7 @@ export function mount(rootEl) {
       const cancelBtn = document.createElement('button');
       cancelBtn.type = 'button';
       cancelBtn.id = 'btn-cancel-new-book';
-      cancelBtn.className = 'min-h-[44px] px-3 py-2 text-zinc-500 hover:text-zinc-700 text-xs font-medium cursor-pointer flex items-center justify-center';
+      cancelBtn.className = 'min-h-[44px] px-3 py-2 text-[#68655F] hover:text-[#1C1B18] dark:text-[#A39E93] dark:hover:text-[#F4F1EA] text-xs font-medium cursor-pointer flex items-center justify-center tactile-spring';
       cancelBtn.textContent = 'Cancel';
       cancelBtn.addEventListener('click', () => {
         isAddingBook = false;
@@ -507,19 +502,18 @@ export function mount(rootEl) {
       const empty = document.createElement('div');
       empty.id = 'books-empty-state';
       empty.className =
-        'p-8 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl text-center flex flex-col items-center gap-2.5 text-zinc-500 bg-zinc-50/50 dark:bg-zinc-900/40';
-
+        'editorial-card p-8 border-dashed text-center flex flex-col items-center gap-2.5 text-[#68655F] dark:text-[#A39E93] bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
       const emptyIcon = document.createElement('div');
       emptyIcon.className =
-        'w-16 h-16 rounded-2xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center p-2.5 mb-2 border border-zinc-200/80 dark:border-zinc-700/80 shadow-xs';
+        'w-16 h-16 rounded-xl bg-[#F0F4F8] dark:bg-[rgba(74,96,122,0.25)] text-[#4A607A] dark:text-[#5E7796] flex items-center justify-center p-2.5 mb-2 border border-[#E6E4DF] dark:border-[#33302C]';
       emptyIcon.innerHTML = BOOKS_SUMMARY_LOGO_SVG;
 
       const emptyMain = document.createElement('p');
-      emptyMain.className = 'text-sm font-semibold text-zinc-800 dark:text-zinc-200';
+      emptyMain.className = 'text-sm font-semibold text-[#1C1B18] dark:text-[#F4F1EA]';
       emptyMain.textContent = 'No books in your library yet';
 
       const emptySub = document.createElement('p');
-      emptySub.className = 'text-xs text-zinc-500 dark:text-zinc-400 max-w-xs leading-relaxed';
+      emptySub.className = 'text-xs text-[#68655F] dark:text-[#A39E93] max-w-xs leading-relaxed';
       emptySub.textContent = 'Click "+ Add New Book" above to get started.';
 
       empty.appendChild(emptyIcon);
@@ -532,7 +526,7 @@ export function mount(rootEl) {
         const card = document.createElement('button');
         card.type = 'button';
         card.className =
-          'book-item-card group flex items-center justify-between p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-xs active:scale-[0.985] transition-all cursor-pointer text-left w-full';
+          'book-item-card editorial-card group flex items-center justify-between p-4 hover:border-[#4A607A] dark:hover:border-[#5E7796] active:scale-[0.985] transition-all cursor-pointer text-left w-full tactile-spring bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
 
         const chapterCount = chapters.length;
         const countText = chapterCount > 0 ? `${chapterCount} chapter${chapterCount > 1 ? 's' : ''}` : 'No chapters yet';
@@ -542,16 +536,16 @@ export function mount(rootEl) {
 
         const icon = document.createElement('div');
         icon.className =
-          'w-11 h-11 rounded-xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center p-1.5 shrink-0 border border-zinc-200/80 dark:border-zinc-700/80 shadow-xs';
+          'w-11 h-11 rounded-lg bg-[#F0F4F8] dark:bg-[rgba(74,96,122,0.25)] text-[#4A607A] dark:text-[#5E7796] flex items-center justify-center p-1.5 shrink-0 border border-[#E6E4DF] dark:border-[#33302C]';
         icon.innerHTML = BOOKS_SUMMARY_LOGO_SVG;
 
         const text = document.createElement('div');
         const titleEl = document.createElement('div');
-        titleEl.className = 'book-item-title font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-indigo-600 transition';
+        titleEl.className = 'book-item-title font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA] group-hover:text-[#4A607A] transition';
         titleEl.textContent = book.title;
 
         const subEl = document.createElement('div');
-        subEl.className = 'text-xs text-zinc-500';
+        subEl.className = 'text-xs font-mono text-[#68655F] dark:text-[#A39E93]';
         subEl.textContent = `${book.author ? `by ${book.author} · ` : ''}${countText}`;
 
         text.appendChild(titleEl);
@@ -561,7 +555,7 @@ export function mount(rootEl) {
 
         const selectBadge = document.createElement('span');
         selectBadge.className =
-          'px-3 py-1.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 group-hover:bg-indigo-50 group-hover:text-indigo-600 dark:group-hover:bg-indigo-950/60 dark:group-hover:text-indigo-400 transition-colors shrink-0';
+          'badge-slate px-3.5 py-1.5 rounded-full text-xs font-mono font-semibold transition-all shrink-0';
         selectBadge.textContent = 'Select →';
         card.appendChild(left);
         card.appendChild(selectBadge);
@@ -598,13 +592,13 @@ export function mount(rootEl) {
 
     // Back to Books List
     const backBar = document.createElement('div');
-    backBar.className = 'flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800';
+    backBar.className = 'flex items-center justify-between pb-2 border-b border-[#E6E4DF] dark:border-[#33302C]';
 
     const backBtn = document.createElement('button');
     backBtn.type = 'button';
     backBtn.id = 'btn-back-to-books-list';
     backBtn.className =
-      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 active:scale-95 transition-all cursor-pointer';
+      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-lg text-xs font-semibold text-[#68655F] dark:text-[#A39E93] hover:text-[#C86D51] dark:hover:text-[#D97E63] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] active:scale-95 transition-all cursor-pointer tactile-spring';
     backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>Back to Books List</span>`;
     backBtn.addEventListener('click', () => {
       currentView = 'books-list';
@@ -620,26 +614,24 @@ export function mount(rootEl) {
 
     const icon = document.createElement('div');
     icon.className =
-      'w-16 h-16 rounded-2xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center p-2.5 mx-auto mb-2 border border-zinc-200/80 dark:border-zinc-700/80 shadow-xs';
+      'w-16 h-16 rounded-xl bg-[#F0F4F8] dark:bg-[rgba(74,96,122,0.25)] text-[#4A607A] dark:text-[#5E7796] flex items-center justify-center p-2.5 mx-auto mb-2 border border-[#E6E4DF] dark:border-[#33302C]';
     icon.innerHTML = BOOKS_SUMMARY_LOGO_SVG;
 
     const titleH1 = document.createElement('h1');
     titleH1.id = 'book-menu-title';
-    titleH1.className = 'text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50';
+    titleH1.className = 'text-2xl font-serif font-semibold tracking-tight text-[#1C1B18] dark:text-[#F4F1EA]';
     titleH1.textContent = book.title;
-
     bookInfo.appendChild(icon);
     bookInfo.appendChild(titleH1);
 
     if (book.author) {
       const authorP = document.createElement('p');
-      authorP.className = 'text-sm font-medium text-zinc-500';
+      authorP.className = 'text-sm font-medium text-[#68655F] dark:text-[#A39E93]';
       authorP.textContent = `by ${book.author}`;
       bookInfo.appendChild(authorP);
     }
-
     const chapCountP = document.createElement('p');
-    chapCountP.className = 'text-xs text-zinc-400 mt-1';
+    chapCountP.className = 'text-xs font-mono text-[#68655F] dark:text-[#A39E93] mt-1';
     chapCountP.textContent = `${chapters.length} chapters documented`;
     bookInfo.appendChild(chapCountP);
 
@@ -654,23 +646,22 @@ export function mount(rootEl) {
     btnContinue.type = 'button';
     btnContinue.id = 'btn-choice-continue-summary';
     btnContinue.className =
-      'flex items-center justify-between p-4 rounded-2xl border-2 border-indigo-600 bg-indigo-50/40 dark:bg-indigo-950/30 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition shadow-xs group cursor-pointer text-left';
-
+      'flex items-center justify-between p-4 rounded-xl border-2 border-[#4A607A] bg-[#F0F4F8] dark:bg-[rgba(74,96,122,0.2)] hover:bg-[#E4ECF3] dark:hover:bg-[rgba(74,96,122,0.3)] transition-all group cursor-pointer text-left tactile-spring';
     const leftC = document.createElement('div');
     leftC.className = 'flex items-center gap-3.5';
 
     const iconC = document.createElement('div');
     iconC.className =
-      'w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center p-2.5 shadow-xs shrink-0 group-hover:scale-105 transition-transform';
+      'w-11 h-11 rounded-lg bg-[#4A607A] text-[#FAF8F5] flex items-center justify-center p-2.5 shrink-0 group-hover:scale-105 transition-transform';
     iconC.innerHTML = PENCIL_WRITE_SVG;
 
     const textC = document.createElement('div');
     const titleC = document.createElement('div');
-    titleC.className = 'font-bold text-zinc-900 dark:text-zinc-100 group-hover:text-indigo-600 transition';
+    titleC.className = 'font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA] group-hover:text-[#4A607A] transition';
     titleC.textContent = 'Continue Summary';
 
     const descC = document.createElement('div');
-    descC.className = 'text-xs text-zinc-500 dark:text-zinc-400';
+    descC.className = 'text-xs text-[#68655F] dark:text-[#A39E93]';
     descC.textContent = 'Write or edit chapters (newest at top)';
 
     textC.appendChild(titleC);
@@ -679,7 +670,7 @@ export function mount(rootEl) {
     leftC.appendChild(textC);
 
     const badgeC = document.createElement('span');
-    badgeC.className = 'px-3.5 py-1.5 rounded-full text-xs font-bold bg-indigo-600 text-white shrink-0 group-hover:shadow-xs transition';
+    badgeC.className = 'px-3.5 py-1.5 rounded-full text-xs font-mono font-semibold bg-[#4A607A] text-[#FAF8F5] shrink-0 transition';
     badgeC.textContent = 'Write →';
 
     btnContinue.appendChild(leftC);
@@ -697,23 +688,22 @@ export function mount(rootEl) {
     btnRead.type = 'button';
     btnRead.id = 'btn-choice-read-summary';
     btnRead.className =
-      'flex items-center justify-between p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 hover:border-zinc-400 dark:hover:border-zinc-600 transition shadow-xs group cursor-pointer text-left';
-
+      'editorial-card flex items-center justify-between p-4 hover:border-[#68655F] dark:hover:border-[#A39E93] transition group cursor-pointer text-left tactile-spring bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
     const leftR = document.createElement('div');
     leftR.className = 'flex items-center gap-3.5';
 
     const iconR = document.createElement('div');
     iconR.className =
-      'w-11 h-11 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center p-2.5 shrink-0 group-hover:scale-105 transition-transform';
+      'w-11 h-11 rounded-lg bg-[#EFECE6] dark:bg-[#2C2926] text-[#1C1B18] dark:text-[#F4F1EA] flex items-center justify-center p-2.5 shrink-0 group-hover:scale-105 transition-transform';
     iconR.innerHTML = BOOK_OPEN_SVG;
 
     const textR = document.createElement('div');
     const titleR = document.createElement('div');
-    titleR.className = 'font-bold text-zinc-900 dark:text-zinc-100 transition';
+    titleR.className = 'font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA] transition';
     titleR.textContent = 'Read the Summary';
 
     const descR = document.createElement('div');
-    descR.className = 'text-xs text-zinc-500 dark:text-zinc-400';
+    descR.className = 'text-xs text-[#68655F] dark:text-[#A39E93]';
     descR.textContent = 'Read all compiled chapters in chronological order';
 
     textR.appendChild(titleR);
@@ -723,7 +713,7 @@ export function mount(rootEl) {
 
     const badgeR = document.createElement('span');
     badgeR.className =
-      'px-3.5 py-1.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition shrink-0';
+      'badge-slate px-3.5 py-1.5 rounded-full text-xs font-mono font-semibold transition shrink-0';
     badgeR.textContent = 'Read →';
 
     btnRead.appendChild(leftR);
@@ -755,13 +745,13 @@ export function mount(rootEl) {
     const sortedChapters = [...chapters].reverse();
 
     const backBar = document.createElement('div');
-    backBar.className = 'flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800';
+    backBar.className = 'flex items-center justify-between pb-2 border-b border-[#E6E4DF] dark:border-[#33302C]';
 
     const backBtn = document.createElement('button');
     backBtn.type = 'button';
     backBtn.id = 'btn-back-to-book-menu';
     backBtn.className =
-      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 active:scale-95 transition-all cursor-pointer';
+      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-lg text-xs font-semibold text-[#68655F] dark:text-[#A39E93] hover:text-[#C86D51] dark:hover:text-[#D97E63] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] active:scale-95 transition-all cursor-pointer tactile-spring';
     backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>Back to Book Menu</span>`;
     backBtn.addEventListener('click', () => {
       currentView = 'book-menu';
@@ -772,7 +762,7 @@ export function mount(rootEl) {
     readLink.type = 'button';
     readLink.id = 'btn-shortcut-read-all';
     readLink.className =
-      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer';
+      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-semibold text-[#4A607A] dark:text-[#5E7796] hover:underline cursor-pointer tactile-spring';
     readLink.innerHTML = `${BOOK_OPEN_SVG} <span>Read All Chapters</span>`;
     readLink.addEventListener('click', () => {
       currentView = 'book-read';
@@ -788,20 +778,20 @@ export function mount(rootEl) {
 
     const leftH = document.createElement('div');
     const h2 = document.createElement('h2');
-    h2.className = 'text-base font-bold text-zinc-900 dark:text-zinc-100';
+    h2.className = 'text-base font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]';
     h2.textContent = book.title;
     leftH.appendChild(h2);
 
     if (book.author) {
       const authorP = document.createElement('p');
-      authorP.className = 'text-xs text-zinc-500';
+      authorP.className = 'text-xs text-[#68655F] dark:text-[#A39E93]';
       authorP.textContent = `by ${book.author}`;
       leftH.appendChild(authorP);
     }
 
     const habitBadge = document.createElement('span');
     habitBadge.className =
-      'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300';
+      'badge-sage inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium';
     habitBadge.textContent = 'Auto-marks habit on Today';
 
     bookHeader.appendChild(leftH);
@@ -810,18 +800,18 @@ export function mount(rootEl) {
 
     // Chapter Dropdown Card
     const dropdownCard = document.createElement('div');
-    dropdownCard.className = 'flex flex-col gap-2 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800';
+    dropdownCard.className = 'editorial-card flex flex-col gap-2 p-4 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
 
     const dropdownLabel = document.createElement('div');
     dropdownLabel.className = 'flex items-center justify-between';
 
     const labelEl = document.createElement('label');
     labelEl.htmlFor = 'chapter-select';
-    labelEl.className = 'text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400';
+    labelEl.className = 'text-xs font-bold uppercase tracking-wider text-[#68655F] dark:text-[#A39E93]';
     labelEl.textContent = 'Select Chapter';
 
     const sortHint = document.createElement('span');
-    sortHint.className = 'text-[11px] text-zinc-400';
+    sortHint.className = 'text-[11px] text-[#68655F] dark:text-[#A39E93]';
     sortHint.textContent = 'Newest at top ↓ Oldest at bottom';
 
     dropdownLabel.appendChild(labelEl);
@@ -831,7 +821,7 @@ export function mount(rootEl) {
     const select = document.createElement('select');
     select.id = 'chapter-select';
     select.className =
-      'w-full min-h-[44px] px-3.5 py-2.5 text-base font-medium rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer';
+      'w-full min-h-[44px] px-3.5 py-2.5 text-base font-medium rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#4A607A] cursor-pointer';
     select.style.fontSize = '16px';
     const newOpt = document.createElement('option');
     newOpt.value = 'new';
@@ -865,21 +855,21 @@ export function mount(rootEl) {
 
     const editCard = document.createElement('div');
     editCard.className =
-      'flex flex-col gap-4 p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs';
+      'editorial-card flex flex-col gap-4 p-5 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
 
     const titleValue = isNew ? newChapterTitle : currentChapter?.title || '';
     const contentValue = isNew ? newChapterContent : currentChapter?.content || '';
 
     const cardHeader = document.createElement('div');
-    cardHeader.className = 'flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800';
+    cardHeader.className = 'flex items-center justify-between pb-2 border-b border-[#E6E4DF] dark:border-[#33302C]';
 
     const modeTitle = document.createElement('span');
-    modeTitle.className = 'text-sm font-bold text-indigo-600 dark:text-indigo-400 inline-flex items-center gap-1.5';
+    modeTitle.className = 'text-sm font-serif font-semibold text-[#4A607A] dark:text-[#5E7796] inline-flex items-center gap-1.5';
     modeTitle.innerHTML = `${PENCIL_WRITE_SVG} <span>${isNew ? 'Writing New Chapter' : 'Editing Chapter Summary'}</span>`;
 
     const statusSpan = document.createElement('span');
     statusSpan.id = 'chapter-save-status';
-    statusSpan.className = 'text-xs text-zinc-400 dark:text-zinc-500';
+    statusSpan.className = 'text-xs text-[#68655F] dark:text-[#A39E93] font-mono';
     statusSpan.textContent = chapterStatus;
 
     cardHeader.appendChild(modeTitle);
@@ -892,7 +882,7 @@ export function mount(rootEl) {
 
     const titleLabel = document.createElement('label');
     titleLabel.htmlFor = 'input-chapter-title';
-    titleLabel.className = 'text-xs font-semibold text-zinc-500';
+    titleLabel.className = 'text-xs font-semibold text-[#68655F] dark:text-[#A39E93]';
     titleLabel.textContent = 'Chapter Title';
 
     const titleInput = document.createElement('input');
@@ -901,7 +891,7 @@ export function mount(rootEl) {
     titleInput.placeholder = `e.g. Chapter ${chapters.length + 1}: Key Principles`;
     titleInput.value = titleValue;
     titleInput.className =
-      'w-full min-h-[44px] px-3.5 py-2 text-base rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500';
+      'w-full min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F] focus:outline-none focus:ring-2 focus:ring-[#4A607A]';
     titleInput.style.fontSize = '16px';
     titleGroup.appendChild(titleLabel);
     titleGroup.appendChild(titleInput);
@@ -915,7 +905,7 @@ export function mount(rootEl) {
     contentHeader.className = 'flex items-center justify-between';
 
     const contentLabel = document.createElement('label');
-    contentLabel.className = 'text-xs font-semibold text-zinc-500';
+    contentLabel.className = 'text-xs font-semibold text-[#68655F] dark:text-[#A39E93]';
     contentLabel.textContent = 'Summary & Takeaways';
 
     const toolbar = document.createElement('div');
@@ -926,7 +916,7 @@ export function mount(rootEl) {
     bulletBtn.id = 'btn-chapter-bullet';
     bulletBtn.title = 'Insert Bullet list';
     bulletBtn.className =
-      'min-h-[44px] px-3 py-1.5 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer inline-flex items-center gap-1.5 active:scale-95';
+      'btn-secondary-surface min-h-[44px] px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold border border-[#E6E4DF] dark:border-[#33302C] text-[#68655F] dark:text-[#A39E93] hover:text-[#4A607A] hover:border-[#4A607A] transition cursor-pointer inline-flex items-center gap-1.5 active:scale-95 tactile-spring';
     bulletBtn.innerHTML = `${LIST_BULLET_SVG} <span>Bullet</span>`;
 
     const numberBtn = document.createElement('button');
@@ -934,7 +924,7 @@ export function mount(rootEl) {
     numberBtn.id = 'btn-chapter-number';
     numberBtn.title = 'Insert Numbered list';
     numberBtn.className =
-      'min-h-[44px] px-3 py-1.5 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer inline-flex items-center gap-1.5 active:scale-95';
+      'btn-secondary-surface min-h-[44px] px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold border border-[#E6E4DF] dark:border-[#33302C] text-[#68655F] dark:text-[#A39E93] hover:text-[#4A607A] hover:border-[#4A607A] transition cursor-pointer inline-flex items-center gap-1.5 active:scale-95 tactile-spring';
     numberBtn.innerHTML = `${LIST_NUMBER_SVG} <span>Numbered</span>`;
     toolbar.appendChild(bulletBtn);
     toolbar.appendChild(numberBtn);
@@ -947,8 +937,7 @@ export function mount(rootEl) {
     contentEditor.setAttribute('role', 'textbox');
     contentEditor.setAttribute('aria-multiline', 'true');
     contentEditor.className =
-      'rich-editor w-full min-h-[180px] p-3.5 text-base rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 overflow-y-auto leading-relaxed outline-none [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-7 [&_ol]:my-2 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-7 [&_ul]:my-2 [&_ul]:space-y-1 [&_li]:pl-1 [&_li]:leading-relaxed [&_p]:my-1.5 [&_p]:leading-relaxed';
-
+      'rich-editor w-full min-h-[180px] p-3.5 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#4A607A] overflow-y-auto leading-relaxed outline-none [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-7 [&_ol]:my-2 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-7 [&_ul]:my-2 [&_ul]:space-y-1 [&_li]:pl-1 [&_li]:leading-relaxed [&_p]:my-1.5 [&_p]:leading-relaxed';
     contentGroup.appendChild(contentHeader);
     contentGroup.appendChild(contentEditor);
     editCard.appendChild(contentGroup);
@@ -959,7 +948,7 @@ export function mount(rootEl) {
 
     const wordCountEl = document.createElement('span');
     wordCountEl.id = 'chapter-word-count';
-    wordCountEl.className = 'text-xs text-zinc-400 font-mono';
+    wordCountEl.className = 'text-xs text-[#68655F] dark:text-[#A39E93] font-mono';
     wordCountEl.textContent = '0 words';
     footer.appendChild(wordCountEl);
 
@@ -968,7 +957,7 @@ export function mount(rootEl) {
       saveChBtn.type = 'button';
       saveChBtn.id = 'btn-save-chapter';
       saveChBtn.className =
-        'px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-sm active:scale-95';
+        'btn-terracotta px-5 py-2.5 text-white text-xs font-mono font-semibold rounded-lg transition cursor-pointer active:scale-95 tactile-spring';
       saveChBtn.textContent = 'Save Chapter ✓';
       saveChBtn.addEventListener('click', async () => {
         const title = (titleInput.value || newChapterTitle || '').trim() || `Chapter ${chapters.length + 1}`;
@@ -1002,7 +991,7 @@ export function mount(rootEl) {
       saveExistingBtn.type = 'button';
       saveExistingBtn.id = 'btn-save-existing-chapter';
       saveExistingBtn.className =
-        'min-h-[44px] px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-xs active:scale-95';
+        'btn-terracotta min-h-[44px] px-4 py-2 text-white text-xs font-mono font-semibold rounded-lg transition cursor-pointer active:scale-95 tactile-spring';
       saveExistingBtn.textContent = 'Save Changes ✓';
       saveExistingBtn.addEventListener('click', async () => {
         if (!currentChapter) return;
@@ -1024,7 +1013,7 @@ export function mount(rootEl) {
       viewCompiledBtn.type = 'button';
       viewCompiledBtn.id = 'btn-view-compiled-reader';
       viewCompiledBtn.className =
-        'min-h-[44px] px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-95 text-zinc-700 dark:text-zinc-300 text-xs font-semibold rounded-xl transition cursor-pointer inline-flex items-center gap-1.5';
+        'btn-secondary-surface min-h-[44px] px-4 py-2 text-xs font-mono font-semibold rounded-lg border border-[#E6E4DF] dark:border-[#33302C] transition cursor-pointer inline-flex items-center gap-1.5 tactile-spring';
       viewCompiledBtn.innerHTML = `${BOOK_OPEN_SVG} <span>Read Summary</span>`;
       viewCompiledBtn.addEventListener('click', () => {
         currentView = 'book-read';
@@ -1107,13 +1096,13 @@ export function mount(rootEl) {
     const chapters = await listBookChapters(book.id);
 
     const backBar = document.createElement('div');
-    backBar.className = 'flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800';
+    backBar.className = 'flex items-center justify-between pb-2 border-b border-[#E6E4DF] dark:border-[#33302C]';
 
     const backBtn = document.createElement('button');
     backBtn.type = 'button';
     backBtn.id = 'btn-back-from-read-to-menu';
     backBtn.className =
-      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 active:scale-95 transition-all cursor-pointer';
+      'min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-lg text-xs font-semibold text-[#68655F] dark:text-[#A39E93] hover:text-[#C86D51] dark:hover:text-[#D97E63] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] active:scale-95 transition-all cursor-pointer tactile-spring';
     backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>Back to Book Menu</span>`;
     backBtn.addEventListener('click', () => {
       currentView = 'book-menu';
@@ -1124,7 +1113,7 @@ export function mount(rootEl) {
     writeShortcut.type = 'button';
     writeShortcut.id = 'btn-shortcut-continue-summary';
     writeShortcut.className =
-      'min-h-[44px] inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 active:scale-95 transition-all cursor-pointer';
+      'min-h-[44px] inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold text-[#4A607A] dark:text-[#5E7796] hover:underline active:scale-95 transition-all cursor-pointer tactile-spring';
     writeShortcut.innerHTML = `<span>Continue Summary</span> ${PENCIL_WRITE_SVG}`;
     writeShortcut.addEventListener('click', () => {
       selectedChapterId = 'new';
@@ -1140,22 +1129,21 @@ export function mount(rootEl) {
     const readerCard = document.createElement('article');
     readerCard.id = 'book-reader-card';
     readerCard.className =
-      'flex flex-col gap-6 p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-sm leading-relaxed';
-
+      'editorial-card flex flex-col gap-6 p-6 leading-relaxed bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
     const totalWords = chapters.reduce((acc, c) => {
       const clean = htmlToText(c.content);
       return acc + (clean ? clean.split(/\s+/).filter(Boolean).length : 0);
     }, 0);
 
     const rHeader = document.createElement('header');
-    rHeader.className = 'pb-4 border-b border-zinc-200 dark:border-zinc-800 flex flex-col gap-1';
+    rHeader.className = 'pb-4 border-b border-[#E6E4DF] dark:border-[#33302C] flex flex-col gap-1';
 
     const overline = document.createElement('span');
-    overline.className = 'text-xs font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400';
+    overline.className = 'text-xs font-mono font-semibold uppercase tracking-widest text-[#4A607A] dark:text-[#5E7796]';
     overline.textContent = 'Complete Book Summary';
 
     const bookTitleH1 = document.createElement('h1');
-    bookTitleH1.className = 'text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 mt-1';
+    bookTitleH1.className = 'text-2xl font-serif font-semibold tracking-tight text-[#1C1B18] dark:text-[#F4F1EA] mt-1';
     bookTitleH1.textContent = book.title;
 
     rHeader.appendChild(overline);
@@ -1163,38 +1151,38 @@ export function mount(rootEl) {
 
     if (book.author) {
       const authorP = document.createElement('p');
-      authorP.className = 'text-sm font-medium text-zinc-500';
+      authorP.className = 'text-sm font-medium text-[#68655F] dark:text-[#A39E93]';
       authorP.textContent = `by ${book.author}`;
       rHeader.appendChild(authorP);
     }
 
     const metaDiv = document.createElement('div');
-    metaDiv.className = 'flex items-center gap-3 text-xs text-zinc-400 mt-2';
+    metaDiv.className = 'flex items-center gap-3 text-xs font-mono text-[#68655F] dark:text-[#A39E93] mt-2';
     metaDiv.textContent = `${chapters.length} Chapters Documented • ${totalWords} Total Words`;
     rHeader.appendChild(metaDiv);
     readerCard.appendChild(rHeader);
 
     if (chapters.length === 0) {
       const empty = document.createElement('p');
-      empty.className = 'text-sm text-zinc-400 italic py-4 text-center';
+      empty.className = 'text-sm text-[#68655F] dark:text-[#A39E93] italic py-4 text-center';
       empty.textContent = 'No chapters summarized yet. Tap "Continue Summary" to write your first chapter.';
       readerCard.appendChild(empty);
     } else {
       const chaptersList = document.createElement('div');
-      chaptersList.className = 'flex flex-col gap-6 divide-y divide-zinc-100 dark:divide-zinc-800/80';
+      chaptersList.className = 'flex flex-col gap-6 divide-y divide-[#E6E4DF] dark:divide-[#33302C]';
 
       chapters.forEach((ch, idx) => {
         const chEl = document.createElement('section');
         chEl.className = idx > 0 ? 'pt-6 flex flex-col gap-2' : 'flex flex-col gap-2';
 
         const chHeading = document.createElement('h2');
-        chHeading.className = 'text-base font-bold text-zinc-900 dark:text-zinc-100';
+        chHeading.className = 'text-base font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]';
         chHeading.textContent = ch.title;
         chEl.appendChild(chHeading);
 
         const contentDiv = document.createElement('div');
         contentDiv.className =
-          'flex flex-col gap-2 text-zinc-700 dark:text-zinc-300 text-sm leading-relaxed [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-7 [&_ol]:my-2 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-7 [&_ul]:my-2 [&_ul]:space-y-1 [&_li]:pl-1 [&_li]:leading-relaxed [&_p]:my-1.5 [&_p]:leading-relaxed';
+          'flex flex-col gap-2 text-[#1C1B18] dark:text-[#F4F1EA] text-sm leading-relaxed [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-7 [&_ol]:my-2 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-7 [&_ul]:my-2 [&_ul]:space-y-1 [&_li]:pl-1 [&_li]:leading-relaxed [&_p]:my-1.5 [&_p]:leading-relaxed';
         renderSummaryContent(contentDiv, ch.content);
         chEl.appendChild(contentDiv);
 

@@ -101,13 +101,13 @@ export function renderPromptCardsJournal({
   // 1. Top Navigation & Stats Bar
   const topBar = document.createElement('div');
   topBar.className =
-    'flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 gap-2';
+    'flex items-center justify-between pb-3 border-b border-[#E6E4DF] dark:border-[#33302C] gap-2';
 
   const backBtn = document.createElement('button');
   backBtn.type = 'button';
   backBtn.id = 'btn-back-from-journal-to-activities';
   backBtn.className =
-    'min-h-[44px] min-w-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 active:scale-95 transition-all cursor-pointer';
+    'min-h-[44px] min-w-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-lg text-xs font-semibold text-[#68655F] dark:text-[#A39E93] hover:text-[#C86D51] dark:hover:text-[#D97E63] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] active:scale-95 transition-all cursor-pointer tactile-spring';
   backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>Back to Activities</span>`;
   backBtn.addEventListener('click', onBack);
 
@@ -116,20 +116,20 @@ export function renderPromptCardsJournal({
 
   const wordBadge = document.createElement('span');
   wordBadge.id = 'journal-total-words';
-  wordBadge.className = 'font-mono text-xs text-zinc-500 dark:text-zinc-400 px-2';
+  wordBadge.className = 'font-mono text-xs text-[#68655F] dark:text-[#A39E93] px-2';
   wordBadge.textContent = `${computeWordCount(answers, additionalNotes)} words`;
 
   const statusBadge = document.createElement('span');
   statusBadge.id = 'journal-status';
   statusBadge.className =
-    'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800/80';
+    'badge-rose inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-medium';
   statusBadge.textContent = status || 'Saved';
 
   const customizeBtn = document.createElement('button');
   customizeBtn.type = 'button';
   customizeBtn.id = 'btn-customize-prompts';
   customizeBtn.className =
-    'min-h-[44px] min-w-[44px] inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 active:scale-95 transition cursor-pointer';
+    'btn-secondary-surface min-h-[44px] min-w-[44px] inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-mono font-semibold border border-[#E6E4DF] dark:border-[#33302C] text-[#68655F] dark:text-[#A39E93] hover:text-[#C86D51] hover:border-[#C86D51] active:scale-95 transition cursor-pointer tactile-spring';
   customizeBtn.innerHTML = `
     <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
       <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
@@ -154,7 +154,7 @@ export function renderPromptCardsJournal({
   activePrompts.forEach((p, idx) => {
     const card = document.createElement('div');
     card.className =
-      'flex flex-col gap-3 p-4 sm:p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/90 dark:border-zinc-800/90 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition';
+      'editorial-card flex flex-col gap-3 p-4 sm:p-5 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C] shadow-none hover:border-[#68655F] dark:hover:border-[#A39E93] transition';
 
     // Card Header
     const cardHeader = document.createElement('div');
@@ -165,12 +165,12 @@ export function renderPromptCardsJournal({
 
     const numBadge = document.createElement('span');
     numBadge.className =
-      'w-6 h-6 rounded-lg bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center justify-center shrink-0';
+      'w-6 h-6 rounded-md badge-rose text-xs font-mono font-bold flex items-center justify-center shrink-0';
     numBadge.textContent = String(idx + 1);
 
     const questionTitle = document.createElement('h3');
     questionTitle.className =
-      'text-sm font-bold text-zinc-900 dark:text-zinc-100 leading-snug';
+      'text-sm font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA] leading-snug';
     questionTitle.textContent = p.prompt;
 
     promptTitleWrap.appendChild(numBadge);
@@ -185,7 +185,7 @@ export function renderPromptCardsJournal({
     bulletBtn.id = idx === 0 ? 'btn-journal-bullet' : `btn-journal-bullet-${idx}`;
     bulletBtn.title = 'Bullet list';
     bulletBtn.className =
-      'min-h-[44px] min-w-[44px] px-3 py-2 rounded-xl text-xs font-medium border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer inline-flex items-center gap-1 active:scale-95';
+      'btn-secondary-surface min-h-[44px] min-w-[44px] px-3 py-2 rounded-lg text-xs font-mono font-semibold border border-[#E6E4DF] dark:border-[#33302C] text-[#68655F] dark:text-[#A39E93] hover:text-[#B56565] hover:border-[#B56565] transition cursor-pointer inline-flex items-center gap-1 active:scale-95 tactile-spring';
     bulletBtn.innerHTML = `${LIST_BULLET_SVG} <span class="hidden sm:inline">Bullet</span>`;
 
     const numberBtn = document.createElement('button');
@@ -193,7 +193,7 @@ export function renderPromptCardsJournal({
     numberBtn.id = idx === 0 ? 'btn-journal-number' : `btn-journal-number-${idx}`;
     numberBtn.title = 'Numbered list';
     numberBtn.className =
-      'min-h-[44px] min-w-[44px] px-3 py-2 rounded-xl text-xs font-medium border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-indigo-400 transition cursor-pointer inline-flex items-center gap-1 active:scale-95';
+      'btn-secondary-surface min-h-[44px] min-w-[44px] px-3 py-2 rounded-lg text-xs font-mono font-semibold border border-[#E6E4DF] dark:border-[#33302C] text-[#68655F] dark:text-[#A39E93] hover:text-[#B56565] hover:border-[#B56565] transition cursor-pointer inline-flex items-center gap-1 active:scale-95 tactile-spring';
     numberBtn.innerHTML = `${LIST_NUMBER_SVG} <span class="hidden sm:inline">Numbered</span>`;
 
     toolbar.appendChild(bulletBtn);
@@ -210,7 +210,7 @@ export function renderPromptCardsJournal({
     editor.setAttribute('aria-multiline', 'true');
     editor.setAttribute('aria-label', p.prompt);
     editor.className =
-      'rich-editor w-full min-h-[96px] p-3 text-base sm:text-sm rounded-xl border border-zinc-200 dark:border-zinc-700/80 bg-zinc-50/50 dark:bg-zinc-800/60 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-zinc-800 transition leading-relaxed outline-none [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-6 [&_ol]:my-1.5 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-6 [&_ul]:my-1.5 [&_p]:my-1';
+      'rich-editor w-full min-h-[96px] p-3 text-base sm:text-sm rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#B56565] focus:bg-white dark:focus:bg-[#161514] transition leading-relaxed outline-none [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-6 [&_ol]:my-1.5 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-6 [&_ul]:my-1.5 [&_p]:my-1';
     editor.innerHTML = answers[p.id] || '';
 
     // Connect editor events
@@ -248,14 +248,14 @@ export function renderPromptCardsJournal({
   const notesCard = document.createElement('div');
   notesCard.id = 'journal-notes-card';
   notesCard.className =
-    'flex flex-col gap-3 p-4 sm:p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/90 dark:border-zinc-800/90 shadow-xs';
+    'editorial-card flex flex-col gap-3 p-4 sm:p-5 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
 
   const notesHeader = document.createElement('div');
   notesHeader.className = 'flex items-center justify-between';
   notesHeader.innerHTML = `
     <div class="flex items-center gap-2">
-      <span class="w-6 h-6 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-xs font-bold flex items-center justify-center shrink-0">✦</span>
-      <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Additional Notes / Free Reflection</h3>
+      <span class="w-6 h-6 rounded-md bg-[#EFECE6] dark:bg-[#2C2926] text-[#68655F] dark:text-[#A39E93] text-xs font-bold flex items-center justify-center shrink-0">✦</span>
+      <h3 class="text-sm font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]">Additional Notes / Free Reflection</h3>
     </div>
     <span class="text-[11px] text-zinc-400">Optional</span>
   `;
@@ -268,7 +268,7 @@ export function renderPromptCardsJournal({
   notesEditor.setAttribute('aria-multiline', 'true');
   notesEditor.setAttribute('aria-label', 'Additional Notes');
   notesEditor.className =
-    'rich-editor w-full min-h-[90px] p-3 text-base sm:text-sm rounded-xl border border-zinc-200 dark:border-zinc-700/80 bg-zinc-50/50 dark:bg-zinc-800/60 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-zinc-800 transition leading-relaxed outline-none [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-6 [&_ol]:my-1.5 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-6 [&_ul]:my-1.5 [&_p]:my-1';
+    'rich-editor w-full min-h-[90px] p-3 text-base sm:text-sm rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#B56565] focus:bg-white dark:focus:bg-[#161514] transition leading-relaxed outline-none [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-6 [&_ol]:my-1.5 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-6 [&_ul]:my-1.5 [&_p]:my-1';
   notesEditor.innerHTML = additionalNotes || '';
 
   notesEditor.addEventListener('input', () => {
@@ -294,16 +294,16 @@ export function openCustomizePromptsModal({ prompts, onSave, onClose }) {
 
   const modal = document.createElement('div');
   modal.className =
-    'w-full max-w-md max-h-[85vh] flex flex-col rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150';
+    'w-full max-w-md max-h-[85vh] flex flex-col rounded-2xl bg-[#FFFFFF] dark:bg-[#22201E] border border-[#E6E4DF] dark:border-[#33302C] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150';
 
   // Modal Header
   const mHeader = document.createElement('div');
   mHeader.className =
-    'flex items-center justify-between p-5 border-b border-zinc-200 dark:border-zinc-800';
+    'flex items-center justify-between p-5 border-b border-[#E6E4DF] dark:border-[#33302C]';
   mHeader.innerHTML = `
     <div>
-      <h3 class="text-base font-bold text-zinc-900 dark:text-zinc-100">Customize Prompts</h3>
-      <p class="text-xs text-zinc-500 dark:text-zinc-400">Reorder, rename, or archive questions</p>
+      <h3 class="text-base font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]">Customize Prompts</h3>
+      <p class="text-xs text-[#68655F] dark:text-[#A39E93]">Reorder, rename, or archive questions</p>
     </div>
   `;
 
@@ -332,7 +332,7 @@ export function openCustomizePromptsModal({ prompts, onSave, onClose }) {
     active.forEach((p, idx) => {
       const row = document.createElement('div');
       row.className =
-        'prompt-row flex items-center gap-2 p-2.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/40';
+        'prompt-row flex items-center gap-2 p-2.5 rounded-xl border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514]';
 
       const orderBadge = document.createElement('span');
       orderBadge.className =
@@ -343,7 +343,7 @@ export function openCustomizePromptsModal({ prompts, onSave, onClose }) {
       input.type = 'text';
       input.value = p.prompt;
       input.className =
-        'prompt-title-input flex-1 text-base sm:text-sm px-3 py-2 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500';
+        'prompt-title-input flex-1 text-base sm:text-sm px-3 py-2 rounded-lg bg-white dark:bg-[#22201E] border border-[#E6E4DF] dark:border-[#33302C] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
       input.addEventListener('change', () => {
         p.prompt = input.value.trim() || p.prompt;
         onSave(prompts);
@@ -413,10 +413,10 @@ export function openCustomizePromptsModal({ prompts, onSave, onClose }) {
 
     // Add new question row
     const addSection = document.createElement('div');
-    addSection.className = 'mt-2 pt-3 border-t border-zinc-200 dark:border-zinc-800 flex flex-col gap-2';
+    addSection.className = 'mt-2 pt-3 border-t border-[#E6E4DF] dark:border-[#33302C] flex flex-col gap-2';
 
     const addLabel = document.createElement('label');
-    addLabel.className = 'text-xs font-semibold text-zinc-600 dark:text-zinc-400';
+    addLabel.className = 'text-xs font-semibold text-[#68655F] dark:text-[#A39E93]';
     addLabel.textContent = 'Add a new question';
 
     const addRow = document.createElement('div');
@@ -427,13 +427,13 @@ export function openCustomizePromptsModal({ prompts, onSave, onClose }) {
     addInput.type = 'text';
     addInput.placeholder = 'e.g. What are you grateful for today?';
     addInput.className =
-      'flex-1 text-base sm:text-sm px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500';
+      'flex-1 text-base sm:text-sm px-3.5 py-2.5 rounded-lg bg-[#F6F5F2] dark:bg-[#161514] border border-[#E6E4DF] dark:border-[#33302C] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
 
     const addSubmitBtn = document.createElement('button');
     addSubmitBtn.type = 'button';
     addSubmitBtn.id = 'btn-submit-add-prompt';
     addSubmitBtn.className =
-      'min-h-[44px] px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition cursor-pointer shrink-0';
+      'btn-terracotta min-h-[44px] px-4 py-2 rounded-lg text-xs font-semibold transition cursor-pointer shrink-0 tactile-spring';
     addSubmitBtn.textContent = '+ Add Question';
     addSubmitBtn.addEventListener('click', () => {
       const val = (addInput.value || '').trim();
@@ -463,13 +463,13 @@ export function openCustomizePromptsModal({ prompts, onSave, onClose }) {
   // Modal Footer
   const mFooter = document.createElement('div');
   mFooter.className =
-    'p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 flex justify-end';
+    'p-4 border-t border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] flex justify-end';
 
   const doneBtn = document.createElement('button');
   doneBtn.type = 'button';
   doneBtn.id = 'btn-done-customize-modal';
   doneBtn.className =
-    'min-h-[44px] px-6 py-2 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-bold hover:opacity-90 active:scale-95 transition cursor-pointer';
+    'btn-terracotta min-h-[44px] px-6 py-2 rounded-lg text-xs font-semibold transition cursor-pointer tactile-spring';
   doneBtn.textContent = 'Done';
   doneBtn.addEventListener('click', () => {
     overlay.remove();

@@ -352,11 +352,15 @@ export async function saveJournalEntry(day, content) {
   };
 
   await commitSingleMutation(STORES.JOURNAL_ENTRIES, record, 'journalEntries', day);
-  if (day === currentDay && !isBlank(record.content)) {
+  if (day === currentDay) {
     try {
-      await triggerActivityCheckIn(LINKED_ACTIVITIES.JOURNAL);
+      if (!isBlank(record.content)) {
+        await triggerActivityCheckIn(LINKED_ACTIVITIES.JOURNAL);
+      } else {
+        await triggerActivityUncheck(LINKED_ACTIVITIES.JOURNAL);
+      }
     } catch (err) {
-      console.warn('Journal auto-checkin failed:', err);
+      console.warn('Journal auto-checkin/uncheck failed:', err);
     }
   }
   return record;
@@ -532,10 +536,11 @@ export async function setActivityArchived(id, archived = true) {
 }
 
 /**
- * Triggers auto-check-in for habits linked to an activity.
+ * Updates check-in state for all active habits linked to a specific activity type for today.
  * @param {'journal' | 'book_summary'} activityType
+ * @param {boolean} targetChecked
  */
-export async function triggerActivityCheckIn(activityType) {
+async function setActivityHabitCheckIn(activityType, targetChecked) {
   const habits = await listHabits({ includeArchived: false });
   const linkedHabits = habits.filter((h) => h.linkedActivity === activityType);
   if (linkedHabits.length === 0) return;
@@ -543,10 +548,29 @@ export async function triggerActivityCheckIn(activityType) {
   const currentDay = today();
   for (const habit of linkedHabits) {
     const days = await getCheckInDays(habit.id);
-    if (!days.has(currentDay)) {
+    const isChecked = days.has(currentDay);
+    if (targetChecked && !isChecked) {
+      await toggleCheckIn(habit.id, currentDay);
+    } else if (!targetChecked && isChecked) {
       await toggleCheckIn(habit.id, currentDay);
     }
   }
+}
+
+/**
+ * Triggers auto-check-in for habits linked to an activity.
+ * @param {'journal' | 'book_summary'} activityType
+ */
+export async function triggerActivityCheckIn(activityType) {
+  await setActivityHabitCheckIn(activityType, true);
+}
+
+/**
+ * Triggers uncheck for habits linked to an activity if they are currently checked in.
+ * @param {'journal' | 'book_summary'} activityType
+ */
+export async function triggerActivityUncheck(activityType) {
+  await setActivityHabitCheckIn(activityType, false);
 }
 
 /**

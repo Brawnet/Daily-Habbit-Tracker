@@ -14,6 +14,15 @@ import { currentStreak, longestStreak } from './streak.js';
 import { completionRate, heatmapWeeks } from './stats.js';
 import { searchEntries } from './search.js';
 import { isBlank, htmlToText, htmlToMarkdownText } from './text.js';
+import {
+  DEFAULT_JOURNAL_PROMPTS,
+  compilePromptJournal,
+  decompilePromptJournal,
+  parseStructuredJournalBlocks,
+  sanitizeJournalHtml,
+  computeWordCount,
+  hasNonEmptyJournalAnswers,
+} from './journal.js';
 
 describe('domain/day', () => {
   describe('toDay and today', () => {
@@ -533,5 +542,111 @@ describe('domain/text', () => {
     it('preserves clean plain text', () => {
       expect(htmlToMarkdownText('Just plain text')).toBe('Just plain text');
     });
+  });
+});
+
+describe('domain/journal', () => {
+  it('compiles answered prompts in order and omits blank prompts', () => {
+    const prompts = [
+      { id: 'p1', prompt: 'Question 1', order: 1, archived: false },
+      { id: 'p0', prompt: 'Question 0', order: 0, archived: false },
+      { id: 'p2', prompt: 'Question 2', order: 2, archived: false },
+    ];
+    const answers = {
+      p0: '<p>Answer 0</p>',
+      p1: '   ', // Blank -> omitted
+      p2: '<p>Answer 2</p>',
+    };
+
+    const compiled = compilePromptJournal(prompts, answers, 'My extra notes');
+    expect(compiled).toContain('data-prompt-id="p0"');
+    expect(compiled).toContain('Question 0');
+    expect(compiled).toContain('Answer 0');
+    expect(compiled).not.toContain('data-prompt-id="p1"');
+    expect(compiled).not.toContain('Question 1');
+    expect(compiled).toContain('data-prompt-id="p2"');
+    expect(compiled).toContain('Question 2');
+    expect(compiled).toContain('Answer 2');
+    expect(compiled).toContain('Additional Notes');
+    expect(compiled).toContain('My extra notes');
+  });
+
+  it('preserves answers for archived prompts if an answer exists, but omits empty archived prompts', () => {
+    const prompts = [
+      { id: 'p_archived_with_ans', prompt: 'Archived Question', order: 0, archived: true },
+      { id: 'p_archived_blank', prompt: 'Empty Archived', order: 1, archived: true },
+    ];
+    const answers = {
+      p_archived_with_ans: 'Historical memory',
+      p_archived_blank: '',
+    };
+
+    const compiled = compilePromptJournal(prompts, answers, '');
+    expect(compiled).toContain('Archived Question');
+    expect(compiled).toContain('Historical memory');
+    expect(compiled).not.toContain('Empty Archived');
+  });
+
+  it('sanitizes dangerous tags and scripts from answers', () => {
+    const malicious = '<p>Good text</p><script>alert("xss")</script><iframe src="evil.com"></iframe><img src=x onerror="alert(1)">';
+    const cleaned = sanitizeJournalHtml(malicious);
+    expect(cleaned).not.toContain('<script');
+    expect(cleaned).not.toContain('<iframe');
+    expect(cleaned).not.toContain('onerror');
+    expect(cleaned).toContain('Good text');
+  });
+
+  it('decompiles compiled journal HTML into answers map and additional notes', () => {
+    const prompts = DEFAULT_JOURNAL_PROMPTS;
+    const compiled = compilePromptJournal(
+      prompts,
+      {
+        jp_day: '<p>Great day</p>',
+        jp_well: '<p>Wrote code</p>',
+      },
+      'Night reflection'
+    );
+
+    const { answers, additionalNotes } = decompilePromptJournal(compiled, prompts);
+    expect(answers.jp_day).toContain('Great day');
+    expect(answers.jp_well).toContain('Wrote code');
+    expect(answers.jp_improve).toBeUndefined();
+    expect(additionalNotes).toContain('Night reflection');
+  });
+
+  it('parses structured blocks into array for History reader view', () => {
+    const compiled = `
+<div class="journal-prompt-block" data-prompt-id="jp_day">
+  <h3 class="font-bold">How was your day?</h3>
+  <div class="journal-prompt-answer">Felt calm and productive.</div>
+</div>
+
+<div class="journal-notes-block">
+  <h3 class="font-bold">Additional Notes</h3>
+  <div class="journal-notes-answer">Read 20 pages.</div>
+</div>
+`.trim();
+
+    const blocks = parseStructuredJournalBlocks(compiled);
+    expect(blocks.length).toBe(2);
+    expect(blocks[0].title).toBe('How was your day?');
+    expect(blocks[0].contentHtml).toBe('Felt calm and productive.');
+    expect(blocks[1].title).toBe('Additional Notes');
+    expect(blocks[1].contentHtml).toBe('Read 20 pages.');
+  });
+
+  it('computes word count accurately across answers and notes', () => {
+    const answers = {
+      p1: '<p>One two three</p>',
+      p2: 'four five',
+    };
+    expect(computeWordCount(answers, 'six seven')).toBe(7);
+    expect(computeWordCount({}, '')).toBe(0);
+  });
+
+  it('hasNonEmptyJournalAnswers detects presence or absence of text', () => {
+    expect(hasNonEmptyJournalAnswers({ p1: '<p><br></p>' }, '   ')).toBe(false);
+    expect(hasNonEmptyJournalAnswers({ p1: 'Hello' }, '')).toBe(true);
+    expect(hasNonEmptyJournalAnswers({}, 'Notes exist')).toBe(true);
   });
 });

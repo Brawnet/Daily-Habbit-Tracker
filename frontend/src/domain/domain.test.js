@@ -596,6 +596,41 @@ describe('domain/journal', () => {
     expect(cleaned).toContain('Good text');
   });
 
+  it('neutralizes slash-delimited attributes, javascript: URLs, SVG and Math tags (Issue #43 Domain 1)', () => {
+    // Slash delimiter attribute injection
+    const slashAttr = '<img/src=x/onerror=alert(1)>';
+    expect(sanitizeJournalHtml(slashAttr)).not.toContain('onerror');
+
+    // javascript: URL in href
+    const jsUrl = '<a href="javascript:alert(1)">Click</a>';
+    expect(sanitizeJournalHtml(jsUrl)).not.toContain('javascript:');
+
+    // SVG and Math tags
+    const svgPayload = '<svg><animate onbegin=alert(1)></svg>';
+    expect(sanitizeJournalHtml(svgPayload)).not.toContain('<svg');
+    expect(sanitizeJournalHtml(svgPayload)).not.toContain('onbegin');
+
+    const mathPayload = '<math><mtext>test</mtext></math>';
+    expect(sanitizeJournalHtml(mathPayload)).not.toContain('<math');
+  });
+
+  it('escapes prompt id in compilePromptJournal to prevent attribute breakout (Issue #43 Domain 1)', () => {
+    const maliciousPrompts = [
+      { id: 'p1" onclick="alert(1)"', prompt: 'Malicious ID Prompt', order: 0, archived: false }
+    ];
+    const answers = { 'p1" onclick="alert(1)"': 'My Answer' };
+    const compiled = compilePromptJournal(maliciousPrompts, answers, '');
+    expect(compiled).not.toContain('data-prompt-id="p1" onclick="alert(1)"');
+    expect(compiled).toContain('data-prompt-id="p1&quot; onclick=&quot;alert(1)&quot;"');
+  });
+
+  it('htmlToMarkdownText does not unescape &lt; and &gt; into live HTML tags', () => {
+    const input = 'Pasted text with &lt;script&gt;alert(1)&lt;/script&gt;';
+    const result = htmlToMarkdownText(input);
+    expect(result).not.toContain('<script>');
+    expect(result).toContain('&lt;script&gt;');
+  });
+
   it('decompiles compiled journal HTML into answers map and additional notes', () => {
     const prompts = DEFAULT_JOURNAL_PROMPTS;
     const compiled = compilePromptJournal(

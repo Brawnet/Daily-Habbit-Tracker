@@ -24,6 +24,53 @@ export const TYPE_CONFIG = Object.freeze({
 });
 
 /**
+ * Checks whether a day string is a valid calendar date in YYYY-MM-DD format.
+ * @param {string} day
+ * @returns {boolean}
+ */
+export function isValidDayString(day) {
+  if (!day || typeof day !== 'string') return false;
+  const match = day.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+  const year = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const dayNum = parseInt(match[3], 10);
+  if (year < 1970 || year > 2100 || month < 1 || month > 12 || dayNum < 1 || dayNum > 31) return false;
+  const dt = new Date(Date.UTC(year, month - 1, dayNum));
+  return dt.getUTCFullYear() === year && dt.getUTCMonth() === month - 1 && dt.getUTCDate() === dayNum;
+}
+
+/**
+ * Validates the schema shape of an incoming record.
+ * @param {string} type
+ * @param {any} record
+ * @returns {boolean}
+ */
+export function isValidRecordShape(type, record) {
+  if (!record || typeof record !== 'object') return false;
+  switch (type) {
+    case 'habits':
+      return typeof record.id === 'string' && record.id.trim() !== '';
+    case 'checkIns':
+      return (
+        typeof record.id === 'string' &&
+        record.id.trim() !== '' &&
+        typeof record.habitId === 'string' &&
+        record.habitId.trim() !== '' &&
+        isValidDayString(record.day)
+      );
+    case 'journalEntries':
+      return isValidDayString(record.day);
+    case 'settings':
+      return typeof record.key === 'string' && record.key.trim() !== '';
+    case 'activities':
+      return typeof record.id === 'string' && record.id.trim() !== '';
+    default:
+      return false;
+  }
+}
+
+/**
  * Determines whether the incoming server record wins against local.
  *
  * Rules:
@@ -152,6 +199,9 @@ export async function applyIncomingChanges(db, { changes = {}, rejected = [] } =
     const lockedSet = lockedKeysByType[type] || new Set();
 
     for (const incoming of incomingList) {
+      if (!isValidRecordShape(type, incoming)) {
+        continue;
+      }
       const key = config.getKey(incoming);
       const isLocked = lockedSet.has(key);
       const outboxKey = `${type}:${key}`;

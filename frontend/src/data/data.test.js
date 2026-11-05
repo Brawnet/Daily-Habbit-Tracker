@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { DB_NAME, getDb, closeDb } from './db.js';
-import { getConfig, setConfig, isConfigured } from './config.js';
+import { getConfig, setConfig, isConfigured, isValidGasUrl, getStorage } from './config.js';
 import {
   listHabits,
   addHabit,
@@ -35,7 +35,7 @@ import {
   removeOutboxEntries,
   countOutbox,
 } from './outbox.js';
-import { shouldIncomingWin, mergeRecord, applyIncomingChanges } from './merge.js';
+import { shouldIncomingWin, mergeRecord, applyIncomingChanges, isValidRecordShape } from './merge.js';
 import { callApi } from './api.js';
 import {
   syncNow,
@@ -82,6 +82,39 @@ describe('Data Layer - Config', () => {
     const config = getConfig();
     expect(config.gasUrl).toBe('https://script.google.com/macros/s/xyz/exec');
     expect(config.pin).toBe('secret123');
+  });
+
+  describe('isValidGasUrl and setConfig validation (Issue #43 Domain 2)', () => {
+    it('validates authentic Google Apps Script web app URLs', () => {
+      expect(isValidGasUrl('https://script.google.com/macros/s/AKfycbz_1234567890/exec')).toBe(true);
+      expect(isValidGasUrl('https://script.google.com/macros/s/AKfycbz_1234567890/exec?foo=bar')).toBe(true);
+    });
+
+    it('rejects malicious or arbitrary origins', () => {
+      expect(isValidGasUrl('https://attacker.com/steal-creds')).toBe(false);
+      expect(isValidGasUrl('http://script.google.com/macros/s/xyz/exec')).toBe(false);
+      expect(isValidGasUrl('https://script.google.com/macros/s/xyz/dev')).toBe(false);
+      expect(isValidGasUrl('https://script.google.com.attacker.com/macros/s/xyz/exec')).toBe(false);
+      expect(isValidGasUrl('javascript:alert(1)')).toBe(false);
+      expect(isValidGasUrl('')).toBe(false);
+      expect(isValidGasUrl(null)).toBe(false);
+    });
+
+    it('setConfig throws descriptive Error on invalid gasUrl', () => {
+      expect(() => {
+        setConfig({ gasUrl: 'https://evil.com/exfiltrate' });
+      }).toThrow('Invalid Google Apps Script Web App URL');
+    });
+
+    it('callApi throws INVALID_CONFIG ApiError if stored gasUrl is invalid', async () => {
+      // Simulate corrupted/tampered storage
+      const storage = getStorage();
+      storage.setItem('habbit.gasUrl', 'https://evil.com/fake');
+      await expect(callApi('ping')).rejects.toMatchObject({
+        code: 'INVALID_CONFIG',
+      });
+      storage.removeItem('habbit.gasUrl');
+    });
   });
 });
 
@@ -511,6 +544,31 @@ describe('Data Layer - LWW Merge and LOCKED Precedence', () => {
 
     // 3. Outbox entry for j1 should be cleared!
     expect(await countOutbox(db)).toBe(0);
+  });
+
+  it('rejects malformed incoming records with isValidRecordShape (Issue #43 Domain 2)', async () => {
+    expect(isValidRecordShape('habits', { id: 'h1' })).toBe(true);
+    expect(isValidRecordShape('habits', { id: '' })).toBe(false);
+    expect(isValidRecordShape('habits', null)).toBe(false);
+
+    expect(isValidRecordShape('checkIns', { id: 'c1', habitId: 'h1', day: '2026-10-20' })).toBe(true);
+    expect(isValidRecordShape('checkIns', { id: 'c1', habitId: 'h1', day: 'invalid-date' })).toBe(false);
+    expect(isValidRecordShape('checkIns', { id: 'c1', habitId: '', day: '2026-10-20' })).toBe(false);
+
+    expect(isValidRecordShape('journalEntries', { day: '2026-10-20' })).toBe(true);
+    expect(isValidRecordShape('journalEntries', { day: 'bad-day' })).toBe(false);
+
+    const db = await getDb();
+    const syncResult = {
+      changes: {
+        checkIns: [
+          { id: 'bad-checkin', habitId: 'h1', day: 'malicious-script-tag' },
+        ],
+      },
+    };
+    await applyIncomingChanges(db, syncResult);
+    const stored = await db.get(STORES.CHECK_INS, 'bad-checkin');
+    expect(stored).toBeUndefined();
   });
 });
 

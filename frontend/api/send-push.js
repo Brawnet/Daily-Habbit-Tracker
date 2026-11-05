@@ -1,18 +1,56 @@
 import crypto from 'node:crypto';
 import webpush from 'web-push';
 
+export const MAX_PUSH_BATCH_SIZE = 100;
+
+export const ALLOWED_PUSH_HOST_PATTERN =
+  /(?:^|\.)(?:push\.apple\.com|fcm\.googleapis\.com|googleapis\.com|notify\.windows\.com|push\.services\.mozilla\.com|web\.push\.apple\.com|push\.example\.com)$/i;
+
 /**
- * Constant-time string comparison to prevent timing attacks.
+ * Validates whether a push subscription endpoint URL is secure (HTTPS) and formatted properly.
+ * Rejects SSRF vectors (e.g. internal IP addresses, loopback, file, ftp, arbitrary third-party hosts)
+ * by enforcing an authorized Web Push provider host allowlist.
+ * @param {string} endpoint
+ * @returns {boolean}
+ */
+export function isValidPushEndpoint(endpoint) {
+  if (!endpoint || typeof endpoint !== 'string') return false;
+  try {
+    const parsed = new URL(endpoint);
+    if (parsed.protocol !== 'https:') return false;
+    const hostname = parsed.hostname.toLowerCase();
+
+    // Reject IP addresses (IPv4, IPv6 including bracketed [::1], hex/octal)
+    if (
+      hostname.startsWith('[') ||
+      hostname.endsWith(']') ||
+      /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) ||
+      hostname.includes(':') ||
+      hostname === 'localhost' ||
+      hostname.endsWith('.localhost')
+    ) {
+      return false;
+    }
+
+    // Require matching authorized Web Push provider allowlist
+    return ALLOWED_PUSH_HOST_PATTERN.test(hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Constant-time string comparison using SHA-256 fixed-length digests to prevent timing attacks
+ * and byte length leakage.
  * @param {string} a
  * @param {string} b
  * @returns {boolean}
  */
 export function timingSafeEqualStr(a, b) {
   if (typeof a !== 'string' || typeof b !== 'string') return false;
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) return false;
-  return crypto.timingSafeEqual(bufA, bufB);
+  const hashA = crypto.createHash('sha256').update(a, 'utf8').digest();
+  const hashB = crypto.createHash('sha256').update(b, 'utf8').digest();
+  return crypto.timingSafeEqual(hashA, hashB);
 }
 
 /**
@@ -61,6 +99,13 @@ export default async function handler(req, res) {
   body = body || {};
 
   const { subscriptions = [], notification = {} } = body;
+  if (!Array.isArray(subscriptions)) {
+    return res.status(400).json({ error: 'Subscriptions must be an array' });
+  }
+  if (subscriptions.length > MAX_PUSH_BATCH_SIZE) {
+    return res.status(400).json({ error: `Subscriptions batch size exceeds maximum of ${MAX_PUSH_BATCH_SIZE}` });
+  }
+
   const payload = JSON.stringify({
     title: notification.title || 'Habbit',
     body: notification.body || '',
@@ -69,6 +114,16 @@ export default async function handler(req, res) {
 
   const results = [];
   for (const sub of subscriptions) {
+    if (!sub || !isValidPushEndpoint(sub.endpoint)) {
+      results.push({
+        endpoint: sub?.endpoint || '',
+        ok: false,
+        statusCode: 400,
+        error: 'Invalid or insecure push endpoint URL',
+      });
+      continue;
+    }
+
     try {
       const resp = await webpush.sendNotification(sub, payload, {
         TTL: 3600,

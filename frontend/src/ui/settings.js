@@ -3,7 +3,7 @@
  * Manages Sync, Habits, Reminders, PWA Installation, and About info.
  */
 
-import { getConfig, setConfig } from '../data/config.js';
+import { getConfig, setConfig, isValidGasUrl } from '../data/config.js';
 import { callApi } from '../data/api.js';
 import { syncNow, getSyncStatus, onSyncStatus } from '../data/sync.js';
 import {
@@ -383,8 +383,12 @@ export function mount(el) {
   btnSaveCredentials?.addEventListener('click', () => {
     const gasUrl = syncGasUrlInput ? syncGasUrlInput.value.trim() : '';
     const pin = syncPinInput ? syncPinInput.value.trim() : '';
-    setConfig({ gasUrl, pin });
-    showToast('Credentials saved');
+    try {
+      setConfig({ gasUrl, pin });
+      showToast('Credentials saved');
+    } catch (err) {
+      showToast(err.message || 'Failed to save credentials');
+    }
   });
 
   btnTestConnection?.addEventListener('click', async () => {

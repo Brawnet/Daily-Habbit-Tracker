@@ -22,7 +22,12 @@ const {
   parseDiaryHeading,
   findChronologicalInsertIndex,
   decideReminder,
-  mergeRecordsLWW
+  mergeRecordsLWW,
+  isValidDayString,
+  clampClientTimestamp,
+  sanitizeFormulaInjection,
+  desanitizeFormulaInjection,
+  isValidPushEndpoint
 } = pureContext.module.exports;
 
 /**
@@ -619,6 +624,58 @@ describe('Pure Functions', () => {
     });
   });
 
+  describe('Pure Helper Functions', () => {
+    it('isValidDayString validates strict YYYY-MM-DD format and calendar bounds', () => {
+      expect(isValidDayString('2026-10-20')).toBe(true);
+      expect(isValidDayString('2024-02-29')).toBe(true); // leap year
+      expect(isValidDayString('2025-02-29')).toBe(false); // non-leap year
+      expect(isValidDayString('2026-04-31')).toBe(false); // April has 30 days
+      expect(isValidDayString('2026-13-01')).toBe(false); // invalid month
+      expect(isValidDayString('2026/10/20')).toBe(false);
+      expect(isValidDayString('')).toBe(false);
+      expect(isValidDayString(null)).toBe(false);
+      expect(isValidDayString('2026-1-1')).toBe(false);
+    });
+
+    it('clampClientTimestamp caps future client timestamps to nowMonotonic', () => {
+      const now = '2026-10-20T12:00:00.000Z';
+      const past = '2026-10-20T11:00:00.000Z';
+      const future = '2026-10-20T13:00:00.000Z';
+      expect(clampClientTimestamp(past, now)).toBe(past);
+      expect(clampClientTimestamp(future, now)).toBe(now);
+      expect(clampClientTimestamp(null, now)).toBe(now);
+      expect(clampClientTimestamp('', now)).toBe(now);
+    });
+
+    it('desanitizeFormulaInjection safely removes leading apostrophe only from formula triggers', () => {
+      expect(desanitizeFormulaInjection("'- Item 1")).toBe("- Item 1");
+      expect(desanitizeFormulaInjection("'=1+1")).toBe("=1+1");
+      expect(desanitizeFormulaInjection("'+cmd")).toBe("+cmd");
+      expect(desanitizeFormulaInjection("'@sum")).toBe("@sum");
+      expect(desanitizeFormulaInjection("Normal text")).toBe("Normal text");
+      expect(desanitizeFormulaInjection("'Normal quote")).toBe("'Normal quote");
+      expect(desanitizeFormulaInjection(null)).toBe("");
+    });
+
+    it('isValidPushEndpoint validates HTTPS and authorized push domains while rejecting SSRF targets', () => {
+      expect(isValidPushEndpoint('https://fcm.googleapis.com/fcm/send/123')).toBe(true);
+      expect(isValidPushEndpoint('https://push.apple.com/send/456')).toBe(true);
+      expect(isValidPushEndpoint('https://web.push.apple.com/send/789')).toBe(true);
+      expect(isValidPushEndpoint('https://notify.windows.com/send/abc')).toBe(true);
+      expect(isValidPushEndpoint('https://updates.push.services.mozilla.com/wpush/v2/xyz')).toBe(true);
+      expect(isValidPushEndpoint('https://push.example.com/sub-1')).toBe(true);
+
+      // Rejections
+      expect(isValidPushEndpoint('http://fcm.googleapis.com/fcm/send')).toBe(false); // non-https
+      expect(isValidPushEndpoint('https://evil.com/push')).toBe(false); // unapproved domain
+      expect(isValidPushEndpoint('https://localhost:8080/push')).toBe(false); // localhost
+      expect(isValidPushEndpoint('https://127.0.0.1:8080/push')).toBe(false); // loopback IP
+      expect(isValidPushEndpoint('https://169.254.169.254/latest')).toBe(false); // cloud metadata
+      expect(isValidPushEndpoint('https://[::1]/push')).toBe(false); // IPv6
+      expect(isValidPushEndpoint(null)).toBe(false);
+    });
+  });
+
   describe('Pure Function Isolation Guardrail (SPEC §6)', () => {
     it('ensures pure functions do not reference ambient GAS globals directly', () => {
       const fs = require('node:fs');
@@ -631,7 +688,13 @@ describe('Pure Functions', () => {
         'parseDiaryHeading',
         'findChronologicalInsertIndex',
         'decideReminder',
-        'mergeRecordsLWW'
+        'mergeRecordsLWW',
+        'isValidDayString',
+        'clampClientTimestamp',
+        'sanitizeFormulaInjection',
+        'desanitizeFormulaInjection',
+        'isValidPushEndpoint',
+        'timingSafeEqualPin'
       ];
 
       const bannedAmbientSymbols = [
@@ -694,7 +757,7 @@ describe('GAS Backend Actions', () => {
       expect(data.error).toBe('UNAUTHORIZED');
     });
 
-    it('locks out and returns RATE_LIMITED after >10 failures in 10 minutes', () => {
+    it('locks out unauthenticated requests after >10 failures while legitimate user with correct PIN remains immune (Issue #43 Domain 3)', () => {
       // 10 failures
       for (let i = 1; i <= 10; i++) {
         const resp = env.exports.doPost({
@@ -713,13 +776,21 @@ describe('GAS Backend Actions', () => {
       expect(lockoutData.ok).toBe(false);
       expect(lockoutData.error).toBe('RATE_LIMITED');
 
-      // Subsequent attempt with even correct PIN is rejected while lockout is active
-      const duringLockout = env.exports.doPost({
+      // Subsequent attempt with invalid PIN continues to be blocked by RATE_LIMITED
+      const stillBlockedResp = env.exports.doPost({
+        postData: { contents: JSON.stringify({ pin: 'another-wrong-pin', action: 'ping' }) }
+      });
+      const stillBlockedData = JSON.parse(stillBlockedResp.getContent());
+      expect(stillBlockedData.ok).toBe(false);
+      expect(stillBlockedData.error).toBe('RATE_LIMITED');
+
+      // Authentic caller knowing legitimate PIN is NOT locked out (DoS protection)
+      const validCaller = env.exports.doPost({
         postData: { contents: JSON.stringify({ pin: PIN, action: 'ping' }) }
       });
-      const duringData = JSON.parse(duringLockout.getContent());
-      expect(duringData.ok).toBe(false);
-      expect(duringData.error).toBe('RATE_LIMITED');
+      const validData = JSON.parse(validCaller.getContent());
+      expect(validData.ok).toBe(true);
+      expect(validData.timeZone).toBe('Asia/Jakarta');
     });
 
     it('succeeds with correct PIN', () => {
@@ -735,6 +806,7 @@ describe('GAS Backend Actions', () => {
 
   describe('Sync Action', () => {
     it('upserts changes across all sheets and returns strictly monotonic cursor', () => {
+      const todayJakarta = env.exports.getTodayJakarta();
       const payload1 = {
         pin: PIN,
         deviceId: 'dev-1',
@@ -745,10 +817,10 @@ describe('GAS Backend Actions', () => {
             { id: 'h1', name: 'Exercise', sortOrder: 1, archived: false, createdAt: '2026-10-20T00:00:00Z', updatedAt: '2026-10-20T01:00:00Z' }
           ],
           checkIns: [
-            { id: 'h1:2026-10-20', habitId: 'h1', day: '2026-10-20', deleted: false, updatedAt: '2026-10-20T01:00:00Z' }
+            { id: `h1:${todayJakarta}`, habitId: 'h1', day: todayJakarta, deleted: false, updatedAt: '2026-10-20T01:00:00Z' }
           ],
           journalEntries: [
-            { day: '2026-10-20', content: 'First entry', updatedAt: '2026-10-20T01:00:00Z' }
+            { day: todayJakarta, content: 'First entry', updatedAt: '2026-10-20T01:00:00Z' }
           ],
           settings: [
             { key: 'reminderTime', value: '21:00', updatedAt: '2026-10-20T01:00:00Z' }
@@ -918,9 +990,74 @@ describe('GAS Backend Actions', () => {
       expect(rows[1][0]).toBe('act-1');
       expect(rows[1][1]).toBe('Pragmatic Programmer');
     });
+
+    it('rejects future-dated journal entry with reason LOCKED', () => {
+      const tomorrow = '2099-01-01';
+      const syncPayload = {
+        pin: PIN,
+        deviceId: 'dev-1',
+        action: 'sync',
+        changes: {
+          journalEntries: [
+            { day: tomorrow, content: 'Time traveler note', updatedAt: '2026-10-20T10:00:00Z' }
+          ]
+        }
+      };
+      const res = JSON.parse(env.exports.doPost({ postData: { contents: JSON.stringify(syncPayload) } }).getContent());
+      expect(res.ok).toBe(true);
+      expect(res.rejected).toEqual([
+        { type: 'journalEntries', key: tomorrow, reason: 'LOCKED' }
+      ]);
+    });
+
+    it('escapes formula injection on sheet write and unescapes on read without corrupting markdown lists', () => {
+      const today = env.exports.getTodayJakarta();
+      const syncPayload = {
+        pin: PIN,
+        deviceId: 'dev-1',
+        action: 'sync',
+        changes: {
+          journalEntries: [
+            { day: today, content: '- Item 1\n- Item 2\n=1+1', updatedAt: '2026-10-20T10:00:00Z' }
+          ]
+        }
+      };
+      const res = JSON.parse(env.exports.doPost({ postData: { contents: JSON.stringify(syncPayload) } }).getContent());
+      expect(res.ok).toBe(true);
+      // In returned changes (readAllJournalEntries), formula triggers are unescaped
+      expect(res.changes.journalEntries[0].content).toBe('- Item 1\n- Item 2\n=1+1');
+
+      // In the underlying raw sheet cell, it is stored with leading apostrophe
+      const jSheet = env.ss.getSheetByName('Journal_Entries');
+      const rawRows = jSheet.getDataRange().getValues();
+      expect(rawRows[1][1].startsWith("'")).toBe(true);
+    });
   });
 
   describe('Push Subscription Management', () => {
+    it('rejects subscribePush with unapproved or malicious endpoint', () => {
+      const badEndpoints = [
+        'http://fcm.googleapis.com/test', // not https
+        'https://169.254.169.254/metadata', // SSRF metadata
+        'https://attacker.com/sub', // untrusted host
+        'https://localhost:3000/sub' // loopback
+      ];
+      for (const ep of badEndpoints) {
+        const resp = JSON.parse(env.exports.doPost({
+          postData: {
+            contents: JSON.stringify({
+              pin: PIN,
+              deviceId: 'bad-device',
+              action: 'subscribePush',
+              subscription: { endpoint: ep, keys: { p256dh: 'k', auth: 'a' } }
+            })
+          }
+        }).getContent());
+        expect(resp.ok).toBe(false);
+        expect(resp.error).toBe('BAD_REQUEST');
+      }
+    });
+
     it('subscribes and updates subscription by deviceId', () => {
       const subPayload = {
         pin: PIN,
@@ -949,7 +1086,7 @@ describe('GAS Backend Actions', () => {
             pin: PIN,
             deviceId: 'phone-ios',
             action: 'subscribePush',
-            subscription: { endpoint: 'https://push/1', keys: { p256dh: 'k', auth: 'a' } }
+            subscription: { endpoint: 'https://push.example.com/1', keys: { p256dh: 'k', auth: 'a' } }
           })
         }
       });
@@ -1406,6 +1543,98 @@ describe('GAS Backend Actions', () => {
       const docs = Array.from(env.docs.values());
       const futureDoc = docs.find(d => d.getName().includes('2099'));
       expect(futureDoc).toBeUndefined();
+    });
+  });
+  describe('Security Hardening (Issue #43 Domains 3 & 4)', () => {
+    it('escapes spreadsheet formula injection characters (=, +, -, @)', () => {
+      expect(env.exports.sanitizeFormulaInjection('=SUM(A1:B10)')).toBe("'=SUM(A1:B10)");
+      expect(env.exports.sanitizeFormulaInjection('+12345')).toBe("'+12345");
+      expect(env.exports.sanitizeFormulaInjection('-cmd|/C calc')).toBe("'-cmd|/C calc");
+      expect(env.exports.sanitizeFormulaInjection('@SUM(A1)')).toBe("'@SUM(A1)");
+      expect(env.exports.sanitizeFormulaInjection('Normal text')).toBe('Normal text');
+      expect(env.exports.sanitizeFormulaInjection('')).toBe('');
+      expect(env.exports.sanitizeFormulaInjection(null)).toBe('');
+    });
+
+    it('rejects check-in edits for days outside today and yesterday (LOCKED)', () => {
+      const todayJakarta = env.exports.getTodayJakarta();
+      const oldDay = '2026-01-01';
+      const syncPayload = {
+        pin: PIN,
+        deviceId: 'dev-1',
+        action: 'sync',
+        since: null,
+        changes: {
+          checkIns: [
+            { id: `h1:${oldDay}`, habitId: 'h1', day: oldDay, deleted: false, updatedAt: '2026-10-20T10:00:00Z' }
+          ]
+        }
+      };
+
+      const res = JSON.parse(env.exports.doPost({ postData: { contents: JSON.stringify(syncPayload) } }).getContent());
+      expect(res.ok).toBe(true);
+      expect(res.rejected).toEqual([
+        { type: 'checkIns', key: `h1:${oldDay}`, reason: 'LOCKED' }
+      ]);
+
+      const cSheet = env.ss.getSheetByName('Check_Ins');
+      expect(cSheet.getDataRange().getValues().length).toBe(1); // Only header
+    });
+
+    it('allows check-ins for today and yesterday', () => {
+      const todayJakarta = env.exports.getTodayJakarta();
+      const yesterdayJakarta = env.exports.getYesterdayJakarta(todayJakarta);
+      const syncPayload = {
+        pin: PIN,
+        deviceId: 'dev-1',
+        action: 'sync',
+        since: null,
+        changes: {
+          checkIns: [
+            { id: `h1:${todayJakarta}`, habitId: 'h1', day: todayJakarta, deleted: false, updatedAt: `${todayJakarta}T10:00:00Z` },
+            { id: `h1:${yesterdayJakarta}`, habitId: 'h1', day: yesterdayJakarta, deleted: false, updatedAt: `${yesterdayJakarta}T10:00:00Z` }
+          ]
+        }
+      };
+
+      const res = JSON.parse(env.exports.doPost({ postData: { contents: JSON.stringify(syncPayload) } }).getContent());
+      expect(res.ok).toBe(true);
+      expect(res.rejected).toEqual([]);
+
+      const cSheet = env.ss.getSheetByName('Check_Ins');
+      expect(cSheet.getDataRange().getValues().length).toBe(3); // header + 2 rows
+    });
+
+    it('setup() throws Error if PIN length is less than 4', () => {
+      const shortEnv = createGasEnv({ PIN: '123' });
+      expect(() => shortEnv.exports.setup()).toThrow('PIN must be at least 4 characters');
+    });
+
+    it('setup() masks secret and does not log PUSH_SHARED_SECRET in cleartext', () => {
+      const logs = [];
+      const logEnv = createGasEnv({ PIN: 'valid-pin-4321' });
+      logEnv.context.Logger.log = (msg) => logs.push(msg);
+      logEnv.exports.setup();
+
+      const secret = logEnv.props['PUSH_SHARED_SECRET'];
+      expect(secret).toBeDefined();
+      expect(secret.length).toBeGreaterThan(10);
+      for (const log of logs) {
+        expect(log).not.toContain(secret);
+      }
+    });
+
+    it('syncDiaryEntries skips malformed day formats and does not create invalid docs', () => {
+      const jSheet = env.ss.getSheetByName('Journal_Entries');
+      const rows = jSheet.getDataRange().getValues();
+      rows.push(['bad-date-format', 'Malformed entry', '2026-10-20T10:00:00Z', '', '2026-10-20T10:00:00Z']);
+      jSheet.getRange(1, 1, rows.length, 5).setValues(rows);
+
+      env.exports.printDiary();
+
+      const docs = Array.from(env.docs.values());
+      const badDoc = docs.find(d => d.getName().includes('bad-date'));
+      expect(badDoc).toBeUndefined();
     });
   });
 });

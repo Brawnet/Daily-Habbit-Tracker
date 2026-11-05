@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import webpush from 'web-push';
-import handler, { timingSafeEqualStr } from './send-push.js';
+import handler, { timingSafeEqualStr, isValidPushEndpoint, MAX_PUSH_BATCH_SIZE } from './send-push.js';
 
 describe('timingSafeEqualStr', () => {
   it('returns true for identical strings', () => {
@@ -202,6 +202,92 @@ describe('send-push API handler', () => {
           error: 'Subscription expired',
         },
       ],
+    });
+  });
+
+  describe('Security Hardening (Issue #43 Domain 5)', () => {
+    it('isValidPushEndpoint validates HTTPS URLs and rejects non-HTTPS or SSRF hosts', () => {
+      expect(isValidPushEndpoint('https://fcm.googleapis.com/fcm/send/xyz')).toBe(true);
+      expect(isValidPushEndpoint('https://web.push.apple.com/xyz')).toBe(true);
+
+      // Rejects non-HTTPS
+      expect(isValidPushEndpoint('http://push.example.com/insecure')).toBe(false);
+      expect(isValidPushEndpoint('ftp://evil.com/payload')).toBe(false);
+
+      // Rejects localhost, loopback, and private IPs (SSRF vectors)
+      expect(isValidPushEndpoint('https://localhost/admin')).toBe(false);
+      expect(isValidPushEndpoint('https://127.0.0.1:8080/')).toBe(false);
+      expect(isValidPushEndpoint('https://169.254.169.254/latest/meta-data/')).toBe(false);
+      expect(isValidPushEndpoint('https://192.168.1.1/router')).toBe(false);
+      expect(isValidPushEndpoint('https://10.0.0.1/internal')).toBe(false);
+      expect(isValidPushEndpoint('not-a-url')).toBe(false);
+      expect(isValidPushEndpoint('')).toBe(false);
+      expect(isValidPushEndpoint(null)).toBe(false);
+    });
+
+    it('rejects batch sizes exceeding MAX_PUSH_BATCH_SIZE (100) with 400', async () => {
+      process.env.PUSH_SHARED_SECRET = 'correct-secret-1234';
+      process.env.VAPID_PUBLIC_KEY = 'mock-public-key';
+      process.env.VAPID_PRIVATE_KEY = 'mock-private-key';
+
+      vi.spyOn(webpush, 'setVapidDetails').mockImplementation(() => {});
+
+      const subscriptions = Array.from({ length: 101 }, (_, i) => ({
+        endpoint: `https://push.example.com/sub-${i}`,
+        keys: { auth: 'a', p256dh: 'b' },
+      }));
+
+      const req = {
+        method: 'POST',
+        headers: { 'x-push-secret': 'correct-secret-1234' },
+        body: {
+          subscriptions,
+          notification: { title: 'Test' },
+        },
+      };
+      const res = createMockResponse();
+
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.body.error).toContain('batch size exceeds maximum');
+    });
+
+    it('returns error statusCode 400 for individual invalid/SSRF push endpoints without crashing', async () => {
+      process.env.PUSH_SHARED_SECRET = 'correct-secret-1234';
+      process.env.VAPID_PUBLIC_KEY = 'mock-public-key';
+      process.env.VAPID_PRIVATE_KEY = 'mock-private-key';
+
+      vi.spyOn(webpush, 'setVapidDetails').mockImplementation(() => {});
+      const sendSpy = vi.spyOn(webpush, 'sendNotification').mockImplementation(async () => ({ statusCode: 201 }));
+
+      const subscriptions = [
+        { endpoint: 'http://insecure-http.com/sub', keys: { auth: 'a', p256dh: 'b' } },
+        { endpoint: 'https://127.0.0.1/ssrf', keys: { auth: 'a', p256dh: 'b' } },
+        { endpoint: 'https://fcm.googleapis.com/valid', keys: { auth: 'a', p256dh: 'b' } },
+      ];
+
+      const req = {
+        method: 'POST',
+        headers: { 'x-push-secret': 'correct-secret-1234' },
+        body: {
+          subscriptions,
+          notification: { title: 'Test' },
+        },
+      };
+      const res = createMockResponse();
+
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.body.results.length).toBe(3);
+      expect(res.body.results[0].ok).toBe(false);
+      expect(res.body.results[0].statusCode).toBe(400);
+      expect(res.body.results[1].ok).toBe(false);
+      expect(res.body.results[1].statusCode).toBe(400);
+      expect(res.body.results[2].ok).toBe(true);
+      expect(res.body.results[2].statusCode).toBe(201);
+      expect(sendSpy).toHaveBeenCalledTimes(1);
     });
   });
 });

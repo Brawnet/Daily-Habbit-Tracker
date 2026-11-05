@@ -694,7 +694,7 @@ describe('GAS Backend Actions', () => {
       expect(data.error).toBe('UNAUTHORIZED');
     });
 
-    it('locks out and returns RATE_LIMITED after >10 failures in 10 minutes', () => {
+    it('locks out unauthenticated requests after >10 failures while legitimate user with correct PIN remains immune (Issue #43 Domain 3)', () => {
       // 10 failures
       for (let i = 1; i <= 10; i++) {
         const resp = env.exports.doPost({
@@ -713,13 +713,21 @@ describe('GAS Backend Actions', () => {
       expect(lockoutData.ok).toBe(false);
       expect(lockoutData.error).toBe('RATE_LIMITED');
 
-      // Subsequent attempt with even correct PIN is rejected while lockout is active
-      const duringLockout = env.exports.doPost({
+      // Subsequent attempt with invalid PIN continues to be blocked by RATE_LIMITED
+      const stillBlockedResp = env.exports.doPost({
+        postData: { contents: JSON.stringify({ pin: 'another-wrong-pin', action: 'ping' }) }
+      });
+      const stillBlockedData = JSON.parse(stillBlockedResp.getContent());
+      expect(stillBlockedData.ok).toBe(false);
+      expect(stillBlockedData.error).toBe('RATE_LIMITED');
+
+      // Authentic caller knowing legitimate PIN is NOT locked out (DoS protection)
+      const validCaller = env.exports.doPost({
         postData: { contents: JSON.stringify({ pin: PIN, action: 'ping' }) }
       });
-      const duringData = JSON.parse(duringLockout.getContent());
-      expect(duringData.ok).toBe(false);
-      expect(duringData.error).toBe('RATE_LIMITED');
+      const validData = JSON.parse(validCaller.getContent());
+      expect(validData.ok).toBe(true);
+      expect(validData.timeZone).toBe('Asia/Jakarta');
     });
 
     it('succeeds with correct PIN', () => {
@@ -735,6 +743,7 @@ describe('GAS Backend Actions', () => {
 
   describe('Sync Action', () => {
     it('upserts changes across all sheets and returns strictly monotonic cursor', () => {
+      const todayJakarta = env.exports.getTodayJakarta();
       const payload1 = {
         pin: PIN,
         deviceId: 'dev-1',
@@ -745,10 +754,10 @@ describe('GAS Backend Actions', () => {
             { id: 'h1', name: 'Exercise', sortOrder: 1, archived: false, createdAt: '2026-10-20T00:00:00Z', updatedAt: '2026-10-20T01:00:00Z' }
           ],
           checkIns: [
-            { id: 'h1:2026-10-20', habitId: 'h1', day: '2026-10-20', deleted: false, updatedAt: '2026-10-20T01:00:00Z' }
+            { id: `h1:${todayJakarta}`, habitId: 'h1', day: todayJakarta, deleted: false, updatedAt: '2026-10-20T01:00:00Z' }
           ],
           journalEntries: [
-            { day: '2026-10-20', content: 'First entry', updatedAt: '2026-10-20T01:00:00Z' }
+            { day: todayJakarta, content: 'First entry', updatedAt: '2026-10-20T01:00:00Z' }
           ],
           settings: [
             { key: 'reminderTime', value: '21:00', updatedAt: '2026-10-20T01:00:00Z' }
@@ -1406,6 +1415,98 @@ describe('GAS Backend Actions', () => {
       const docs = Array.from(env.docs.values());
       const futureDoc = docs.find(d => d.getName().includes('2099'));
       expect(futureDoc).toBeUndefined();
+    });
+  });
+  describe('Security Hardening (Issue #43 Domains 3 & 4)', () => {
+    it('escapes spreadsheet formula injection characters (=, +, -, @)', () => {
+      expect(env.exports.sanitizeFormulaInjection('=SUM(A1:B10)')).toBe("'=SUM(A1:B10)");
+      expect(env.exports.sanitizeFormulaInjection('+12345')).toBe("'+12345");
+      expect(env.exports.sanitizeFormulaInjection('-cmd|/C calc')).toBe("'-cmd|/C calc");
+      expect(env.exports.sanitizeFormulaInjection('@SUM(A1)')).toBe("'@SUM(A1)");
+      expect(env.exports.sanitizeFormulaInjection('Normal text')).toBe('Normal text');
+      expect(env.exports.sanitizeFormulaInjection('')).toBe('');
+      expect(env.exports.sanitizeFormulaInjection(null)).toBe('');
+    });
+
+    it('rejects check-in edits for days outside today and yesterday (LOCKED)', () => {
+      const todayJakarta = env.exports.getTodayJakarta();
+      const oldDay = '2026-01-01';
+      const syncPayload = {
+        pin: PIN,
+        deviceId: 'dev-1',
+        action: 'sync',
+        since: null,
+        changes: {
+          checkIns: [
+            { id: `h1:${oldDay}`, habitId: 'h1', day: oldDay, deleted: false, updatedAt: '2026-10-20T10:00:00Z' }
+          ]
+        }
+      };
+
+      const res = JSON.parse(env.exports.doPost({ postData: { contents: JSON.stringify(syncPayload) } }).getContent());
+      expect(res.ok).toBe(true);
+      expect(res.rejected).toEqual([
+        { type: 'checkIns', key: `h1:${oldDay}`, reason: 'LOCKED' }
+      ]);
+
+      const cSheet = env.ss.getSheetByName('Check_Ins');
+      expect(cSheet.getDataRange().getValues().length).toBe(1); // Only header
+    });
+
+    it('allows check-ins for today and yesterday', () => {
+      const todayJakarta = env.exports.getTodayJakarta();
+      const yesterdayJakarta = env.exports.getYesterdayJakarta(todayJakarta);
+      const syncPayload = {
+        pin: PIN,
+        deviceId: 'dev-1',
+        action: 'sync',
+        since: null,
+        changes: {
+          checkIns: [
+            { id: `h1:${todayJakarta}`, habitId: 'h1', day: todayJakarta, deleted: false, updatedAt: `${todayJakarta}T10:00:00Z` },
+            { id: `h1:${yesterdayJakarta}`, habitId: 'h1', day: yesterdayJakarta, deleted: false, updatedAt: `${yesterdayJakarta}T10:00:00Z` }
+          ]
+        }
+      };
+
+      const res = JSON.parse(env.exports.doPost({ postData: { contents: JSON.stringify(syncPayload) } }).getContent());
+      expect(res.ok).toBe(true);
+      expect(res.rejected).toEqual([]);
+
+      const cSheet = env.ss.getSheetByName('Check_Ins');
+      expect(cSheet.getDataRange().getValues().length).toBe(3); // header + 2 rows
+    });
+
+    it('setup() throws Error if PIN length is less than 4', () => {
+      const shortEnv = createGasEnv({ PIN: '123' });
+      expect(() => shortEnv.exports.setup()).toThrow('PIN must be at least 4 characters');
+    });
+
+    it('setup() masks secret and does not log PUSH_SHARED_SECRET in cleartext', () => {
+      const logs = [];
+      const logEnv = createGasEnv({ PIN: 'valid-pin-4321' });
+      logEnv.context.Logger.log = (msg) => logs.push(msg);
+      logEnv.exports.setup();
+
+      const secret = logEnv.props['PUSH_SHARED_SECRET'];
+      expect(secret).toBeDefined();
+      expect(secret.length).toBeGreaterThan(10);
+      for (const log of logs) {
+        expect(log).not.toContain(secret);
+      }
+    });
+
+    it('syncDiaryEntries skips malformed day formats and does not create invalid docs', () => {
+      const jSheet = env.ss.getSheetByName('Journal_Entries');
+      const rows = jSheet.getDataRange().getValues();
+      rows.push(['bad-date-format', 'Malformed entry', '2026-10-20T10:00:00Z', '', '2026-10-20T10:00:00Z']);
+      jSheet.getRange(1, 1, rows.length, 5).setValues(rows);
+
+      env.exports.printDiary();
+
+      const docs = Array.from(env.docs.values());
+      const badDoc = docs.find(d => d.getName().includes('bad-date'));
+      expect(badDoc).toBeUndefined();
     });
   });
 });

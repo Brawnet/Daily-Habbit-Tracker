@@ -41,6 +41,7 @@ import {
   DEFAULT_JOURNAL_PROMPTS,
   computeWordCount,
   decompilePromptJournal,
+  sanitizeJournalHtml,
 } from '../domain/journal.js';
 /**
  * Loads current prompts from Settings, or seeds and returns defaults.
@@ -211,7 +212,7 @@ export function renderPromptCardsJournal({
     editor.setAttribute('aria-label', p.prompt);
     editor.className =
       'rich-editor w-full min-h-[96px] p-3 text-base sm:text-sm rounded-xl border border-zinc-200 dark:border-zinc-700/80 bg-zinc-50/50 dark:bg-zinc-800/60 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-zinc-800 transition leading-relaxed outline-none [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-6 [&_ol]:my-1.5 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-6 [&_ul]:my-1.5 [&_p]:my-1';
-    editor.innerHTML = answers[p.id] || '';
+    editor.innerHTML = sanitizeJournalHtml(answers[p.id] || '');
 
     // Connect editor events
     editor.addEventListener('input', () => {
@@ -269,7 +270,7 @@ export function renderPromptCardsJournal({
   notesEditor.setAttribute('aria-label', 'Additional Notes');
   notesEditor.className =
     'rich-editor w-full min-h-[90px] p-3 text-base sm:text-sm rounded-xl border border-zinc-200 dark:border-zinc-700/80 bg-zinc-50/50 dark:bg-zinc-800/60 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-zinc-800 transition leading-relaxed outline-none [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-6 [&_ol]:my-1.5 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-6 [&_ul]:my-1.5 [&_p]:my-1';
-  notesEditor.innerHTML = additionalNotes || '';
+  notesEditor.innerHTML = sanitizeJournalHtml(additionalNotes || '');
 
   notesEditor.addEventListener('input', () => {
     additionalNotes = notesEditor.innerHTML;

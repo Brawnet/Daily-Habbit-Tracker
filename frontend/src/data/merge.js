@@ -24,6 +24,37 @@ export const TYPE_CONFIG = Object.freeze({
 });
 
 /**
+ * Validates the schema shape of an incoming record.
+ * @param {string} type
+ * @param {any} record
+ * @returns {boolean}
+ */
+export function isValidRecordShape(type, record) {
+  if (!record || typeof record !== 'object') return false;
+  switch (type) {
+    case 'habits':
+      return typeof record.id === 'string' && record.id.trim() !== '';
+    case 'checkIns':
+      return (
+        typeof record.id === 'string' &&
+        record.id.trim() !== '' &&
+        typeof record.habitId === 'string' &&
+        record.habitId.trim() !== '' &&
+        typeof record.day === 'string' &&
+        /^\d{4}-\d{2}-\d{2}$/.test(record.day)
+      );
+    case 'journalEntries':
+      return typeof record.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(record.day);
+    case 'settings':
+      return typeof record.key === 'string' && record.key.trim() !== '';
+    case 'activities':
+      return typeof record.id === 'string' && record.id.trim() !== '';
+    default:
+      return false;
+  }
+}
+
+/**
  * Determines whether the incoming server record wins against local.
  *
  * Rules:
@@ -152,6 +183,9 @@ export async function applyIncomingChanges(db, { changes = {}, rejected = [] } =
     const lockedSet = lockedKeysByType[type] || new Set();
 
     for (const incoming of incomingList) {
+      if (!isValidRecordShape(type, incoming)) {
+        continue;
+      }
       const key = config.getKey(incoming);
       const isLocked = lockedSet.has(key);
       const outboxKey = `${type}:${key}`;

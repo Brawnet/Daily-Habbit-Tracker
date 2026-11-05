@@ -304,6 +304,34 @@ function getNowHHMMJakarta() {
   }).format(now);
 }
 
+function getYesterdayJakarta(todayJakarta) {
+  const baseDay = todayJakarta || getTodayJakarta();
+  const d = new Date(baseDay + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function sanitizeFormulaInjection(value) {
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  if (/^[=+\-@]/.test(str)) {
+    return "'" + str;
+  }
+  return str;
+}
+
+function timingSafeEqualPin(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  let mismatch = a.length === b.length ? 0 : 1;
+  const len = Math.max(a.length, b.length);
+  for (let i = 0; i < len; i++) {
+    const charA = a.charCodeAt(i % (a.length || 1));
+    const charB = b.charCodeAt(i % (b.length || 1));
+    mismatch |= charA ^ charB;
+  }
+  return mismatch === 0;
+}
+
 function getMonotonicNow() {
   const props = PropertiesService.getScriptProperties();
   const lastNow = props.getProperty('LAST_SERVER_NOW') || '';
@@ -462,33 +490,34 @@ function syncHabits(sheet, incomingHabits, nowMonotonic) {
   for (const habit of incomingHabits) {
     const id = String(habit.id);
     if (!id) continue;
+    const clientUpdatedAt = habit.updatedAt && habit.updatedAt > nowMonotonic ? nowMonotonic : (habit.updatedAt || nowMonotonic);
     const rowIndex = rowMap.get(id);
     if (rowIndex !== undefined) {
       const existingUpdatedAt = String(data[rowIndex][5] || '');
-      if (!existingUpdatedAt || (habit.updatedAt && habit.updatedAt > existingUpdatedAt)) {
-        data[rowIndex][1] = habit.name;
+      if (!existingUpdatedAt || clientUpdatedAt > existingUpdatedAt) {
+        data[rowIndex][1] = sanitizeFormulaInjection(habit.name || '');
         data[rowIndex][2] = Number(habit.sortOrder) || 0;
         data[rowIndex][3] = habit.archived ? 'TRUE' : 'FALSE';
-        data[rowIndex][4] = habit.createdAt;
-        data[rowIndex][5] = habit.updatedAt;
+        data[rowIndex][4] = habit.createdAt || data[rowIndex][4] || nowMonotonic;
+        data[rowIndex][5] = clientUpdatedAt;
         data[rowIndex][6] = nowMonotonic;
       }
     } else {
       const newRow = [
         id,
-        habit.name,
+        sanitizeFormulaInjection(habit.name || ''),
         Number(habit.sortOrder) || 0,
         habit.archived ? 'TRUE' : 'FALSE',
-        habit.createdAt,
-        habit.updatedAt,
+        habit.createdAt || nowMonotonic,
+        clientUpdatedAt,
         nowMonotonic
       ];
       data.push(newRow);
       rowMap.set(id, data.length - 1);
     }
   }
-  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
   sheet.getRange(1, 1, data.length, headers.length).setNumberFormat('@');
+  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
 }
 
 function syncCheckIns(sheet, incomingCheckIns, nowMonotonic) {
@@ -499,34 +528,52 @@ function syncCheckIns(sheet, incomingCheckIns, nowMonotonic) {
     if (data[i][0]) rowMap.set(String(data[i][0]), i);
   }
 
+  const todayJakarta = getTodayJakarta();
+  const yesterdayJakarta = getYesterdayJakarta(todayJakarta);
+  const rejected = [];
+
   for (const checkIn of incomingCheckIns) {
     const id = String(checkIn.id);
     if (!id) continue;
+    const day = String(checkIn.day || '').trim();
+
+    // Server-side temporal enforcement: only yesterday and today are editable
+    if (day !== todayJakarta && day !== yesterdayJakarta) {
+      rejected.push({
+        type: 'checkIns',
+        key: id,
+        reason: 'LOCKED'
+      });
+      continue;
+    }
+
+    const clientUpdatedAt = checkIn.updatedAt && checkIn.updatedAt > nowMonotonic ? nowMonotonic : (checkIn.updatedAt || nowMonotonic);
     const rowIndex = rowMap.get(id);
     if (rowIndex !== undefined) {
       const existingUpdatedAt = String(data[rowIndex][4] || '');
-      if (!existingUpdatedAt || (checkIn.updatedAt && checkIn.updatedAt > existingUpdatedAt)) {
-        data[rowIndex][1] = checkIn.habitId;
-        data[rowIndex][2] = checkIn.day;
+      if (!existingUpdatedAt || clientUpdatedAt > existingUpdatedAt) {
+        data[rowIndex][1] = sanitizeFormulaInjection(checkIn.habitId);
+        data[rowIndex][2] = day;
         data[rowIndex][3] = checkIn.deleted ? 'TRUE' : 'FALSE';
-        data[rowIndex][4] = checkIn.updatedAt;
+        data[rowIndex][4] = clientUpdatedAt;
         data[rowIndex][5] = nowMonotonic;
       }
     } else {
       const newRow = [
         id,
-        checkIn.habitId,
-        checkIn.day,
+        sanitizeFormulaInjection(checkIn.habitId),
+        day,
         checkIn.deleted ? 'TRUE' : 'FALSE',
-        checkIn.updatedAt,
+        clientUpdatedAt,
         nowMonotonic
       ];
       data.push(newRow);
       rowMap.set(id, data.length - 1);
     }
   }
-  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
   sheet.getRange(1, 1, data.length, headers.length).setNumberFormat('@');
+  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
+  return rejected;
 }
 
 function syncJournalEntries(sheet, incomingJournalEntries, nowMonotonic) {
@@ -540,8 +587,9 @@ function syncJournalEntries(sheet, incomingJournalEntries, nowMonotonic) {
   const todayJakarta = getTodayJakarta();
   const rejected = [];
   for (const entry of incomingJournalEntries) {
-    const day = String(entry.day);
-    if (!day) continue;
+    const day = String(entry.day || '').trim();
+    if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+    const clientUpdatedAt = entry.updatedAt && entry.updatedAt > nowMonotonic ? nowMonotonic : (entry.updatedAt || nowMonotonic);
     const rowIndex = rowMap.get(day);
     if (rowIndex !== undefined) {
       const printedToDiaryAt = String(data[rowIndex][3] || '');
@@ -554,16 +602,16 @@ function syncJournalEntries(sheet, incomingJournalEntries, nowMonotonic) {
         continue;
       }
       const existingUpdatedAt = String(data[rowIndex][2] || '');
-      if (!existingUpdatedAt || (entry.updatedAt && entry.updatedAt > existingUpdatedAt)) {
-        data[rowIndex][1] = entry.content || '';
-        data[rowIndex][2] = entry.updatedAt;
+      if (!existingUpdatedAt || clientUpdatedAt > existingUpdatedAt) {
+        data[rowIndex][1] = sanitizeFormulaInjection(entry.content || '');
+        data[rowIndex][2] = clientUpdatedAt;
         data[rowIndex][4] = nowMonotonic;
       }
     } else {
       const newRow = [
         day,
-        entry.content || '',
-        entry.updatedAt,
+        sanitizeFormulaInjection(entry.content || ''),
+        clientUpdatedAt,
         '',
         nowMonotonic
       ];
@@ -571,8 +619,8 @@ function syncJournalEntries(sheet, incomingJournalEntries, nowMonotonic) {
       rowMap.set(day, data.length - 1);
     }
   }
-  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
   sheet.getRange(1, 1, data.length, headers.length).setNumberFormat('@');
+  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
   return rejected;
 }
 
@@ -587,27 +635,29 @@ function syncSettings(sheet, incomingSettings, nowMonotonic) {
   for (const setting of incomingSettings) {
     const key = String(setting.key);
     if (!key) continue;
+    const clientUpdatedAt = setting.updatedAt && setting.updatedAt > nowMonotonic ? nowMonotonic : (setting.updatedAt || nowMonotonic);
+    const escapedValue = sanitizeFormulaInjection(String(setting.value ?? ''));
     const rowIndex = rowMap.get(key);
     if (rowIndex !== undefined) {
       const existingUpdatedAt = String(data[rowIndex][2] || '');
-      if (!existingUpdatedAt || (setting.updatedAt && setting.updatedAt > existingUpdatedAt)) {
-        data[rowIndex][1] = String(setting.value ?? '');
-        data[rowIndex][2] = setting.updatedAt;
+      if (!existingUpdatedAt || clientUpdatedAt > existingUpdatedAt) {
+        data[rowIndex][1] = escapedValue;
+        data[rowIndex][2] = clientUpdatedAt;
         data[rowIndex][3] = nowMonotonic;
       }
     } else {
       const newRow = [
         key,
-        String(setting.value ?? ''),
-        setting.updatedAt,
+        escapedValue,
+        clientUpdatedAt,
         nowMonotonic
       ];
       data.push(newRow);
       rowMap.set(key, data.length - 1);
     }
   }
-  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
   sheet.getRange(1, 1, data.length, headers.length).setNumberFormat('@');
+  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
 }
 
 function syncActivities(sheet, incomingActivities, nowMonotonic) {
@@ -621,42 +671,43 @@ function syncActivities(sheet, incomingActivities, nowMonotonic) {
   for (const act of incomingActivities) {
     const id = String(act.id);
     if (!id) continue;
+    const clientUpdatedAt = act.updatedAt && act.updatedAt > nowMonotonic ? nowMonotonic : (act.updatedAt || nowMonotonic);
     const existingIndex = rowMap.get(id);
 
     if (existingIndex !== undefined) {
       const existingUpdatedAt = String(data[existingIndex][9] || '');
-      if (!existingUpdatedAt || (act.updatedAt && act.updatedAt > existingUpdatedAt)) {
-        data[existingIndex][1] = act.title !== undefined ? act.title : data[existingIndex][1];
-        data[existingIndex][2] = act.author !== undefined ? act.author : data[existingIndex][2];
+      if (!existingUpdatedAt || clientUpdatedAt > existingUpdatedAt) {
+        data[existingIndex][1] = act.title !== undefined ? sanitizeFormulaInjection(act.title) : data[existingIndex][1];
+        data[existingIndex][2] = act.author !== undefined ? sanitizeFormulaInjection(act.author) : data[existingIndex][2];
         data[existingIndex][3] = act.type !== undefined ? act.type : data[existingIndex][3];
         data[existingIndex][4] = act.status !== undefined ? act.status : data[existingIndex][4];
-        data[existingIndex][5] = act.totalPages !== undefined ? act.totalPages : data[existingIndex][5];
-        data[existingIndex][6] = act.summary !== undefined ? act.summary : data[existingIndex][6];
+        data[existingIndex][5] = act.totalPages !== undefined ? Number(act.totalPages) || 0 : data[existingIndex][5];
+        data[existingIndex][6] = act.summary !== undefined ? sanitizeFormulaInjection(act.summary) : data[existingIndex][6];
         data[existingIndex][7] = act.archived ? 'TRUE' : 'FALSE';
         data[existingIndex][8] = act.createdAt !== undefined ? act.createdAt : data[existingIndex][8];
-        data[existingIndex][9] = act.updatedAt;
+        data[existingIndex][9] = clientUpdatedAt;
         data[existingIndex][10] = nowMonotonic;
       }
     } else {
       const newRow = [
         id,
-        act.title || '',
-        act.author || '',
+        sanitizeFormulaInjection(act.title || ''),
+        sanitizeFormulaInjection(act.author || ''),
         act.type || '',
         act.status || '',
-        act.totalPages !== undefined ? act.totalPages : 0,
-        act.summary || '',
+        Number(act.totalPages) || 0,
+        sanitizeFormulaInjection(act.summary || ''),
         act.archived ? 'TRUE' : 'FALSE',
-        act.createdAt || '',
-        act.updatedAt || '',
+        act.createdAt || nowMonotonic,
+        clientUpdatedAt,
         nowMonotonic
       ];
       data.push(newRow);
       rowMap.set(id, data.length - 1);
     }
   }
-  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
   sheet.getRange(1, 1, data.length, headers.length).setNumberFormat('@');
+  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
 }
 
 function collectChanges(ss, since) {
@@ -989,21 +1040,27 @@ function doPost(e) {
     return createJsonResponse({ ok: false, error: 'BAD_REQUEST', message: 'Invalid JSON payload' });
   }
 
-  const cache = CacheService.getScriptCache();
-  const lockout = cache.get('RL_LOCKOUT');
-  if (lockout) {
-    return createJsonResponse({
-      ok: false,
-      error: 'RATE_LIMITED',
-      message: 'Too many failed attempts. Locked out for 10 minutes.'
-    });
-  }
-
   const props = PropertiesService.getScriptProperties();
   const configuredPin = props.getProperty('PIN');
+  const userPin = typeof payload.pin === 'string' ? payload.pin : '';
+  const isPinValid = Boolean(configuredPin && timingSafeEqualPin(userPin, configuredPin));
 
-  // Check PIN
-  if (!configuredPin || payload.pin !== configuredPin) {
+  const cache = CacheService.getScriptCache();
+
+  // If PIN is valid, authenticate caller and bypass unauthenticated lockout
+  if (isPinValid) {
+    cache.remove('RL_FAIL_COUNT');
+  } else {
+    // If PIN is invalid, enforce lockout check and increment fail counter
+    const lockout = cache.get('RL_LOCKOUT');
+    if (lockout) {
+      return createJsonResponse({
+        ok: false,
+        error: 'RATE_LIMITED',
+        message: 'Too many failed attempts. Locked out for 10 minutes.'
+      });
+    }
+
     const failCountStr = cache.get('RL_FAIL_COUNT');
     const failCount = (failCountStr ? parseInt(failCountStr, 10) : 0) + 1;
     if (failCount > 10) {
@@ -1023,9 +1080,6 @@ function doPost(e) {
       });
     }
   }
-
-  // Clear fail count on successful PIN
-  cache.remove('RL_FAIL_COUNT');
 
   const action = payload.action;
   if (!action) {
@@ -1074,8 +1128,9 @@ function doPost(e) {
         const activitiesSheet = getOrCreateSheet(ss, 'Activities', SCHEMA.Activities);
 
         syncHabits(habitsSheet, incomingHabits, serverNow);
-        syncCheckIns(checkInsSheet, incomingCheckIns, serverNow);
-        const rejected = syncJournalEntries(journalSheet, incomingJournal, serverNow);
+        const rejectedCheckIns = syncCheckIns(checkInsSheet, incomingCheckIns, serverNow);
+        const rejectedJournal = syncJournalEntries(journalSheet, incomingJournal, serverNow);
+        const rejected = [...(rejectedCheckIns || []), ...(rejectedJournal || [])];
         syncSettings(settingsSheet, incomingSettings, serverNow);
         syncActivities(activitiesSheet, incomingActivities, serverNow);
         const changes = collectChanges(ss, payload.since);
@@ -1120,6 +1175,12 @@ function doPost(e) {
 function setup() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
+  const props = PropertiesService.getScriptProperties();
+  const configuredPin = props.getProperty('PIN');
+  if (configuredPin && configuredPin.length < 4) {
+    throw new Error('PIN must be at least 4 characters');
+  }
+
   for (const sheetName of Object.keys(SCHEMA)) {
     const headers = SCHEMA[sheetName];
     let sheet = ss.getSheetByName(sheetName);
@@ -1131,8 +1192,6 @@ function setup() {
     const maxCols = Math.max(sheet.getMaxColumns(), headers.length);
     sheet.getRange(1, 1, maxRows, maxCols).setNumberFormat('@');
   }
-
-  const props = PropertiesService.getScriptProperties();
 
   // Folder 'Habbit Diary'
   let folderId = props.getProperty('DIARY_FOLDER_ID');
@@ -1166,7 +1225,7 @@ function setup() {
     }
     props.setProperty('PUSH_SHARED_SECRET', secret);
     if (typeof Logger !== 'undefined') {
-      Logger.log('Generated PUSH_SHARED_SECRET: ' + secret);
+      Logger.log('Generated PUSH_SHARED_SECRET successfully.');
     }
   }
 
@@ -1233,6 +1292,7 @@ function syncDiaryEntries(ss, props, options) {
     const todayJakarta = getTodayJakarta();
     const entries = readAllJournalEntries(sheet);
     const toExport = entries.filter(e => {
+      if (!e.day || !/^\d{4}-\d{2}-\d{2}$/.test(String(e.day).trim())) return false;
       if (e.day > todayJakarta) return false;
       if (!includeToday && e.day === todayJakarta) return false;
       const notPrinted = !e.printedToDiaryAt || String(e.printedToDiaryAt).trim() === '';
@@ -1406,8 +1466,11 @@ if (typeof module !== 'undefined' && module.exports) {
     decideReminder,
     mergeRecordsLWW,
     getTodayJakarta,
+    getYesterdayJakarta,
     getNowHHMMJakarta,
     getMonotonicNow,
+    sanitizeFormulaInjection,
+    timingSafeEqualPin,
     createJsonResponse,
     getOrCreateSheet,
     readAllHabits,

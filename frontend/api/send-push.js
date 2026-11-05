@@ -1,18 +1,52 @@
 import crypto from 'node:crypto';
 import webpush from 'web-push';
 
+export const MAX_PUSH_BATCH_SIZE = 100;
+
 /**
- * Constant-time string comparison to prevent timing attacks.
+ * Validates whether a push subscription endpoint URL is secure (HTTPS) and formatted properly.
+ * Rejects SSRF vectors (e.g. internal IP addresses, loopback, file, ftp).
+ * @param {string} endpoint
+ * @returns {boolean}
+ */
+export function isValidPushEndpoint(endpoint) {
+  if (!endpoint || typeof endpoint !== 'string') return false;
+  try {
+    const parsed = new URL(endpoint);
+    if (parsed.protocol !== 'https:') return false;
+    const hostname = parsed.hostname.toLowerCase();
+    // Reject loopback and internal private IPs
+    if (
+      hostname === 'localhost' ||
+      hostname.endsWith('.localhost') ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1' ||
+      hostname === '0.0.0.0' ||
+      /^10\./.test(hostname) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+      /^192\.168\./.test(hostname) ||
+      /^169\.254\./.test(hostname)
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Constant-time string comparison using SHA-256 fixed-length digests to prevent timing attacks
+ * and byte length leakage.
  * @param {string} a
  * @param {string} b
  * @returns {boolean}
  */
 export function timingSafeEqualStr(a, b) {
   if (typeof a !== 'string' || typeof b !== 'string') return false;
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) return false;
-  return crypto.timingSafeEqual(bufA, bufB);
+  const hashA = crypto.createHash('sha256').update(a, 'utf8').digest();
+  const hashB = crypto.createHash('sha256').update(b, 'utf8').digest();
+  return crypto.timingSafeEqual(hashA, hashB);
 }
 
 /**
@@ -61,6 +95,13 @@ export default async function handler(req, res) {
   body = body || {};
 
   const { subscriptions = [], notification = {} } = body;
+  if (!Array.isArray(subscriptions)) {
+    return res.status(400).json({ error: 'Subscriptions must be an array' });
+  }
+  if (subscriptions.length > MAX_PUSH_BATCH_SIZE) {
+    return res.status(400).json({ error: `Subscriptions batch size exceeds maximum of ${MAX_PUSH_BATCH_SIZE}` });
+  }
+
   const payload = JSON.stringify({
     title: notification.title || 'Habbit',
     body: notification.body || '',
@@ -69,6 +110,16 @@ export default async function handler(req, res) {
 
   const results = [];
   for (const sub of subscriptions) {
+    if (!sub || !isValidPushEndpoint(sub.endpoint)) {
+      results.push({
+        endpoint: sub?.endpoint || '',
+        ok: false,
+        statusCode: 400,
+        error: 'Invalid or insecure push endpoint URL',
+      });
+      continue;
+    }
+
     try {
       const resp = await webpush.sendNotification(sub, payload, {
         TTL: 3600,

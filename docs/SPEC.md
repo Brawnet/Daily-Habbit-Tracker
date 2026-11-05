@@ -64,7 +64,7 @@ Semua timestamp ISO-8601 UTC string. `updatedAt` diisi Device saat mutasi; `serv
 /** @typedef {{ id: string /*uuid*/, name: string /*1–60*/, sortOrder: number, archived: boolean, linkedActivity?: 'journal' | 'book_summary' | null, createdAt: string, updatedAt: string }} Habit */
 /** @typedef {{ id: string /*uuid*/, habitId: string, day: string /*YYYY-MM-DD*/, deleted: boolean, updatedAt: string }} CheckIn */
 /** @typedef {{ day: string /*YYYY-MM-DD*/, content: string, updatedAt: string, printedToDiaryAt: string }} JournalEntry */
-/** @typedef {{ key: 'reminderTime', value: string, updatedAt: string }} Setting */
+/** @typedef {{ key: 'reminderTime' | 'diaryFolderId', value: string, updatedAt: string }} Setting */
 /** @typedef {{ id: string, title: string, author: string, createdAt: string, updatedAt: string }} Book */
 /** @typedef {{ id: string, bookId: string, title: string, content: string, sortOrder: number, createdAt: string, updatedAt: string }} BookChapter */
 /** @typedef {{ id: string, title: string, author: string, type: 'Book' | 'Course' | 'Article' | 'Other', status: 'Backlog' | 'In Progress' | 'Completed', totalPages: number, summary: string, archived: boolean, createdAt: string, updatedAt: string }} Activity */
@@ -134,11 +134,17 @@ Satu file, tetapi logika murni (format/parse heading Diary, posisi sisip, keputu
 
 Buat sheet + header + format teks bila belum ada; buat folder Drive `Habbit Diary`; generate `PUSH_SHARED_SECRET` bila kosong; hapus lalu pasang ulang trigger `printDiary` (harian ~02:00) dan `checkReminder` (tiap 10 menit); log ringkasan + langkah berikutnya.
 
-### 6.3 `syncDiaryEntries()` & `printDiary()` (auto-sync 10 menit & trigger harian)
+### 6.3 `syncDiaryEntries()`, `printDiary()`, & `exportDiaryNow()` (auto-sync 10 menit, trigger harian, & on-demand export)
 
-Auto-sync jurnal ke Google Drive Doc dijalankan setiap 10 menit di dalam siklus background `checkReminder()` serta di-catch up harian pada `printDiary()` (~02:00 Jakarta).
+Auto-sync jurnal ke Google Drive Doc dijalankan setiap 10 menit di dalam siklus background `checkReminder()` serta di-catch up harian pada `printDiary()` (~02:00 Jakarta). Untuk pengujian manual atau ekspor langsung entri hari ini, fungsi `exportDiaryNow()` dapat dipanggil dari console editor GAS (`includeToday: true, forceToday: true`).
 
-Ambil Journal Entry yang belum dicetak (`!printedToDiaryAt`) atau telah diedit setelah pencetakan (`serverUpdatedAt > printedToDiaryAt`). Entri dikelompokkan per tahun (`YYYY`) untuk membuka dan menyimpan setiap Google Doc sekali per siklus di folder `DIARY_FOLDER_ID`:
+Resolusi folder Google Drive tujuan menggunakan 3-tier fallback ladder:
+1. Setting `diaryFolderId` di sheet `Settings` (disinkronkan dari klien).
+2. Script Property `DIARY_FOLDER_ID`.
+3. Folder default `Habbit Diary` di Google Drive (dicari by name atau dibuat otomatis).
+Bila folder tujuan berubah ke folder custom, file diary tahunan yang sudah ada (`DIARY_DOC_<YYYY>`) otomatis dipindahkan (`moveTo`) ke folder baru tanpa menduplikasi dokumen.
+
+Ambil Journal Entry yang belum dicetak (`!printedToDiaryAt`) atau telah diedit setelah pencetakan (`serverUpdatedAt > printedToDiaryAt`). Entri dikelompokkan per tahun (`YYYY`) untuk membuka dan menyimpan setiap Google Doc sekali per siklus di folder tujuan yang teresolusi:
 - Bila heading tanggal sudah ada di Doc:
   - Jika content diisi: update isi paragraf secara in-place di bawah heading tanggal tersebut tanpa membuat heading duplikat.
   - Jika content kosong/dihapus: hapus heading tanggal dan paragraf pemisahnya dari Doc.
@@ -185,7 +191,7 @@ Keluar bila: `nowHHMM < reminderTime`, atau `LAST_REMINDER_DAY === todayJakarta`
 
 - **Today**: tanggal panjang; progres `3/5 done`; daftar Habit aktif (urut `sortOrder`) dengan tombol Check-in + Streak (`🔥 5`); textarea Journal Entry autosave (debounce 800 ms) dengan status "Saved"; empty state → link ke Manage Habits.
 - **History**: kartu per Habit aktif: heatmap 12 minggu (kolom = minggu, baris Senin–Minggu), Streak saat ini, Streak terpanjang, completion 30 hari (penyebut = Day dalam 30 hari terakhir sejak `createdAt` Habit). Sel hari ini & kemarin bisa di-tap untuk toggle Check-in; lainnya read-only. Bagian "Archived" ter-collapse. Di bawah: kotak search + daftar Journal Entry terbaru dulu (tanggal pendek + cuplikan 2 baris, highlight hasil search); tap → tampilan baca penuh (read-only; bila hari ini → tombol "Edit in Today").
-- **Settings**: *Sync* (URL Web App, PIN `type=password`, Test connection → `ping`, Sync now, last synced, status) · *Manage Habits* (tambah, rename inline, ▲▼, archive/unarchive) · *Reminder* (input jam, Enable notifications, Send test notification, status) · *Install App* (§8) · versi aplikasi.
+- **Settings**: *Sync* (URL Web App, PIN `type=password`, Diary Google Drive Folder [input link/ID folder dengan link buka folder di Drive, opsional, fallback ke folder default 'Habbit Diary'], Test connection → `ping`, Sync now, last synced, status) · *Manage Habits* (tambah, rename inline, ▲▼, archive/unarchive) · *Reminder* (input jam, Enable notifications, Send test notification, status) · *Install App* (§8) · versi aplikasi.
 - **Activities**: empty state dengan tombol buat baru; daftar Activity dengan filter status (*All*, *Backlog*, *In Progress*, *Completed*, *Archived*); kartu Activity menampilkan judul, author, badge tipe & status, jumlah halaman, dan ringkasan eksekutif; aksi Edit dan Archive; modal form dengan input terstandar (16px, target sentuh ≥44px).
 
 ## 11. Tes (Vitest) — wajib hijau

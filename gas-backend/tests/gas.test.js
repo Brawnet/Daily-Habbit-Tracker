@@ -128,8 +128,30 @@ function createGasEnv(initialProps = {}) {
       if (!f) throw new Error('File not found: ' + id);
       return {
         getId: () => id,
+        getParents: () => {
+          const parentFolder = f.folderId ? folders.get(f.folderId) : null;
+          let done = !parentFolder;
+          return {
+            hasNext: () => !done,
+            next: () => {
+              done = true;
+              return parentFolder;
+            }
+          };
+        },
         moveTo: (targetFolder) => {
           f.folderId = targetFolder.getId();
+        }
+      };
+    },
+    getFilesByName: (name) => {
+      const matchingFiles = Array.from(files.entries()).filter(([_, entry]) => entry.name === name);
+      let fidx = 0;
+      return {
+        hasNext: () => fidx < matchingFiles.length,
+        next: () => {
+          const [fileId] = matchingFiles[fidx++];
+          return drive.getFileById(fileId);
         }
       };
     }
@@ -1406,6 +1428,127 @@ describe('GAS Backend Actions', () => {
       const docs = Array.from(env.docs.values());
       const futureDoc = docs.find(d => d.getName().includes('2099'));
       expect(futureDoc).toBeUndefined();
+    });
+  });
+
+  describe('Configurable Diary Google Drive Folder & exportDiaryNow', () => {
+    it('reads diaryFolderId from Settings sheet and exports to custom folder', () => {
+      const customFolder = env.context.DriveApp.createFolder('Custom Diary Folder');
+      const settingsSheet = env.ss.getSheetByName('Settings');
+      const sRows = settingsSheet.getDataRange().getValues();
+      sRows.push(['diaryFolderId', customFolder.getId(), '2026-10-21T00:00:00Z', '2026-10-21T00:00:00Z']);
+      settingsSheet.getRange(1, 1, sRows.length, 4).setValues(sRows);
+
+      const todayJakarta = env.exports.getTodayJakarta();
+      const jSheet = env.ss.getSheetByName('Journal_Entries');
+      const jRows = jSheet.getDataRange().getValues();
+      jRows.push([todayJakarta, 'Custom folder journal entry', `${todayJakarta}T10:00:00Z`, '', `${todayJakarta}T10:00:00Z`]);
+      jSheet.getRange(1, 1, jRows.length, 5).setValues(jRows);
+
+      env.exports.syncDiaryEntries(env.ss, env.context.PropertiesService.getScriptProperties(), { includeToday: true });
+
+      const customFiles = customFolder.getFilesByName(`Habbit – Diary ${todayJakarta.slice(0, 4)}`);
+      expect(customFiles.hasNext()).toBe(true);
+    });
+
+    it('moves existing Diary doc to new custom folder when diaryFolderId changes', () => {
+      const todayJakarta = env.exports.getTodayJakarta();
+      const year = todayJakarta.slice(0, 4);
+      const jSheet = env.ss.getSheetByName('Journal_Entries');
+      const jRows = jSheet.getDataRange().getValues();
+      jRows.push([todayJakarta, 'Initial entry in default folder', `${todayJakarta}T10:00:00Z`, '', `${todayJakarta}T10:00:00Z`]);
+      jSheet.getRange(1, 1, jRows.length, 5).setValues(jRows);
+
+      // Run in default folder first
+      env.exports.syncDiaryEntries(env.ss, env.context.PropertiesService.getScriptProperties(), { includeToday: true });
+
+      const defaultFolderId = env.props['DIARY_FOLDER_ID'];
+      const defaultFolder = env.context.DriveApp.getFolderById(defaultFolderId);
+      expect(defaultFolder.getFilesByName(`Habbit – Diary ${year}`).hasNext()).toBe(true);
+
+      // Now configure a new custom folder in Settings
+      const customFolder = env.context.DriveApp.createFolder('Brand New Diary Folder');
+      const settingsSheet = env.ss.getSheetByName('Settings');
+      const sRows = settingsSheet.getDataRange().getValues();
+      sRows.push(['diaryFolderId', customFolder.getId(), '2026-10-21T01:00:00Z', '2026-10-21T01:00:00Z']);
+      settingsSheet.getRange(1, 1, sRows.length, 4).setValues(sRows);
+
+      // Update journal content to trigger re-export/relocation check
+      const updatedJRows = jSheet.getDataRange().getValues();
+      updatedJRows[1][1] = 'Updated entry moving to custom folder';
+      updatedJRows[1][4] = `${todayJakarta}T11:00:00Z`; // serverUpdatedAt > printedToDiaryAt
+      jSheet.getRange(1, 1, updatedJRows.length, 5).setValues(updatedJRows);
+
+      env.exports.syncDiaryEntries(env.ss, env.context.PropertiesService.getScriptProperties(), { includeToday: true });
+
+      // Document should now be in the custom folder
+      expect(customFolder.getFilesByName(`Habbit – Diary ${year}`).hasNext()).toBe(true);
+    });
+
+    it('exportDiaryNow() manually triggers immediate export of today journal entry', () => {
+      const todayJakarta = env.exports.getTodayJakarta();
+      const jSheet = env.ss.getSheetByName('Journal_Entries');
+      const jRows = jSheet.getDataRange().getValues();
+      jRows.push([todayJakarta, 'Immediate manual export', `${todayJakarta}T12:00:00Z`, '', `${todayJakarta}T12:00:00Z`]);
+      jSheet.getRange(1, 1, jRows.length, 5).setValues(jRows);
+
+      expect(typeof env.exports.exportDiaryNow).toBe('function');
+      env.exports.exportDiaryNow();
+
+      const rowsAfter = jSheet.getDataRange().getValues();
+      expect(rowsAfter[1][3]).not.toBe(''); // printedToDiaryAt populated
+    });
+
+    it('falls back to default folder when Settings sheet diaryFolderId is invalid', () => {
+      const settingsSheet = env.ss.getSheetByName('Settings');
+      const sRows = settingsSheet.getDataRange().getValues();
+      sRows.push(['diaryFolderId', 'non-existent-folder-id', '2026-10-21T00:00:00Z', '2026-10-21T00:00:00Z']);
+      settingsSheet.getRange(1, 1, sRows.length, 4).setValues(sRows);
+
+      const resolved = env.exports.resolveTargetDiaryFolder(env.ss, env.context.PropertiesService.getScriptProperties());
+      expect(resolved.folder).toBeDefined();
+      expect(resolved.folder.getId()).toBe(env.props['DIARY_FOLDER_ID']);
+      expect(resolved.isCustom).toBe(false);
+    });
+
+    it('creates Habbit Diary default folder if DIARY_FOLDER_ID is missing from props', () => {
+      delete env.props['DIARY_FOLDER_ID'];
+      const resolved = env.exports.resolveTargetDiaryFolder(env.ss, env.context.PropertiesService.getScriptProperties());
+      expect(resolved.folder).toBeDefined();
+      expect(resolved.folder.name).toBe('Habbit Diary');
+      expect(env.props['DIARY_FOLDER_ID']).toBe(resolved.folder.getId());
+    });
+
+    it('recovers existing yearly doc globally from Drive without duplicating when prop is missing', () => {
+      const year = '2026';
+      const docName = `Habbit – Diary ${year}`;
+      // Create a doc in some folder or root
+      const initialDoc = env.context.DocumentApp.create(docName);
+      const initialDocId = initialDoc.getId();
+
+      // Ensure props has NO DIARY_DOC_2026 property
+      delete env.props[`DIARY_DOC_${year}`];
+
+      const targetFolder = env.context.DriveApp.createFolder('Target Folder');
+      const doc = env.exports.getOrCreateDiaryDoc(targetFolder, year, env.context.PropertiesService.getScriptProperties());
+
+      expect(doc.getId()).toBe(initialDocId);
+      expect(env.props[`DIARY_DOC_${year}`]).toBe(initialDocId);
+
+      // Verify the file was moved to the target folder
+      const inTarget = targetFolder.getFilesByName(docName);
+      expect(inTarget.hasNext()).toBe(true);
+    });
+
+    it('getSettingValue safely returns value or defaultValue', () => {
+      const sSheet = env.ss.getSheetByName('Settings');
+      const sRows = sSheet.getDataRange().getValues();
+      sRows.push(['customKey', 'customVal', '2026-10-21T00:00:00Z', '2026-10-21T00:00:00Z']);
+      sSheet.getRange(1, 1, sRows.length, 4).setValues(sRows);
+
+      expect(env.exports.getSettingValue(env.ss, 'customKey', 'defaultVal')).toBe('customVal');
+      expect(env.exports.getSettingValue(env.ss, 'missingKey', 'defaultVal')).toBe('defaultVal');
+      expect(env.exports.getSettingValue(null, 'missingKey', 'defaultVal')).toBe('defaultVal');
     });
   });
 });

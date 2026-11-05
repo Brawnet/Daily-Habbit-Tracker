@@ -407,6 +407,26 @@ function readAllSettings(sheet) {
   return list;
 }
 
+function getSettingValue(ss, key, defaultValue) {
+  const fallback = defaultValue !== undefined ? defaultValue : '';
+  if (!ss || !key) return fallback;
+  try {
+    const sheet = ss.getSheetByName('Settings');
+    if (!sheet) return fallback;
+    const settings = readAllSettings(sheet);
+    const item = settings.find(s => s.key === key);
+    if (item && item.value !== undefined && String(item.value).trim() !== '') {
+      return String(item.value).trim();
+    }
+    return fallback;
+  } catch (err) {
+    if (typeof Logger !== 'undefined') {
+      Logger.log('getSettingValue error for key ' + key + ': ' + err.message);
+    }
+    return fallback;
+  }
+}
+
 function readAllActivities(sheet) {
   const data = sheet.getDataRange().getValues();
   const list = [];
@@ -823,9 +843,62 @@ function ensureFileInFolder(file, folder) {
   }
 }
 
+function resolveDriveFolderById(id) {
+  if (!id) return null;
+  try {
+    return DriveApp.getFolderById(id);
+  } catch (err) {
+    if (typeof Logger !== 'undefined') {
+      Logger.log('Failed to access folder ID ' + id + ': ' + err.message);
+    }
+    return null;
+  }
+}
+
+function resolveTargetDiaryFolder(ss, props) {
+  const customFolderId = getSettingValue(ss, 'diaryFolderId', '');
+  let folder = null;
+  let isCustom = false;
+
+  if (customFolderId) {
+    folder = resolveDriveFolderById(customFolderId);
+    if (folder) {
+      isCustom = true;
+    }
+  }
+
+  if (!folder) {
+    const defaultFolderId = props ? props.getProperty('DIARY_FOLDER_ID') : '';
+    if (defaultFolderId && defaultFolderId !== customFolderId) {
+      folder = resolveDriveFolderById(defaultFolderId);
+    }
+  }
+
+  if (!folder) {
+    try {
+      const folders = DriveApp.getFoldersByName('Habbit Diary');
+      if (folders && folders.hasNext()) {
+        folder = folders.next();
+      } else {
+        folder = DriveApp.createFolder('Habbit Diary');
+      }
+      if (props && folder && typeof folder.getId === 'function') {
+        props.setProperty('DIARY_FOLDER_ID', folder.getId());
+      }
+    } catch (err) {
+      if (typeof Logger !== 'undefined') {
+        Logger.log('Failed to find or create default Habbit Diary folder: ' + err.message);
+      }
+      folder = null;
+    }
+  }
+
+  return { folder, isCustom };
+}
+
 function getOrCreateDiaryDoc(folder, year, props) {
   const propKey = 'DIARY_DOC_' + year;
-  const docId = props.getProperty(propKey);
+  const docId = props ? props.getProperty(propKey) : null;
   let doc = null;
   if (docId) {
     try {
@@ -837,14 +910,30 @@ function getOrCreateDiaryDoc(folder, year, props) {
   if (!doc) {
     const docName = 'Habbit – Diary ' + year;
     const files = folder.getFilesByName(docName);
-    if (files.hasNext()) {
+    if (files && files.hasNext()) {
       const file = files.next();
       doc = DocumentApp.openById(file.getId());
-      props.setProperty(propKey, file.getId());
+      if (props) props.setProperty(propKey, file.getId());
     } else {
-      doc = DocumentApp.create(docName);
-      DriveApp.getFileById(doc.getId()).moveTo(folder);
-      props.setProperty(propKey, doc.getId());
+      let existingGlobalFile = null;
+      try {
+        const globalFiles = DriveApp.getFilesByName(docName);
+        if (globalFiles && globalFiles.hasNext()) {
+          existingGlobalFile = globalFiles.next();
+        }
+      } catch (e) {
+        existingGlobalFile = null;
+      }
+
+      if (existingGlobalFile) {
+        doc = DocumentApp.openById(existingGlobalFile.getId());
+        ensureFileInFolder(DriveApp.getFileById(existingGlobalFile.getId()), folder);
+        if (props) props.setProperty(propKey, existingGlobalFile.getId());
+      } else {
+        doc = DocumentApp.create(docName);
+        DriveApp.getFileById(doc.getId()).moveTo(folder);
+        if (props) props.setProperty(propKey, doc.getId());
+      }
     }
   } else {
     ensureFileInFolder(DriveApp.getFileById(doc.getId()), folder);
@@ -1241,63 +1330,31 @@ function syncDiaryEntries(ss, props, options) {
     const includeToday = options && options.includeToday !== undefined ? options.includeToday : true;
     const forceToday = options && options.forceToday === true;
 
-    // 1. Resolve folder: check Settings sheet first, then Script Properties, then default
-    let folderId = '';
-    const settingsSheet = ss.getSheetByName('Settings');
-    if (settingsSheet) {
-      const settings = readAllSettings(settingsSheet);
-      const customSetting = settings.find(s => s.key === 'diaryFolderId');
-      if (customSetting && customSetting.value && String(customSetting.value).trim() !== '') {
-        folderId = String(customSetting.value).trim();
-      }
-    }
-
-    function resolveDriveFolderById(id) {
-      if (!id) return null;
-      try {
-        return DriveApp.getFolderById(id);
-      } catch (err) {
-        if (typeof Logger !== 'undefined') Logger.log('Failed to access folder ID ' + id + ': ' + err.message);
-        return null;
-      }
-    }
-
-    let folder = resolveDriveFolderById(folderId);
-
-    // Fallback: If custom folder failed or was empty, check default DIARY_FOLDER_ID in props
-    if (!folder) {
-      const defaultFolderId = props.getProperty('DIARY_FOLDER_ID') || '';
-      if (defaultFolderId !== folderId) {
-        folder = resolveDriveFolderById(defaultFolderId);
-      }
-    }
-
-    // Final fallback: search for 'Habbit Diary' folder by name
-    if (!folder) {
-      try {
-        const folders = DriveApp.getFoldersByName('Habbit Diary');
-        if (folders.hasNext()) {
-          folder = folders.next();
-        }
-      } catch (e) {
-        folder = null;
-      }
-    }
+    // 1. Resolve folder via 3-tier resolution ladder
+    const { folder, isCustom } = resolveTargetDiaryFolder(ss, props);
 
     if (!folder) {
-      if (typeof Logger !== 'undefined') Logger.log('No valid Drive folder found for Diary export');
+      if (typeof Logger !== 'undefined') {
+        Logger.log('No valid Drive folder found for Diary export');
+      }
       return;
     }
 
-    // Relocate any existing yearly diary files to the active folder if destination changed
-    const allProps = props.getProperties ? props.getProperties() : {};
-    for (const key of Object.keys(allProps)) {
-      if (key.startsWith('DIARY_DOC_')) {
-        const docId = allProps[key];
-        if (docId) {
-          try {
-            ensureFileInFolder(DriveApp.getFileById(docId), folder);
-          } catch (e) {}
+    // Relocate any existing yearly diary files to the active folder if a custom folder is configured
+    if (isCustom) {
+      const allProps = props && props.getProperties ? props.getProperties() : {};
+      for (const key of Object.keys(allProps)) {
+        if (key.startsWith('DIARY_DOC_')) {
+          const docId = allProps[key];
+          if (docId) {
+            try {
+              ensureFileInFolder(DriveApp.getFileById(docId), folder);
+            } catch (err) {
+              if (typeof Logger !== 'undefined') {
+                Logger.log('Could not relocate diary doc ' + docId + ': ' + err.message);
+              }
+            }
+          }
         }
       }
     }
@@ -1392,15 +1449,7 @@ function checkReminder() {
   const lastReminderDay = props.getProperty('LAST_REMINDER_DAY') || '';
   const todayJakarta = getTodayJakarta();
   const nowHHMM = getNowHHMMJakarta();
-  const settingsSheet = ss.getSheetByName('Settings');
-  let reminderTime = '20:00';
-  if (settingsSheet) {
-    const settings = readAllSettings(settingsSheet);
-    const rt = settings.find(s => s.key === 'reminderTime');
-    if (rt && rt.value && rt.value.trim() !== '') {
-      reminderTime = rt.value.trim();
-    }
-  }
+  const reminderTime = getSettingValue(ss, 'reminderTime', '20:00');
 
   const pushSheet = ss.getSheetByName('Push_Subscriptions');
   const subscriptions = pushSheet ? readAllPushSubscriptions(pushSheet) : [];
@@ -1504,6 +1553,9 @@ if (typeof module !== 'undefined' && module.exports) {
     readAllCheckIns,
     readAllJournalEntries,
     readAllSettings,
+    getSettingValue,
+    resolveDriveFolderById,
+    resolveTargetDiaryFolder,
     readAllPushSubscriptions,
     syncHabits,
     syncCheckIns,

@@ -19,15 +19,21 @@ export function extractDriveFolderId(input) {
   const trimmed = input.trim();
   if (!trimmed) return '';
 
-  // 1. Match full or partial Google Drive folder URL
+  // 1. Match full or partial Google Drive folder URL (/folders/<id>)
   const folderUrlMatch = trimmed.match(/\/folders\/([a-zA-Z0-9_-]+)/);
-  if (folderUrlMatch && folderUrlMatch[1]) {
+  if (folderUrlMatch && folderUrlMatch[1] && folderUrlMatch[1].length >= 10) {
     return folderUrlMatch[1];
   }
 
-  // 2. Match raw folder ID (may contain query params like ?hl=ID or trailing slash)
+  // 2. Match open?id=<id>, ?id=<id>, or &id=<id> Drive URL parameter
+  const idParamMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (idParamMatch && idParamMatch[1] && idParamMatch[1].length >= 10) {
+    return idParamMatch[1];
+  }
+
+  // 3. Match raw folder ID (may contain query params like ?hl=ID or trailing slash)
   const candidate = trimmed.split('?')[0].split('#')[0].replace(/\/+$/, '').trim();
-  if (/^[a-zA-Z0-9_-]+$/.test(candidate)) {
+  if (candidate.length >= 10 && /^[a-zA-Z0-9_-]+$/.test(candidate)) {
     return candidate;
   }
 

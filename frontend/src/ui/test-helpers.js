@@ -108,7 +108,6 @@ export class MockElement {
       let match;
       while ((match = tagMatchRegex.exec(this._innerHTML)) !== null) {
         const tagName = match[1];
-        if (tagName.startsWith('/')) continue;
         const attrStr = match[2];
         const child = new MockElement(tagName, this.doc);
         const attrRegex = /([a-zA-Z0-9_-]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;

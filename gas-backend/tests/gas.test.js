@@ -143,6 +143,17 @@ function createGasEnv(initialProps = {}) {
           f.folderId = targetFolder.getId();
         }
       };
+    },
+    getFilesByName: (name) => {
+      const matchingFiles = Array.from(files.entries()).filter(([_, entry]) => entry.name === name);
+      let fidx = 0;
+      return {
+        hasNext: () => fidx < matchingFiles.length,
+        next: () => {
+          const [fileId] = matchingFiles[fidx++];
+          return drive.getFileById(fileId);
+        }
+      };
     }
   };
 
@@ -1486,6 +1497,58 @@ describe('GAS Backend Actions', () => {
 
       const rowsAfter = jSheet.getDataRange().getValues();
       expect(rowsAfter[1][3]).not.toBe(''); // printedToDiaryAt populated
+    });
+
+    it('falls back to default folder when Settings sheet diaryFolderId is invalid', () => {
+      const settingsSheet = env.ss.getSheetByName('Settings');
+      const sRows = settingsSheet.getDataRange().getValues();
+      sRows.push(['diaryFolderId', 'non-existent-folder-id', '2026-10-21T00:00:00Z', '2026-10-21T00:00:00Z']);
+      settingsSheet.getRange(1, 1, sRows.length, 4).setValues(sRows);
+
+      const resolved = env.exports.resolveTargetDiaryFolder(env.ss, env.context.PropertiesService.getScriptProperties());
+      expect(resolved.folder).toBeDefined();
+      expect(resolved.folder.getId()).toBe(env.props['DIARY_FOLDER_ID']);
+      expect(resolved.isCustom).toBe(false);
+    });
+
+    it('creates Habbit Diary default folder if DIARY_FOLDER_ID is missing from props', () => {
+      delete env.props['DIARY_FOLDER_ID'];
+      const resolved = env.exports.resolveTargetDiaryFolder(env.ss, env.context.PropertiesService.getScriptProperties());
+      expect(resolved.folder).toBeDefined();
+      expect(resolved.folder.name).toBe('Habbit Diary');
+      expect(env.props['DIARY_FOLDER_ID']).toBe(resolved.folder.getId());
+    });
+
+    it('recovers existing yearly doc globally from Drive without duplicating when prop is missing', () => {
+      const year = '2026';
+      const docName = `Habbit – Diary ${year}`;
+      // Create a doc in some folder or root
+      const initialDoc = env.context.DocumentApp.create(docName);
+      const initialDocId = initialDoc.getId();
+
+      // Ensure props has NO DIARY_DOC_2026 property
+      delete env.props[`DIARY_DOC_${year}`];
+
+      const targetFolder = env.context.DriveApp.createFolder('Target Folder');
+      const doc = env.exports.getOrCreateDiaryDoc(targetFolder, year, env.context.PropertiesService.getScriptProperties());
+
+      expect(doc.getId()).toBe(initialDocId);
+      expect(env.props[`DIARY_DOC_${year}`]).toBe(initialDocId);
+
+      // Verify the file was moved to the target folder
+      const inTarget = targetFolder.getFilesByName(docName);
+      expect(inTarget.hasNext()).toBe(true);
+    });
+
+    it('getSettingValue safely returns value or defaultValue', () => {
+      const sSheet = env.ss.getSheetByName('Settings');
+      const sRows = sSheet.getDataRange().getValues();
+      sRows.push(['customKey', 'customVal', '2026-10-21T00:00:00Z', '2026-10-21T00:00:00Z']);
+      sSheet.getRange(1, 1, sRows.length, 4).setValues(sRows);
+
+      expect(env.exports.getSettingValue(env.ss, 'customKey', 'defaultVal')).toBe('customVal');
+      expect(env.exports.getSettingValue(env.ss, 'missingKey', 'defaultVal')).toBe('defaultVal');
+      expect(env.exports.getSettingValue(null, 'missingKey', 'defaultVal')).toBe('defaultVal');
     });
   });
 });

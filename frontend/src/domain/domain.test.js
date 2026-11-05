@@ -678,12 +678,24 @@ describe('domain/drive', () => {
       expect(extractDriveFolderId('1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC?hl=ID')).toBe('1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC');
     });
 
+    it('extracts folder ID from open?id= Google Drive URL', () => {
+      const url = 'https://drive.google.com/open?id=1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC';
+      expect(extractDriveFolderId(url)).toBe('1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC');
+    });
+
+    it('extracts folder ID from URL with id query parameter', () => {
+      const url = 'https://drive.google.com/drive/folders?id=1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC&usp=sharing';
+      expect(extractDriveFolderId(url)).toBe('1YixDEkQMxEvQobGhhJ-7kQaLfxsrAtcC');
+    });
+
     it('returns empty string for blank or invalid inputs', () => {
       expect(extractDriveFolderId('')).toBe('');
       expect(extractDriveFolderId('   ')).toBe('');
       expect(extractDriveFolderId(null)).toBe('');
       expect(extractDriveFolderId(undefined)).toBe('');
       expect(extractDriveFolderId('https://example.com/not-drive')).toBe('');
+      expect(extractDriveFolderId('hello')).toBe(''); // Too short (< 10)
+      expect(extractDriveFolderId('https://drive.google.com/open?id=short')).toBe('');
     });
   });
 

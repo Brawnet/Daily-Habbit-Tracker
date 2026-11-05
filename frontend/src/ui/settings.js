@@ -19,7 +19,7 @@ import {
 import { getInstallState, promptInstall, onInstallStateChange } from '../pwa/install.js';
 import { getPushState, enablePush, sendTestPush } from '../pwa/push.js';
 import { showToast } from './shell.js';
-import { LINKED_ACTIVITIES } from '../shared/contracts.js';
+import { LINKED_ACTIVITIES, SETTING_KEYS } from '../shared/contracts.js';
 import { extractDriveFolderId, buildDriveFolderUrl } from '../domain/drive.js';
 
 /**
@@ -434,7 +434,7 @@ export function mount(el) {
       return;
     }
     try {
-      const val = await getSetting('diaryFolderId');
+      const val = await getSetting(SETTING_KEYS.DIARY_FOLDER_ID);
       if (!isMounted) return;
       syncDiaryFolderInput.value = val || '';
       updateDiaryFolderLink(val || '');
@@ -447,20 +447,10 @@ export function mount(el) {
   async function saveDiaryFolder(rawInput) {
     if (!syncDiaryFolderInput) return;
     const raw = (rawInput ?? '').trim();
-    if (!raw) {
-      syncDiaryFolderInput.value = '';
-      updateDiaryFolderLink('');
-      try {
-        await setSetting('diaryFolderId', '');
-        showToast('Drive folder reset to default');
-      } catch (err) {
-        showToast(err.message || 'Failed to reset Drive folder');
-      }
-      return;
-    }
+    const isReset = !raw;
+    const cleanId = isReset ? '' : extractDriveFolderId(raw);
 
-    const cleanId = extractDriveFolderId(raw);
-    if (!cleanId) {
+    if (!isReset && !cleanId) {
       showToast('Invalid Google Drive folder link or ID');
       await loadDiaryFolderSetting();
       return;
@@ -469,10 +459,10 @@ export function mount(el) {
     syncDiaryFolderInput.value = cleanId;
     updateDiaryFolderLink(cleanId);
     try {
-      await setSetting('diaryFolderId', cleanId);
-      showToast('Drive folder saved');
+      await setSetting(SETTING_KEYS.DIARY_FOLDER_ID, cleanId);
+      showToast(isReset ? 'Drive folder reset to default' : 'Drive folder saved');
     } catch (err) {
-      showToast(err.message || 'Failed to save Drive folder');
+      showToast(err.message || (isReset ? 'Failed to reset Drive folder' : 'Failed to save Drive folder'));
     }
   }
 
@@ -848,7 +838,7 @@ export function mount(el) {
       return;
     }
     try {
-      const val = await getSetting('reminderTime');
+      const val = await getSetting(SETTING_KEYS.REMINDER_TIME);
       if (!isMounted) return;
       settingReminderTimeInput.value = val || '20:00';
     } catch {
@@ -859,7 +849,7 @@ export function mount(el) {
   settingReminderTimeInput?.addEventListener('change', async () => {
     const val = settingReminderTimeInput.value || '20:00';
     try {
-      await setSetting('reminderTime', val);
+      await setSetting(SETTING_KEYS.REMINDER_TIME, val);
       showToast('Reminder time saved');
     } catch (err) {
       showToast(err.message || 'Failed to save reminder');

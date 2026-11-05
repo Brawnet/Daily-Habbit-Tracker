@@ -24,6 +24,23 @@ export const TYPE_CONFIG = Object.freeze({
 });
 
 /**
+ * Checks whether a day string is a valid calendar date in YYYY-MM-DD format.
+ * @param {string} day
+ * @returns {boolean}
+ */
+export function isValidDayString(day) {
+  if (!day || typeof day !== 'string') return false;
+  const match = day.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+  const year = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const dayNum = parseInt(match[3], 10);
+  if (year < 1970 || year > 2100 || month < 1 || month > 12 || dayNum < 1 || dayNum > 31) return false;
+  const dt = new Date(Date.UTC(year, month - 1, dayNum));
+  return dt.getUTCFullYear() === year && dt.getUTCMonth() === month - 1 && dt.getUTCDate() === dayNum;
+}
+
+/**
  * Validates the schema shape of an incoming record.
  * @param {string} type
  * @param {any} record
@@ -40,11 +57,10 @@ export function isValidRecordShape(type, record) {
         record.id.trim() !== '' &&
         typeof record.habitId === 'string' &&
         record.habitId.trim() !== '' &&
-        typeof record.day === 'string' &&
-        /^\d{4}-\d{2}-\d{2}$/.test(record.day)
+        isValidDayString(record.day)
       );
     case 'journalEntries':
-      return typeof record.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(record.day);
+      return isValidDayString(record.day);
     case 'settings':
       return typeof record.key === 'string' && record.key.trim() !== '';
     case 'activities':

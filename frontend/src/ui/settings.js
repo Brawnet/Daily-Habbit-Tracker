@@ -383,10 +383,6 @@ export function mount(el) {
   btnSaveCredentials?.addEventListener('click', () => {
     const gasUrl = syncGasUrlInput ? syncGasUrlInput.value.trim() : '';
     const pin = syncPinInput ? syncPinInput.value.trim() : '';
-    if (gasUrl && !isValidGasUrl(gasUrl)) {
-      showToast('Invalid Web App URL. Must match https://script.google.com/macros/s/.../exec');
-      return;
-    }
     try {
       setConfig({ gasUrl, pin });
       showToast('Credentials saved');

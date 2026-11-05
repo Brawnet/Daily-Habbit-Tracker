@@ -58,8 +58,11 @@ export function sanitizeJournalHtml(html) {
   // 2. Strip event handlers (with whitespace or slash delimiter: <img/src=x/onerror=...>)
   clean = clean.replace(/(?:\s|\/)+on[a-zA-Z0-9_-]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?/gi, '');
 
-  // 3. Strip javascript:, vbscript:, and data:html URLs in attributes
-  clean = clean.replace(/\b(?:href|src|action|formaction)\s*=\s*(?:"\s*(?:javascript|vbscript|data:text\/html)[^"]*"|'\s*(?:javascript|vbscript|data:text\/html)[^']*'|[^\s>]*javascript:[^\s>]*)/gi, '');
+  // 3. Strip dangerous style attributes
+  clean = clean.replace(/(?:\s|\/)+style\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+
+  // 4. Strip javascript:, vbscript:, and data: URLs in attributes
+  clean = clean.replace(/\b(?:href|src|action|formaction)\s*=\s*(?:"\s*(?:javascript|vbscript|data:)[^"]*"|'\s*(?:javascript|vbscript|data:)[^']*'|[^\s>]*(?:javascript|vbscript|data:)[^\s>]*)/gi, '');
 
   if (typeof DOMParser !== 'undefined') {
     try {
@@ -67,8 +70,9 @@ export function sanitizeJournalHtml(html) {
       const doc = parser.parseFromString(`<body>${clean}</body>`, 'text/html');
       const ALLOWED_TAGS = new Set([
         'P', 'BR', 'UL', 'OL', 'LI', 'B', 'STRONG', 'I', 'EM', 'SPAN', 'DIV',
-        'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'PRE', 'CODE', 'HR'
+        'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'PRE', 'CODE', 'HR', 'A'
       ]);
+      const ALLOWED_ATTRS = new Set(['class', 'id', 'title', 'alt', 'data-prompt-id']);
 
       const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT);
       const toRemove = [];
@@ -81,7 +85,13 @@ export function sanitizeJournalHtml(html) {
           for (const attr of attrs) {
             const name = attr.name.toLowerCase();
             const val = attr.value.trim().toLowerCase();
-            if (name.startsWith('on') || val.includes('javascript:') || val.includes('vbscript:')) {
+            if (name.startsWith('on') || name === 'style' || val.includes('javascript:') || val.includes('vbscript:') || val.includes('data:')) {
+              node.removeAttribute(attr.name);
+            } else if (node.tagName === 'A' && name === 'href') {
+              if (!/^(?:https?:|mailto:|\/|#|\.)/i.test(attr.value.trim())) {
+                node.removeAttribute(attr.name);
+              }
+            } else if (!ALLOWED_ATTRS.has(name) && !name.startsWith('data-')) {
               node.removeAttribute(attr.name);
             }
           }

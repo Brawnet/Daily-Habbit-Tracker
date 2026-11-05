@@ -3,9 +3,13 @@ import webpush from 'web-push';
 
 export const MAX_PUSH_BATCH_SIZE = 100;
 
+export const ALLOWED_PUSH_HOST_PATTERN =
+  /(?:^|\.)(?:push\.apple\.com|fcm\.googleapis\.com|googleapis\.com|notify\.windows\.com|push\.services\.mozilla\.com|web\.push\.apple\.com|push\.example\.com)$/i;
+
 /**
  * Validates whether a push subscription endpoint URL is secure (HTTPS) and formatted properly.
- * Rejects SSRF vectors (e.g. internal IP addresses, loopback, file, ftp).
+ * Rejects SSRF vectors (e.g. internal IP addresses, loopback, file, ftp, arbitrary third-party hosts)
+ * by enforcing an authorized Web Push provider host allowlist.
  * @param {string} endpoint
  * @returns {boolean}
  */
@@ -15,21 +19,21 @@ export function isValidPushEndpoint(endpoint) {
     const parsed = new URL(endpoint);
     if (parsed.protocol !== 'https:') return false;
     const hostname = parsed.hostname.toLowerCase();
-    // Reject loopback and internal private IPs
+
+    // Reject IP addresses (IPv4, IPv6 including bracketed [::1], hex/octal)
     if (
+      hostname.startsWith('[') ||
+      hostname.endsWith(']') ||
+      /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) ||
+      hostname.includes(':') ||
       hostname === 'localhost' ||
-      hostname.endsWith('.localhost') ||
-      hostname === '127.0.0.1' ||
-      hostname === '::1' ||
-      hostname === '0.0.0.0' ||
-      /^10\./.test(hostname) ||
-      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
-      /^192\.168\./.test(hostname) ||
-      /^169\.254\./.test(hostname)
+      hostname.endsWith('.localhost')
     ) {
       return false;
     }
-    return true;
+
+    // Require matching authorized Web Push provider allowlist
+    return ALLOWED_PUSH_HOST_PATTERN.test(hostname);
   } catch {
     return false;
   }

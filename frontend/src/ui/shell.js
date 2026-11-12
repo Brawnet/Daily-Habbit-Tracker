@@ -101,8 +101,7 @@ function updateSyncIndicator(status) {
   const pending = status?.pending || 0;
 
   // Reset dot styling classes
-  syncDotElement.className = 'inline-block w-2.5 h-2.5 rounded-full shrink-0 transition-colors';
-
+  syncDotElement.className = 'inline-block w-2.5 h-2.5 rounded-full shrink-0 transition-all';
   switch (state) {
     case 'not-configured':
       syncDotElement.classList.add('bg-zinc-400', 'dark:bg-zinc-600');
@@ -110,7 +109,7 @@ function updateSyncIndicator(status) {
       syncTextElement.textContent = UNCONFIGURED_SYNC_LABEL;
       break;
     case 'idle':
-      syncDotElement.classList.add('bg-emerald-500');
+      syncDotElement.classList.add('bg-emerald-500', 'pulse-dot-active');
       syncTextElement.className = 'inline truncate max-w-[120px]';
       syncTextElement.textContent = 'Synced';
       break;
@@ -161,10 +160,10 @@ function renderBottomNavButtons() {
     btn.dataset.tab = name;
     btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
     btn.setAttribute('aria-controls', 'tab-content');
-    btn.className = `flex flex-col items-center justify-center flex-1 min-w-[44px] min-h-[44px] py-1 px-2 text-xs transition cursor-pointer select-none ${
+    btn.className = `flex flex-col items-center justify-center flex-1 min-w-[44px] min-h-[44px] py-1 px-2 text-xs transition-all cursor-pointer select-none tactile-spring ${
       isActive
-        ? 'text-indigo-600 dark:text-indigo-400 font-semibold'
-        : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
+        ? 'text-[#C86D51] dark:text-[#D97E63] font-semibold'
+        : 'text-[#68655F] dark:text-[#A39E93] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA]'
     }`;
 
     const iconSpan = document.createElement('span');
@@ -262,10 +261,10 @@ export function navigate(name, updateUrl = true) {
       btn.setAttribute('aria-selected', isSelected ? 'true' : 'false');
       if (isSelected) {
         btn.className =
-          'flex flex-col items-center justify-center flex-1 min-w-[44px] min-h-[44px] py-1 px-2 text-xs transition cursor-pointer select-none text-indigo-600 dark:text-indigo-400 font-semibold';
+          'flex flex-col items-center justify-center flex-1 min-w-[44px] min-h-[44px] py-1 px-2 text-xs transition-all cursor-pointer select-none tactile-spring text-[#C86D51] dark:text-[#D97E63] font-semibold';
       } else {
         btn.className =
-          'flex flex-col items-center justify-center flex-1 min-w-[44px] min-h-[44px] py-1 px-2 text-xs transition cursor-pointer select-none text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200';
+          'flex flex-col items-center justify-center flex-1 min-w-[44px] min-h-[44px] py-1 px-2 text-xs transition-all cursor-pointer select-none tactile-spring text-[#68655F] dark:text-[#A39E93] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA]';
       }
     }
   }
@@ -325,8 +324,7 @@ export function showToast(message, { action } = {}) {
   toast.setAttribute('role', 'status');
   toast.setAttribute('aria-live', 'polite');
   toast.className =
-    'pointer-events-auto flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl shadow-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-sm font-medium transition-all duration-200 transform translate-y-0 opacity-100';
-
+    'pointer-events-auto flex items-center justify-between gap-3 px-4 py-3 rounded-xl shadow-lg bg-[#22201E] text-[#F4F1EA] border border-[#33302C] text-sm font-medium transition-all duration-200 transform translate-y-0 opacity-100';
   const textSpan = document.createElement('span');
   textSpan.className = 'flex-1 text-xs sm:text-sm';
   textSpan.textContent = message;
@@ -351,7 +349,7 @@ export function showToast(message, { action } = {}) {
     const actionBtn = document.createElement('button');
     actionBtn.type = 'button';
     actionBtn.className =
-      'min-h-[36px] min-w-[44px] px-2 py-1 text-xs font-bold text-indigo-400 dark:text-indigo-600 hover:underline cursor-pointer';
+      'min-h-[36px] min-w-[44px] px-3 py-1 text-xs font-bold font-mono text-[#D97E63] hover:underline cursor-pointer tactile-spring';
     actionBtn.textContent = action.label;
     actionBtn.addEventListener('click', (e) => {
       e.preventDefault();
@@ -387,21 +385,19 @@ export function mountShell(rootEl) {
   attachAppHeightListeners();
 
   const shellLayout = document.createElement('div');
-  shellLayout.className = 'shell-layout flex flex-col bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 antialiased select-none';
-
+  shellLayout.className = 'shell-layout flex flex-col bg-[#F6F5F2] text-[#1C1B18] dark:bg-[#161514] dark:text-[#F4F1EA] antialiased select-none';
   // --- Header ---
   const header = document.createElement('header');
   header.className =
-    'flex items-center justify-between px-4 pb-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 shrink-0';
+    'editorial-header flex items-center justify-between px-4 pb-3 shrink-0';
   header.style.paddingTop = 'calc(env(safe-area-inset-top, 0px) + 12px)';
   header.style.paddingLeft = 'max(16px, env(safe-area-inset-left, 0px))';
   header.style.paddingRight = 'max(16px, env(safe-area-inset-right, 0px))';
-
   const titleWrap = document.createElement('div');
   titleWrap.className = 'flex items-center gap-2';
   const title = document.createElement('h1');
-  title.className = 'text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100';
-  title.textContent = 'Habbit';
+  title.className = 'text-xl font-semibold font-serif tracking-tight text-[#1C1B18] dark:text-[#F4F1EA] flex items-center gap-1.5';
+  title.innerHTML = 'Habbit<span class="w-1.5 h-1.5 rounded-full bg-[#C86D51] inline-block"></span>';
   titleWrap.appendChild(title);
 
   const headerRight = document.createElement('div');
@@ -410,7 +406,7 @@ export function mountShell(rootEl) {
   // Sync indicator
   const syncWrap = document.createElement('div');
   syncWrap.id = 'sync-status';
-  syncWrap.className = 'flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400';
+  syncWrap.className = 'flex items-center gap-1.5 text-xs text-[#68655F] dark:text-[#A39E93] font-mono';
   syncWrap.setAttribute('aria-live', 'polite');
 
   syncDotElement = document.createElement('span');
@@ -425,8 +421,7 @@ export function mountShell(rootEl) {
   syncBadgeElement = document.createElement('span');
   syncBadgeElement.id = 'sync-badge';
   syncBadgeElement.className =
-    'hidden px-1.5 py-0.5 text-[10px] font-semibold bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-full leading-none';
-
+    'hidden px-2 py-0.5 text-[10px] font-semibold font-mono bg-[#FDF2EE] dark:bg-[#2C2926] text-[#C86D51] dark:text-[#D97E63] rounded-full leading-none border border-[#E6E4DF] dark:border-[#33302C]';
   syncWrap.appendChild(syncDotElement);
   syncWrap.appendChild(syncTextElement);
   syncWrap.appendChild(syncBadgeElement);
@@ -438,7 +433,7 @@ export function mountShell(rootEl) {
   syncButtonElement.setAttribute('aria-label', 'Sync now');
   syncButtonElement.title = 'Sync now';
   syncButtonElement.className =
-    'p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-800 active:scale-95 transition text-zinc-600 dark:text-zinc-300 cursor-pointer';
+    'p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] active:scale-95 transition text-[#68655F] dark:text-[#A39E93] hover:text-[#C86D51] dark:hover:text-[#D97E63] cursor-pointer tactile-spring';
   syncButtonElement.innerHTML = `
     <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
       <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -468,7 +463,7 @@ export function mountShell(rootEl) {
   tabContentElement = document.createElement('main');
   tabContentElement.id = 'tab-content';
   tabContentElement.setAttribute('role', 'tabpanel');
-  tabContentElement.className = 'flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4';
+  tabContentElement.className = 'flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 animate-stagger-in';
   tabContentElement.style.paddingLeft = 'max(16px, env(safe-area-inset-left, 0px))';
   tabContentElement.style.paddingRight = 'max(16px, env(safe-area-inset-right, 0px))';
 
@@ -486,7 +481,7 @@ export function mountShell(rootEl) {
   bottomNavElement.setAttribute('role', 'tablist');
   bottomNavElement.setAttribute('aria-label', 'Main Navigation');
   bottomNavElement.className =
-    'flex items-center justify-around border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 shrink-0 pt-2';
+    'editorial-nav flex items-center justify-around shrink-0 pt-2';
   bottomNavElement.style.paddingBottom = 'max(12px, env(safe-area-inset-bottom, 12px))';
   bottomNavElement.style.paddingLeft = 'max(8px, env(safe-area-inset-left, 0px))';
   bottomNavElement.style.paddingRight = 'max(8px, env(safe-area-inset-right, 0px))';

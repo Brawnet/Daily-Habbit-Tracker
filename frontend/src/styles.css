@@ -6,6 +6,63 @@
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
   --app-height: 100dvh;
+
+  /* Crisp Editorial Minimalism Tokens (Crisp Gallery Light + Warm Obsidian Dark) */
+  --font-serif: 'Newsreader', 'Instrument Serif', 'Playfair Display', Georgia, serif;
+  --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Light Mode (Crisp Gallery) */
+  --bg-canvas: #F6F5F2;          /* Subtle Alabaster (App Shell / secondary canvas) */
+  --surface-card: #FFFFFF;       /* Pure Crisp White (Elevated Cards / Writing Sheets) */
+  --surface-hover: #EFECE6;      /* Soft Stone */
+  --text-primary: #1C1B18;       /* Charcoal Ink */
+  --text-secondary: #68655F;     /* Muted Graphite */
+  --border-hairline: #E6E4DF;    /* Crisp Stone (1px solid borders) */
+
+  /* Refined Semantic Accents */
+  --accent-terracotta: #C86D51;  /* Primary CTA & Active State */
+  --accent-terracotta-soft: #FDF2EE;
+  --accent-sage: #3D6B58;        /* To-Do List & Completion */
+  --accent-sage-soft: #EEF5F2;
+  --accent-ochre: #D49A45;       /* Daily Schedule & Timeline */
+  --accent-ochre-soft: #FDF7EC;
+  --accent-rose: #B56565;        /* Journaling & Reflection */
+  --accent-rose-soft: #FBF2F2;
+  --accent-slate: #4A607A;       /* Book Summary & Insights */
+  --accent-slate-soft: #F0F4F8;
+
+  /* Geometry & Shadows */
+  --radius-card: 12px;
+  --radius-btn: 8px;
+  --radius-pill: 9999px;
+  --shadow-card: 0 2px 8px rgba(28, 27, 24, 0.04);
+  --shadow-soft: 0 8px 24px -4px rgba(28, 27, 24, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-canvas: #161514;          /* Warm Obsidian */
+    --surface-card: #22201E;       /* Dark Espresso */
+    --surface-hover: #2C2926;      /* Warm Slate */
+    --text-primary: #F4F1EA;       /* Warm Alabaster */
+    --text-secondary: #A39E93;     /* Muted Stone */
+    --border-hairline: #33302C;    /* Charcoal Line */
+
+    --accent-terracotta: #D97E63;
+    --accent-terracotta-soft: rgba(200, 109, 81, 0.22);
+    --accent-sage: #5F8776;
+    --accent-sage-soft: rgba(74, 107, 93, 0.22);
+    --accent-ochre: #E0A653;
+    --accent-ochre-soft: rgba(212, 154, 69, 0.22);
+    --accent-rose: #C67878;
+    --accent-rose-soft: rgba(181, 101, 101, 0.22);
+    --accent-slate: #5E7796;
+    --accent-slate-soft: rgba(74, 96, 122, 0.22);
+
+    --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.4);
+    --shadow-soft: 0 8px 24px -4px rgba(0, 0, 0, 0.4);
+  }
 }
 
 @media all and (display-mode: standalone) {
@@ -23,12 +80,16 @@ html, body {
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
-  background-color: #ffffff;
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  line-height: 1.65;
 }
 
 @media (prefers-color-scheme: dark) {
   html, body {
-    background-color: #09090b;
+    background-color: var(--bg-canvas);
+    color: var(--text-primary);
   }
 }
 
@@ -62,8 +123,175 @@ button, a, input, select, textarea, [role="button"], [role="tab"] {
 
 /* Clear visible focus indicator (SPEC §8) */
 :focus-visible {
-  outline: 2px solid #6366f1;
+  outline: 2px solid var(--accent-terracotta);
   outline-offset: 2px;
+}
+
+/* SaaS Mobile (High-Tech Boutique) Typography & Utilities */
+.font-serif {
+  font-family: var(--font-serif);
+  letter-spacing: -0.02em;
+}
+
+.font-sans {
+  font-family: var(--font-sans);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Editorial Structural Surfaces */
+.editorial-header {
+  background-color: rgba(246, 245, 242, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-hairline);
+}
+
+.editorial-nav {
+  background-color: rgba(246, 245, 242, 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border-hairline);
+}
+
+@media (prefers-color-scheme: dark) {
+  .editorial-header {
+    background-color: rgba(34, 32, 30, 0.92);
+    border-bottom: 1px solid var(--border-hairline);
+  }
+  .editorial-nav {
+    background-color: rgba(34, 32, 30, 0.94);
+    border-top: 1px solid var(--border-hairline);
+  }
+}
+
+/* 12px Rounded Paper Cards with 1px Hairline Border */
+.editorial-card {
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+}
+
+/* Primary Burnt Terracotta Button */
+.btn-terracotta {
+  background-color: var(--accent-terracotta);
+  color: #FAF8F5;
+  border-radius: var(--radius-btn);
+  font-weight: 600;
+  box-shadow: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.btn-terracotta:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.btn-terracotta:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Secondary Soft Sand Surface Button */
+.btn-secondary-surface {
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-primary);
+  border-radius: var(--radius-btn);
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.btn-secondary-surface:hover:not(:disabled) {
+  background-color: var(--surface-hover);
+}
+
+.btn-secondary-surface:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Tactile Spring Press */
+.tactile-spring {
+  transition: transform 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.tactile-spring:active:not(:disabled) {
+  transform: scale(0.97);
+}
+/* Active Bottom Navigation Tab */
+button[role="tab"][aria-selected="true"] {
+  color: var(--accent-terracotta) !important;
+  font-weight: 600;
+}
+
+button[role="tab"][aria-selected="true"] .tab-icon {
+  transform: translateY(-1px);
+  transition: transform 0.15s ease;
+}
+
+
+/* Semantic Badge Pills */
+.badge-sage {
+  background-color: var(--accent-sage-soft);
+  color: var(--accent-sage);
+  border: 1px solid rgba(74, 107, 93, 0.25);
+}
+
+.badge-terracotta {
+  background-color: var(--accent-terracotta-soft);
+  color: var(--accent-terracotta);
+  border: 1px solid rgba(200, 109, 81, 0.25);
+}
+
+.badge-rose {
+  background-color: var(--accent-rose-soft);
+  color: var(--accent-rose);
+  border: 1px solid rgba(181, 101, 101, 0.25);
+}
+
+.badge-slate {
+  background-color: var(--accent-slate-soft);
+  color: var(--accent-slate);
+  border: 1px solid rgba(74, 96, 122, 0.25);
+}
+
+.badge-ochre {
+  background-color: var(--accent-ochre-soft);
+  color: var(--accent-ochre);
+  border: 1px solid rgba(212, 154, 69, 0.25);
+}
+
+/* Pulsing Status Dot */
+@keyframes pulseDot {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.8;
+  }
+}
+
+.pulse-dot-active {
+  animation: pulseDot 2s ease-in-out infinite;
+}
+
+/* Staggered Screen Mount Entrance */
+@keyframes fadeInUpWarm {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-stagger-in {
+  animation: fadeInUpWarm 0.2s ease-out backwards;
 }
 
 /* Respect prefers-reduced-motion (SPEC §8) */

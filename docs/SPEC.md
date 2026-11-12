@@ -115,20 +115,22 @@ Server: `JSON.parse(e.postData.contents)`. Selalu HTTP 200 (Apps Script tak bisa
 Aturan `sync` di server (di dalam `LockService.getScriptLock().waitLock(20000)`):
 
 1. `now` = waktu server, dipaksa monoton (> nilai terakhir di Script Properties).
-2. Per record masuk: cari by key. Tulis bila belum ada **atau** `incoming.updatedAt > existing.updatedAt`; set `serverUpdatedAt = now`. `printedToDiaryAt` dari klien diabaikan. Journal Entry hari lampau (`day < todayJakarta`) yang `printedToDiaryAt` sudah terisi → tolak dengan reason `LOCKED` (entri hari ini tetap bebas diedit dan di-sync sepanjang hari).
+2. Per record masuk: cari by key. Tulis bila belum ada **atau** `incoming.updatedAt > existing.updatedAt` (dengan `incoming.updatedAt` dibatasi atas / clamped ke waktu server `now` untuk mencegah pemalsuan timestamp masa depan); set `serverUpdatedAt = now`. `printedToDiaryAt` dari klien diabaikan. Aturan lock sinkronisasi:
+   - Check-in: hanya hari ini dan kemarin (`day === todayJakarta || day === yesterdayJakarta`) yang dapat diubah; tanggal di luar jendela ini ditolak dengan reason `LOCKED`.
+   - Journal Entry: hanya hari ini yang bebas diedit; catatan masa lalu (`day < todayJakarta`) yang `printedToDiaryAt` sudah terisi ditolak server dengan reason `LOCKED`. Entri masa depan (`day > todayJakarta`) atau dengan format tanggal tidak valid ditolak.
 3. Balas semua record dengan `serverUpdatedAt > since` (`since` null = semua). `cursor = now`.
 
-Auth: bandingkan `pin` dengan Script Property `PIN`. Gagal >10x dalam 10 menit (CacheService) → `RATE_LIMITED` selama 10 menit.
+Auth: bandingkan `pin` dengan Script Property `PIN` menggunakan perbandingan timing-safe (`timingSafeEqualPin`). PIN minimal 4 karakter. Kegagalan >10x berturut-turut dalam 10 menit (CacheService terproteksi LockService) → `RATE_LIMITED` selama 10 menit bagi percobaan tidak terautentikasi (pemanggil dengan PIN valid tidak terpengaruh DoS lockout).
 
 ## 6. Backend Apps Script (`gas-backend/Code.gs`)
 
-Container-bound ke Spreadsheet. `appsscript.json`: `timeZone: "Asia/Jakarta"`, `runtimeVersion: "V8"`, webapp `executeAs: USER_DEPLOYING`, `access: ANYONE_ANONYMOUS`, `oauthScopes` eksplisit (spreadsheets, documents, drive, script.external_request, script.scriptapp).
+Container-bound ke Spreadsheet. `appsscript.json`: `timeZone: "Asia/Jakarta"`, `runtimeVersion: "V8"`, webapp `executeAs: USER_DEPLOYING`, `access: ANYONE_ANONYMOUS`, `oauthScopes` eksplisit berprinsip least privilege (`https://www.googleapis.com/auth/spreadsheets.currentonly` dan `https://www.googleapis.com/auth/drive.file`, serta `script.external_request`, `script.scriptapp`).
 
 Satu file, tetapi logika murni (format/parse heading Diary, posisi sisip, keputusan Reminder, merge LWW, teks notifikasi) dipisah ke fungsi tanpa akses global GAS agar bisa diuji di Node.
 
 ### 6.1 Script Properties
 
-`PIN` (diisi manual user, disarankan ≥16 karakter acak), `PUSH_SHARED_SECRET` (dibuat `setup()` bila kosong, di-log sekali), `PUSH_ENDPOINT_URL` (diisi manual setelah deploy Vercel), `DIARY_FOLDER_ID`, `DIARY_DOC_<YYYY>`, `LAST_REMINDER_DAY`, `LAST_SERVER_NOW`.
+`PIN` (diisi manual user, disarankan ≥16 karakter acak, minimal 4 karakter), `PUSH_SHARED_SECRET` (dibuat `setup()` bila kosong, di-mask pada log eksekusi agar tidak bocor), `PUSH_ENDPOINT_URL` (diisi manual setelah deploy Vercel), `DIARY_FOLDER_ID`, `DIARY_DOC_<YYYY>`, `LAST_REMINDER_DAY`, `LAST_SERVER_NOW`.
 
 ### 6.2 `setup()` — idempoten, dijalankan manual sekali
 

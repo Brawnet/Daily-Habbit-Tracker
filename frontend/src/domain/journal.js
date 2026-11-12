@@ -42,20 +42,72 @@ export function escapeHtml(str) {
 }
 
 /**
- * Strips dangerous HTML tags (scripts, objects, embeds, iframes) and inline event handlers.
- * Allows safe formatting tags: p, br, ul, ol, li, b, strong, i, em.
+ * Strips dangerous HTML tags (scripts, objects, embeds, iframes, svg, math) and inline event handlers.
+ * Allows safe formatting tags: p, br, ul, ol, li, b, strong, i, em, span, div.
  * @param {string} html
  * @returns {string}
  */
 export function sanitizeJournalHtml(html) {
   if (!html) return '';
-  return String(html)
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
-    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
-    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
-    .replace(/\son\w+\s*=\s*(['"]).*?\1/gi, '')
-    .replace(/\son\w+\s*=\s*[^>\s]+/gi, '');
+  let clean = String(html);
+
+  // 1. Strip dangerous tag blocks
+  clean = clean.replace(/<(?:script|style|iframe|object|embed|svg|math|applet|form)\b[^>]*>[\s\S]*?<\/(?:script|style|iframe|object|embed|svg|math|applet|form)>/gi, '');
+  clean = clean.replace(/<\/?(?:script|style|iframe|object|embed|svg|math|applet|form|base|meta|link)\b[^>]*>/gi, '');
+
+  // 2. Strip event handlers (with whitespace or slash delimiter: <img/src=x/onerror=...>)
+  clean = clean.replace(/(?:\s|\/)+on[a-zA-Z0-9_-]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?/gi, '');
+
+  // 3. Strip dangerous style attributes
+  clean = clean.replace(/(?:\s|\/)+style\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+
+  // 4. Strip javascript:, vbscript:, and data: URLs in attributes
+  clean = clean.replace(/\b(?:href|src|action|formaction)\s*=\s*(?:"\s*(?:javascript|vbscript|data:)[^"]*"|'\s*(?:javascript|vbscript|data:)[^']*'|[^\s>]*(?:javascript|vbscript|data:)[^\s>]*)/gi, '');
+
+  if (typeof DOMParser !== 'undefined') {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(`<body>${clean}</body>`, 'text/html');
+      const ALLOWED_TAGS = new Set([
+        'P', 'BR', 'UL', 'OL', 'LI', 'B', 'STRONG', 'I', 'EM', 'SPAN', 'DIV',
+        'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'PRE', 'CODE', 'HR', 'A'
+      ]);
+      const ALLOWED_ATTRS = new Set(['class', 'id', 'title', 'alt', 'data-prompt-id']);
+
+      const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT);
+      const toRemove = [];
+      let node = walker.nextNode();
+      while (node) {
+        if (!ALLOWED_TAGS.has(node.tagName)) {
+          toRemove.push(node);
+        } else {
+          const attrs = Array.from(node.attributes);
+          for (const attr of attrs) {
+            const name = attr.name.toLowerCase();
+            const val = attr.value.trim().toLowerCase();
+            if (name.startsWith('on') || name === 'style' || val.includes('javascript:') || val.includes('vbscript:') || val.includes('data:')) {
+              node.removeAttribute(attr.name);
+            } else if (node.tagName === 'A' && name === 'href') {
+              if (!/^(?:https?:|mailto:|\/|#|\.)/i.test(attr.value.trim())) {
+                node.removeAttribute(attr.name);
+              }
+            } else if (!ALLOWED_ATTRS.has(name) && !name.startsWith('data-')) {
+              node.removeAttribute(attr.name);
+            }
+          }
+        }
+        node = walker.nextNode();
+      }
+      for (const el of toRemove) {
+        el.remove();
+      }
+      return doc.body.innerHTML;
+    } catch {
+      // Fallback to regex-cleaned string
+    }
+  }
+
+  return clean;
 }
 
 /**
@@ -75,7 +127,7 @@ export function compilePromptJournal(prompts, answers, additionalNotes = '') {
     const textOnly = cleanAns.replace(/<[^>]*>/g, '').trim();
     if (!textOnly) continue;
 
-    out += `<div class="journal-prompt-block" data-prompt-id="${p.id}">\n`;
+    out += `<div class="journal-prompt-block" data-prompt-id="${escapeHtml(p.id)}">\n`;
     out += `  <h3 class="font-bold text-zinc-900 dark:text-zinc-100">${escapeHtml(p.prompt)}</h3>\n`;
     out += `  <div class="journal-prompt-answer">${cleanAns}</div>\n`;
     out += `</div>\n\n`;
@@ -192,12 +244,12 @@ export function decompilePromptJournal(htmlContent, prompts) {
           const id = block.getAttribute('data-prompt-id');
           const ansEl = block.querySelector('.journal-prompt-answer');
           if (id && ansEl) {
-            answers[id] = ansEl.innerHTML.trim();
+            answers[id] = sanitizeJournalHtml(ansEl.innerHTML.trim());
           }
         }
         const notesEl = doc.querySelector('.journal-notes-block .journal-notes-answer');
         if (notesEl) {
-          additionalNotes = notesEl.innerHTML.trim();
+          additionalNotes = sanitizeJournalHtml(notesEl.innerHTML.trim());
         }
         return { answers, additionalNotes };
       }
@@ -209,16 +261,16 @@ export function decompilePromptJournal(htmlContent, prompts) {
   if (parsedSections.length > 0 && parsedSections[0].type !== 'freeform') {
     for (const sec of parsedSections) {
       if (sec.type === 'prompt' && sec.id) {
-        answers[sec.id] = sec.contentHtml;
+        answers[sec.id] = sanitizeJournalHtml(sec.contentHtml);
       } else if (sec.type === 'notes') {
-        additionalNotes = sec.contentHtml;
+        additionalNotes = sanitizeJournalHtml(sec.contentHtml);
       }
     }
     return { answers, additionalNotes };
   }
 
   // Legacy fallback
-  additionalNotes = htmlContent;
+  additionalNotes = sanitizeJournalHtml(htmlContent);
   return { answers, additionalNotes };
 }
 

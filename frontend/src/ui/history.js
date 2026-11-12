@@ -16,7 +16,7 @@ import {
   onChange,
 } from '../data/repo.js';
 import { navigate, showToast } from './shell.js';
-import { parseStructuredJournalBlocks } from '../domain/journal.js';
+import { parseStructuredJournalBlocks, sanitizeJournalHtml } from '../domain/journal.js';
 import { htmlToText } from '../domain/text.js';
 
 /**
@@ -264,7 +264,7 @@ export function mount(el) {
 
           const answerDiv = document.createElement('div');
           answerDiv.className = 'journal-reader-answer text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-6 [&_ol]:my-1.5 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-6 [&_ul]:my-1.5 [&_p]:my-1';
-          answerDiv.innerHTML = block.contentHtml;
+          answerDiv.innerHTML = sanitizeJournalHtml(block.contentHtml);
           if (answerDiv.children.length === 0 && !answerDiv.textContent) {
             answerDiv.textContent = block.contentHtml.replace(/<[^>]*>/g, '').trim();
           }

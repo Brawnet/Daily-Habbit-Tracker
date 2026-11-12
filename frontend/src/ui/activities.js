@@ -38,6 +38,7 @@ import {
 import { today } from '../domain/day.js';
 import { showToast } from './shell.js';
 import { isBlank, htmlToText, htmlToMarkdownText } from '../domain/text.js';
+import { sanitizeJournalHtml } from '../domain/journal.js';
 export const JOURNALING_LOGO_SVG = `
 <svg class="w-full h-full" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
   <defs>
@@ -1377,7 +1378,7 @@ function attachRichListEditor(editorEl, initialContent, onUpdate) {
 function renderSummaryContent(containerEl, content) {
   if (!content) return;
   if (content.includes('<p>') || content.includes('<li>')) {
-    containerEl.innerHTML = content;
+    containerEl.innerHTML = sanitizeJournalHtml(content);
     if (!containerEl.children.length) {
       containerEl.textContent = content.replace(/<[^>]*>/g, ' ');
     }

@@ -1,4 +1,4 @@
-import { getConfig } from './config.js';
+import { getConfig, isValidGasUrl } from './config.js';
 import { ApiError } from '../shared/contracts.js';
 
 /**
@@ -13,6 +13,10 @@ export async function callApi(action, payload = {}) {
 
   if (!gasUrl) {
     throw new ApiError('NOT_CONFIGURED', 'Gas URL not configured');
+  }
+
+  if (!isValidGasUrl(gasUrl)) {
+    throw new ApiError('INVALID_CONFIG', 'Invalid Google Apps Script Web App URL');
   }
 
   let response;

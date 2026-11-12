@@ -4,7 +4,7 @@ const STORAGE_KEYS = {
   deviceId: 'habbit.deviceId',
 };
 
-function getStorage() {
+export function getStorage() {
   if (typeof localStorage !== 'undefined' && localStorage !== null) {
     return localStorage;
   }
@@ -43,6 +43,18 @@ export function getConfig() {
   return { gasUrl, pin, deviceId };
 }
 
+export const GAS_URL_REGEX = /^https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/exec(\?.*)?$/;
+
+/**
+ * Validates whether a URL is a legitimate Google Apps Script Web App exec URL.
+ * @param {string} url
+ * @returns {boolean}
+ */
+export function isValidGasUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  return GAS_URL_REGEX.test(url.trim());
+}
+
 /**
  * @param {Partial<{ gasUrl: string, pin: string, deviceId: string }>} partial
  */
@@ -52,7 +64,11 @@ export function setConfig(partial = {}) {
     if (partial.gasUrl === null || partial.gasUrl === '') {
       storage.removeItem(STORAGE_KEYS.gasUrl);
     } else {
-      storage.setItem(STORAGE_KEYS.gasUrl, String(partial.gasUrl).trim());
+      const trimmed = String(partial.gasUrl).trim();
+      if (!isValidGasUrl(trimmed)) {
+        throw new Error('Invalid Google Apps Script Web App URL. Must match https://script.google.com/macros/s/.../exec');
+      }
+      storage.setItem(STORAGE_KEYS.gasUrl, trimmed);
     }
   }
   if (partial.pin !== undefined) {

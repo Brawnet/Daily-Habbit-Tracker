@@ -41,6 +41,7 @@ import {
   DEFAULT_JOURNAL_PROMPTS,
   computeWordCount,
   decompilePromptJournal,
+  sanitizeJournalHtml,
 } from '../domain/journal.js';
 /**
  * Loads current prompts from Settings, or seeds and returns defaults.

@@ -242,11 +242,27 @@ function mergeRecordsLWW(existingRecords, incomingRecords, nowMonotonic, todayJa
     if (!key) continue;
     const existing = existingMap.get(key);
     const isJournal = isJournalRecord(incoming) || isJournalRecord(existing);
+    const isCheckIn = (incoming && incoming.habitId !== undefined && incoming.day !== undefined) ||
+      (existing && existing.habitId !== undefined && existing.day !== undefined);
+
+    const today = todayJakarta !== undefined
+      ? todayJakarta
+      : (typeof getTodayJakarta === 'function' ? getTodayJakarta() : '');
+
+    if (isCheckIn && today) {
+      const yesterday = getYesterdayJakarta(today);
+      const checkInDay = incoming.day || (existing ? existing.day : '');
+      if (checkInDay !== today && checkInDay !== yesterday) {
+        rejected.push({
+          type: 'checkIns',
+          key: key,
+          reason: 'LOCKED'
+        });
+        continue;
+      }
+    }
 
     if (isJournal && existing && existing.printedToDiaryAt && String(existing.printedToDiaryAt).trim() !== '') {
-      const today = todayJakarta !== undefined
-        ? todayJakarta
-        : (typeof getTodayJakarta === 'function' ? getTodayJakarta() : '');
       if (!today || key < today) {
         rejected.push({
           type: 'journalEntries',
@@ -304,6 +320,82 @@ function getNowHHMMJakarta() {
   }).format(now);
 }
 
+function getYesterdayJakarta(todayJakarta) {
+  const baseDay = todayJakarta || getTodayJakarta();
+  const d = new Date(baseDay + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function isValidDayString(day) {
+  if (!day || typeof day !== 'string') return false;
+  const match = day.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+  const year = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const dayNum = parseInt(match[3], 10);
+  if (year < 1970 || year > 2100 || month < 1 || month > 12 || dayNum < 1 || dayNum > 31) return false;
+  const dt = new Date(Date.UTC(year, month - 1, dayNum));
+  return dt.getUTCFullYear() === year && dt.getUTCMonth() === month - 1 && dt.getUTCDate() === dayNum;
+}
+
+function clampClientTimestamp(updatedAt, nowMonotonic) {
+  if (!updatedAt || typeof updatedAt !== 'string') return nowMonotonic;
+  return updatedAt > nowMonotonic ? nowMonotonic : updatedAt;
+}
+
+function sanitizeFormulaInjection(value) {
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  if (/^[=+\-@]/.test(str)) {
+    return "'" + str;
+  }
+  return str;
+}
+
+function desanitizeFormulaInjection(value) {
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  if (/^'[=+\-@]/.test(str)) {
+    return str.slice(1);
+  }
+  return str;
+}
+
+function isValidPushEndpoint(endpoint) {
+  if (!endpoint || typeof endpoint !== 'string') return false;
+  try {
+    if (!/^https:\/\/[^/]+/i.test(endpoint)) return false;
+    const urlWithoutScheme = endpoint.slice(8);
+    const host = (urlWithoutScheme.split('/')[0] || '').toLowerCase();
+    if (
+      host.startsWith('[') ||
+      host.endsWith(']') ||
+      /^(\d{1,3}\.){3}\d{1,3}/.test(host) ||
+      host.includes(':') && !/^[^:]+:\d+$/.test(host) ||
+      host === 'localhost' ||
+      host.endsWith('.localhost')
+    ) {
+      return false;
+    }
+    return /(?:^|\.)(?:push\.apple\.com|fcm\.googleapis\.com|googleapis\.com|notify\.windows\.com|push\.services\.mozilla\.com|web\.push\.apple\.com|push\.example\.com)(?::\d+)?$/i.test(host);
+  } catch (e) {
+    return false;
+  }
+}
+
+function timingSafeEqualPin(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  let mismatch = a.length === b.length ? 0 : 1;
+  const len = Math.max(a.length, b.length);
+  for (let i = 0; i < len; i++) {
+    const charA = a.charCodeAt(i % (a.length || 1));
+    const charB = b.charCodeAt(i % (b.length || 1));
+    mismatch |= charA ^ charB;
+  }
+  return mismatch === 0;
+}
+
 function getMonotonicNow() {
   const props = PropertiesService.getScriptProperties();
   const lastNow = props.getProperty('LAST_SERVER_NOW') || '';
@@ -345,7 +437,7 @@ function readAllHabits(sheet) {
     if (!row[0]) continue;
     list.push({
       id: String(row[0]),
-      name: String(row[1] || ''),
+      name: desanitizeFormulaInjection(row[1] || ''),
       sortOrder: Number(row[2]) || 0,
       archived: row[3] === 'TRUE' || row[3] === true,
       createdAt: String(row[4] || ''),
@@ -364,7 +456,7 @@ function readAllCheckIns(sheet) {
     if (!row[0]) continue;
     list.push({
       id: String(row[0]),
-      habitId: String(row[1] || ''),
+      habitId: desanitizeFormulaInjection(row[1] || ''),
       day: String(row[2] || ''),
       deleted: row[3] === 'TRUE' || row[3] === true,
       updatedAt: String(row[4] || ''),
@@ -382,7 +474,7 @@ function readAllJournalEntries(sheet) {
     if (!row[0]) continue;
     list.push({
       day: String(row[0]),
-      content: String(row[1] || ''),
+      content: desanitizeFormulaInjection(row[1] || ''),
       updatedAt: String(row[2] || ''),
       printedToDiaryAt: String(row[3] || ''),
       serverUpdatedAt: String(row[4] || '')
@@ -399,7 +491,7 @@ function readAllSettings(sheet) {
     if (!row[0]) continue;
     list.push({
       key: String(row[0]),
-      value: String(row[1] || ''),
+      value: desanitizeFormulaInjection(row[1] || ''),
       updatedAt: String(row[2] || ''),
       serverUpdatedAt: String(row[3] || '')
     });
@@ -415,12 +507,12 @@ function readAllActivities(sheet) {
     if (!row[0]) continue;
     list.push({
       id: String(row[0]),
-      title: String(row[1] || ''),
-      author: String(row[2] || ''),
+      title: desanitizeFormulaInjection(row[1] || ''),
+      author: desanitizeFormulaInjection(row[2] || ''),
       type: String(row[3] || ''),
       status: String(row[4] || ''),
       totalPages: Number(row[5]) || 0,
-      summary: String(row[6] || ''),
+      summary: desanitizeFormulaInjection(row[6] || ''),
       archived: row[7] === 'TRUE' || row[7] === true,
       createdAt: String(row[8] || ''),
       updatedAt: String(row[9] || ''),
@@ -462,33 +554,34 @@ function syncHabits(sheet, incomingHabits, nowMonotonic) {
   for (const habit of incomingHabits) {
     const id = String(habit.id);
     if (!id) continue;
+    const clientUpdatedAt = clampClientTimestamp(habit.updatedAt, nowMonotonic);
     const rowIndex = rowMap.get(id);
     if (rowIndex !== undefined) {
       const existingUpdatedAt = String(data[rowIndex][5] || '');
-      if (!existingUpdatedAt || (habit.updatedAt && habit.updatedAt > existingUpdatedAt)) {
-        data[rowIndex][1] = habit.name;
+      if (!existingUpdatedAt || clientUpdatedAt > existingUpdatedAt) {
+        data[rowIndex][1] = sanitizeFormulaInjection(habit.name || '');
         data[rowIndex][2] = Number(habit.sortOrder) || 0;
         data[rowIndex][3] = habit.archived ? 'TRUE' : 'FALSE';
-        data[rowIndex][4] = habit.createdAt;
-        data[rowIndex][5] = habit.updatedAt;
+        data[rowIndex][4] = habit.createdAt || data[rowIndex][4] || nowMonotonic;
+        data[rowIndex][5] = clientUpdatedAt;
         data[rowIndex][6] = nowMonotonic;
       }
     } else {
       const newRow = [
         id,
-        habit.name,
+        sanitizeFormulaInjection(habit.name || ''),
         Number(habit.sortOrder) || 0,
         habit.archived ? 'TRUE' : 'FALSE',
-        habit.createdAt,
-        habit.updatedAt,
+        habit.createdAt || nowMonotonic,
+        clientUpdatedAt,
         nowMonotonic
       ];
       data.push(newRow);
       rowMap.set(id, data.length - 1);
     }
   }
-  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
   sheet.getRange(1, 1, data.length, headers.length).setNumberFormat('@');
+  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
 }
 
 function syncCheckIns(sheet, incomingCheckIns, nowMonotonic) {
@@ -499,34 +592,53 @@ function syncCheckIns(sheet, incomingCheckIns, nowMonotonic) {
     if (data[i][0]) rowMap.set(String(data[i][0]), i);
   }
 
+  const todayJakarta = getTodayJakarta();
+  const yesterdayJakarta = getYesterdayJakarta(todayJakarta);
+  const rejected = [];
+
   for (const checkIn of incomingCheckIns) {
     const id = String(checkIn.id);
     if (!id) continue;
+    const day = String(checkIn.day || '').trim();
+    if (!isValidDayString(day)) continue;
+
+    // Server-side temporal enforcement: only yesterday and today are editable
+    if (day !== todayJakarta && day !== yesterdayJakarta) {
+      rejected.push({
+        type: 'checkIns',
+        key: id,
+        reason: 'LOCKED'
+      });
+      continue;
+    }
+
+    const clientUpdatedAt = clampClientTimestamp(checkIn.updatedAt, nowMonotonic);
     const rowIndex = rowMap.get(id);
     if (rowIndex !== undefined) {
       const existingUpdatedAt = String(data[rowIndex][4] || '');
-      if (!existingUpdatedAt || (checkIn.updatedAt && checkIn.updatedAt > existingUpdatedAt)) {
-        data[rowIndex][1] = checkIn.habitId;
-        data[rowIndex][2] = checkIn.day;
+      if (!existingUpdatedAt || clientUpdatedAt > existingUpdatedAt) {
+        data[rowIndex][1] = sanitizeFormulaInjection(checkIn.habitId);
+        data[rowIndex][2] = day;
         data[rowIndex][3] = checkIn.deleted ? 'TRUE' : 'FALSE';
-        data[rowIndex][4] = checkIn.updatedAt;
+        data[rowIndex][4] = clientUpdatedAt;
         data[rowIndex][5] = nowMonotonic;
       }
     } else {
       const newRow = [
         id,
-        checkIn.habitId,
-        checkIn.day,
+        sanitizeFormulaInjection(checkIn.habitId),
+        day,
         checkIn.deleted ? 'TRUE' : 'FALSE',
-        checkIn.updatedAt,
+        clientUpdatedAt,
         nowMonotonic
       ];
       data.push(newRow);
       rowMap.set(id, data.length - 1);
     }
   }
-  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
   sheet.getRange(1, 1, data.length, headers.length).setNumberFormat('@');
+  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
+  return rejected;
 }
 
 function syncJournalEntries(sheet, incomingJournalEntries, nowMonotonic) {
@@ -540,8 +652,17 @@ function syncJournalEntries(sheet, incomingJournalEntries, nowMonotonic) {
   const todayJakarta = getTodayJakarta();
   const rejected = [];
   for (const entry of incomingJournalEntries) {
-    const day = String(entry.day);
-    if (!day) continue;
+    const day = String(entry.day || '').trim();
+    if (!isValidDayString(day)) continue;
+    if (day > todayJakarta) {
+      rejected.push({
+        type: 'journalEntries',
+        key: day,
+        reason: 'LOCKED'
+      });
+      continue;
+    }
+    const clientUpdatedAt = clampClientTimestamp(entry.updatedAt, nowMonotonic);
     const rowIndex = rowMap.get(day);
     if (rowIndex !== undefined) {
       const printedToDiaryAt = String(data[rowIndex][3] || '');
@@ -554,16 +675,16 @@ function syncJournalEntries(sheet, incomingJournalEntries, nowMonotonic) {
         continue;
       }
       const existingUpdatedAt = String(data[rowIndex][2] || '');
-      if (!existingUpdatedAt || (entry.updatedAt && entry.updatedAt > existingUpdatedAt)) {
-        data[rowIndex][1] = entry.content || '';
-        data[rowIndex][2] = entry.updatedAt;
+      if (!existingUpdatedAt || clientUpdatedAt > existingUpdatedAt) {
+        data[rowIndex][1] = sanitizeFormulaInjection(entry.content || '');
+        data[rowIndex][2] = clientUpdatedAt;
         data[rowIndex][4] = nowMonotonic;
       }
     } else {
       const newRow = [
         day,
-        entry.content || '',
-        entry.updatedAt,
+        sanitizeFormulaInjection(entry.content || ''),
+        clientUpdatedAt,
         '',
         nowMonotonic
       ];
@@ -571,8 +692,8 @@ function syncJournalEntries(sheet, incomingJournalEntries, nowMonotonic) {
       rowMap.set(day, data.length - 1);
     }
   }
-  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
   sheet.getRange(1, 1, data.length, headers.length).setNumberFormat('@');
+  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
   return rejected;
 }
 
@@ -587,27 +708,29 @@ function syncSettings(sheet, incomingSettings, nowMonotonic) {
   for (const setting of incomingSettings) {
     const key = String(setting.key);
     if (!key) continue;
+    const clientUpdatedAt = clampClientTimestamp(setting.updatedAt, nowMonotonic);
+    const escapedValue = sanitizeFormulaInjection(String(setting.value ?? ''));
     const rowIndex = rowMap.get(key);
     if (rowIndex !== undefined) {
       const existingUpdatedAt = String(data[rowIndex][2] || '');
-      if (!existingUpdatedAt || (setting.updatedAt && setting.updatedAt > existingUpdatedAt)) {
-        data[rowIndex][1] = String(setting.value ?? '');
-        data[rowIndex][2] = setting.updatedAt;
+      if (!existingUpdatedAt || clientUpdatedAt > existingUpdatedAt) {
+        data[rowIndex][1] = escapedValue;
+        data[rowIndex][2] = clientUpdatedAt;
         data[rowIndex][3] = nowMonotonic;
       }
     } else {
       const newRow = [
         key,
-        String(setting.value ?? ''),
-        setting.updatedAt,
+        escapedValue,
+        clientUpdatedAt,
         nowMonotonic
       ];
       data.push(newRow);
       rowMap.set(key, data.length - 1);
     }
   }
-  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
   sheet.getRange(1, 1, data.length, headers.length).setNumberFormat('@');
+  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
 }
 
 function syncActivities(sheet, incomingActivities, nowMonotonic) {
@@ -621,42 +744,43 @@ function syncActivities(sheet, incomingActivities, nowMonotonic) {
   for (const act of incomingActivities) {
     const id = String(act.id);
     if (!id) continue;
+    const clientUpdatedAt = clampClientTimestamp(act.updatedAt, nowMonotonic);
     const existingIndex = rowMap.get(id);
 
     if (existingIndex !== undefined) {
       const existingUpdatedAt = String(data[existingIndex][9] || '');
-      if (!existingUpdatedAt || (act.updatedAt && act.updatedAt > existingUpdatedAt)) {
-        data[existingIndex][1] = act.title !== undefined ? act.title : data[existingIndex][1];
-        data[existingIndex][2] = act.author !== undefined ? act.author : data[existingIndex][2];
+      if (!existingUpdatedAt || clientUpdatedAt > existingUpdatedAt) {
+        data[existingIndex][1] = act.title !== undefined ? sanitizeFormulaInjection(act.title) : data[existingIndex][1];
+        data[existingIndex][2] = act.author !== undefined ? sanitizeFormulaInjection(act.author) : data[existingIndex][2];
         data[existingIndex][3] = act.type !== undefined ? act.type : data[existingIndex][3];
         data[existingIndex][4] = act.status !== undefined ? act.status : data[existingIndex][4];
-        data[existingIndex][5] = act.totalPages !== undefined ? act.totalPages : data[existingIndex][5];
-        data[existingIndex][6] = act.summary !== undefined ? act.summary : data[existingIndex][6];
+        data[existingIndex][5] = act.totalPages !== undefined ? Number(act.totalPages) || 0 : data[existingIndex][5];
+        data[existingIndex][6] = act.summary !== undefined ? sanitizeFormulaInjection(act.summary) : data[existingIndex][6];
         data[existingIndex][7] = act.archived ? 'TRUE' : 'FALSE';
         data[existingIndex][8] = act.createdAt !== undefined ? act.createdAt : data[existingIndex][8];
-        data[existingIndex][9] = act.updatedAt;
+        data[existingIndex][9] = clientUpdatedAt;
         data[existingIndex][10] = nowMonotonic;
       }
     } else {
       const newRow = [
         id,
-        act.title || '',
-        act.author || '',
+        sanitizeFormulaInjection(act.title || ''),
+        sanitizeFormulaInjection(act.author || ''),
         act.type || '',
         act.status || '',
-        act.totalPages !== undefined ? act.totalPages : 0,
-        act.summary || '',
+        Number(act.totalPages) || 0,
+        sanitizeFormulaInjection(act.summary || ''),
         act.archived ? 'TRUE' : 'FALSE',
-        act.createdAt || '',
-        act.updatedAt || '',
+        act.createdAt || nowMonotonic,
+        clientUpdatedAt,
         nowMonotonic
       ];
       data.push(newRow);
       rowMap.set(id, data.length - 1);
     }
   }
-  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
   sheet.getRange(1, 1, data.length, headers.length).setNumberFormat('@');
+  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
 }
 
 function collectChanges(ss, since) {
@@ -690,8 +814,8 @@ function handleSubscribePush(ss, deviceId, subscription) {
   if (!deviceId) {
     return createJsonResponse({ ok: false, error: 'BAD_REQUEST', message: 'Missing deviceId' });
   }
-  if (!subscription || !subscription.endpoint) {
-    return createJsonResponse({ ok: false, error: 'BAD_REQUEST', message: 'Missing subscription or endpoint' });
+  if (!subscription || !subscription.endpoint || !isValidPushEndpoint(subscription.endpoint)) {
+    return createJsonResponse({ ok: false, error: 'BAD_REQUEST', message: 'Missing or invalid subscription endpoint' });
   }
   const sheet = getOrCreateSheet(ss, 'Push_Subscriptions', SCHEMA.Push_Subscriptions);
   const data = sheet.getDataRange().getValues();
@@ -712,11 +836,12 @@ function handleSubscribePush(ss, deviceId, subscription) {
     data[rowIndex][1] = endpoint;
     data[rowIndex][2] = p256dh;
     data[rowIndex][3] = auth;
+    sheet.getRange(rowIndex + 1, 1, 1, 5).setNumberFormat('@');
     sheet.getRange(rowIndex + 1, 1, 1, 5).setValues([[deviceId, endpoint, p256dh, auth, data[rowIndex][4] || now]]);
   } else {
     data.push([deviceId, endpoint, p256dh, auth, now]);
-    sheet.getRange(1, 1, data.length, 5).setValues(data);
     sheet.getRange(1, 1, data.length, 5).setNumberFormat('@');
+    sheet.getRange(1, 1, data.length, 5).setValues(data);
   }
   return createJsonResponse({ ok: true });
 }
@@ -829,7 +954,7 @@ function getOrCreateDiaryDoc(folder, year, props) {
 function writeEntryParagraphs(body, startIndex, lines) {
   let pos = startIndex;
   for (const rawLine of lines) {
-    const line = String(rawLine ?? '');
+    const line = desanitizeFormulaInjection(String(rawLine ?? ''));
     const trimmed = line.trim();
 
     // Check if line contains a question heading (HTML <h3> or Markdown ###)
@@ -989,43 +1114,61 @@ function doPost(e) {
     return createJsonResponse({ ok: false, error: 'BAD_REQUEST', message: 'Invalid JSON payload' });
   }
 
-  const cache = CacheService.getScriptCache();
-  const lockout = cache.get('RL_LOCKOUT');
-  if (lockout) {
-    return createJsonResponse({
-      ok: false,
-      error: 'RATE_LIMITED',
-      message: 'Too many failed attempts. Locked out for 10 minutes.'
-    });
-  }
-
   const props = PropertiesService.getScriptProperties();
   const configuredPin = props.getProperty('PIN');
+  const userPin = typeof payload.pin === 'string' ? payload.pin : '';
+  const isPinValid = Boolean(
+    userPin.length >= 4 &&
+    configuredPin &&
+    configuredPin.length >= 4 &&
+    timingSafeEqualPin(userPin, configuredPin)
+  );
 
-  // Check PIN
-  if (!configuredPin || payload.pin !== configuredPin) {
-    const failCountStr = cache.get('RL_FAIL_COUNT');
-    const failCount = (failCountStr ? parseInt(failCountStr, 10) : 0) + 1;
-    if (failCount > 10) {
-      cache.put('RL_LOCKOUT', '1', 600);
-      cache.remove('RL_FAIL_COUNT');
-      return createJsonResponse({
-        ok: false,
-        error: 'RATE_LIMITED',
-        message: 'Too many failed attempts. Locked out for 10 minutes.'
-      });
-    } else {
-      cache.put('RL_FAIL_COUNT', String(failCount), 600);
-      return createJsonResponse({
-        ok: false,
-        error: 'UNAUTHORIZED',
-        message: 'Invalid PIN'
-      });
+  const cache = CacheService.getScriptCache();
+
+  // If PIN is valid, authenticate caller and bypass unauthenticated lockout
+  // (do not wipe RL_FAIL_COUNT on valid PIN to prevent attacker counter reset)
+  if (!isPinValid) {
+    const authLock = LockService.getScriptLock();
+    try {
+      authLock.waitLock(5000);
+    } catch (e) {}
+
+    try {
+      // If PIN is invalid, enforce lockout check and increment fail counter
+      const lockout = cache.get('RL_LOCKOUT');
+      if (lockout) {
+        return createJsonResponse({
+          ok: false,
+          error: 'RATE_LIMITED',
+          message: 'Too many failed attempts. Locked out for 10 minutes.'
+        });
+      }
+
+      const failCountStr = cache.get('RL_FAIL_COUNT');
+      const failCount = (failCountStr ? parseInt(failCountStr, 10) : 0) + 1;
+      if (failCount > 10) {
+        cache.put('RL_LOCKOUT', '1', 600);
+        cache.remove('RL_FAIL_COUNT');
+        return createJsonResponse({
+          ok: false,
+          error: 'RATE_LIMITED',
+          message: 'Too many failed attempts. Locked out for 10 minutes.'
+        });
+      } else {
+        cache.put('RL_FAIL_COUNT', String(failCount), 600);
+        return createJsonResponse({
+          ok: false,
+          error: 'UNAUTHORIZED',
+          message: 'Invalid PIN'
+        });
+      }
+    } finally {
+      try {
+        authLock.releaseLock();
+      } catch (e) {}
     }
   }
-
-  // Clear fail count on successful PIN
-  cache.remove('RL_FAIL_COUNT');
 
   const action = payload.action;
   if (!action) {
@@ -1074,8 +1217,9 @@ function doPost(e) {
         const activitiesSheet = getOrCreateSheet(ss, 'Activities', SCHEMA.Activities);
 
         syncHabits(habitsSheet, incomingHabits, serverNow);
-        syncCheckIns(checkInsSheet, incomingCheckIns, serverNow);
-        const rejected = syncJournalEntries(journalSheet, incomingJournal, serverNow);
+        const rejectedCheckIns = syncCheckIns(checkInsSheet, incomingCheckIns, serverNow);
+        const rejectedJournal = syncJournalEntries(journalSheet, incomingJournal, serverNow);
+        const rejected = [...(rejectedCheckIns || []), ...(rejectedJournal || [])];
         syncSettings(settingsSheet, incomingSettings, serverNow);
         syncActivities(activitiesSheet, incomingActivities, serverNow);
         const changes = collectChanges(ss, payload.since);
@@ -1120,6 +1264,12 @@ function doPost(e) {
 function setup() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
+  const props = PropertiesService.getScriptProperties();
+  const configuredPin = props.getProperty('PIN');
+  if (configuredPin && configuredPin.length < 4) {
+    throw new Error('PIN must be at least 4 characters');
+  }
+
   for (const sheetName of Object.keys(SCHEMA)) {
     const headers = SCHEMA[sheetName];
     let sheet = ss.getSheetByName(sheetName);
@@ -1131,8 +1281,6 @@ function setup() {
     const maxCols = Math.max(sheet.getMaxColumns(), headers.length);
     sheet.getRange(1, 1, maxRows, maxCols).setNumberFormat('@');
   }
-
-  const props = PropertiesService.getScriptProperties();
 
   // Folder 'Habbit Diary'
   let folderId = props.getProperty('DIARY_FOLDER_ID');
@@ -1166,7 +1314,7 @@ function setup() {
     }
     props.setProperty('PUSH_SHARED_SECRET', secret);
     if (typeof Logger !== 'undefined') {
-      Logger.log('Generated PUSH_SHARED_SECRET: ' + secret);
+      Logger.log('Generated PUSH_SHARED_SECRET successfully.');
     }
   }
 
@@ -1233,6 +1381,7 @@ function syncDiaryEntries(ss, props, options) {
     const todayJakarta = getTodayJakarta();
     const entries = readAllJournalEntries(sheet);
     const toExport = entries.filter(e => {
+      if (!isValidDayString(e.day)) return false;
       if (e.day > todayJakarta) return false;
       if (!includeToday && e.day === todayJakarta) return false;
       const notPrinted = !e.printedToDiaryAt || String(e.printedToDiaryAt).trim() === '';
@@ -1406,8 +1555,15 @@ if (typeof module !== 'undefined' && module.exports) {
     decideReminder,
     mergeRecordsLWW,
     getTodayJakarta,
+    getYesterdayJakarta,
     getNowHHMMJakarta,
     getMonotonicNow,
+    isValidDayString,
+    clampClientTimestamp,
+    sanitizeFormulaInjection,
+    desanitizeFormulaInjection,
+    isValidPushEndpoint,
+    timingSafeEqualPin,
     createJsonResponse,
     getOrCreateSheet,
     readAllHabits,

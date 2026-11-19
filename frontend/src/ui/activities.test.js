@@ -155,9 +155,10 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     expect(editor2).not.toBeNull();
     expect(editor2.getAttribute('aria-label')).toBe('What could be improved?');
 
-    // Additional notes card is present
-    const notesEditor = root.querySelector('#editor-journal-notes');
-    expect(notesEditor).not.toBeNull();
+    // Additional notes card is not rendered
+    expect(root.querySelector('#journal-notes-card')).toBeNull();
+    expect(root.querySelector('#editor-journal-notes')).toBeNull();
+    expect(journalView.textContent).not.toContain('Additional Notes / Free Reflection');
 
     // Formatting shortcuts exist
     const bulletBtn = root.querySelector('#btn-journal-bullet');
@@ -184,7 +185,7 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     await new Promise((r) => setTimeout(r, 10));
 
     const editor0 = root.querySelector('#editor-journal-content');
-    const notesEditor = root.querySelector('#editor-journal-notes');
+    const editor1 = root.querySelector('#editor-journal-content-1');
     const wordBadge = root.querySelector('#journal-total-words');
 
     expect(wordBadge.textContent).toBe('0 words');
@@ -195,9 +196,9 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
 
     expect(wordBadge.textContent).toBe('5 words');
 
-    // Type in additional notes
-    notesEditor.innerHTML = '<p>Remember to stretch before sleep</p>';
-    notesEditor.dispatchEvent({ type: 'input' });
+    // Type in prompt 2
+    editor1.innerHTML = '<p>Finished the morning workout early</p>';
+    editor1.dispatchEvent({ type: 'input' });
 
     expect(wordBadge.textContent).toBe('10 words');
 
@@ -209,16 +210,18 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     expect(lastCall[1]).toContain('data-prompt-id="jp_day"');
     expect(lastCall[1]).toContain('How was your day?');
     expect(lastCall[1]).toContain('Had a productive planning session');
-    expect(lastCall[1]).toContain('Additional Notes');
-    expect(lastCall[1]).toContain('Remember to stretch before sleep');
+    expect(lastCall[1]).toContain('data-prompt-id="jp_well"');
+    expect(lastCall[1]).toContain('What went well today?');
+    expect(lastCall[1]).toContain('Finished the morning workout early');
+    expect(lastCall[1]).not.toContain('Additional Notes');
+    expect(lastCall[1]).not.toContain('journal-notes-block');
     // Unanswered prompts omitted
-    expect(lastCall[1]).not.toContain('What went well today?');
     expect(lastCall[1]).not.toContain('What could be improved?');
 
     cleanup();
   });
 
-  it('rehydrates prompt answers and additional notes from compiled journal entry on load', async () => {
+  it('rehydrates prompt answers from compiled journal entry on load without rendering an additional notes card', async () => {
     const compiledEntry = `
 <div class="journal-prompt-block" data-prompt-id="jp_day">
   <h3 class="font-bold">How was your day?</h3>
@@ -254,8 +257,9 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     const editor1 = root.querySelector('#editor-journal-content-1');
     expect(editor1.innerHTML).toBe('Completed all deep work sprints.');
 
-    const notesEditor = root.querySelector('#editor-journal-notes');
-    expect(notesEditor.innerHTML).toBe('Quiet evening tea.');
+    expect(root.querySelector('#journal-notes-card')).toBeNull();
+    expect(root.querySelector('#editor-journal-notes')).toBeNull();
+    expect(root.querySelector('#journal-total-words').textContent).toBe('8 words');
 
     cleanup();
   });

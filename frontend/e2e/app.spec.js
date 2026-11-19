@@ -145,6 +145,8 @@ test.describe('Habbit App E2E', () => {
     await page.click('#choice-journals');
     const journalEditor = page.locator('#editor-journal-content');
     await expect(journalEditor).toBeVisible();
+    await expect(page.locator('#journal-notes-card')).toHaveCount(0);
+    await expect(page.locator('#editor-journal-notes')).toHaveCount(0);
 
     // Type reflection text
     const testReflection = 'Refleksi hari ini: berhasil menyelesaikan target dengan fokus.';

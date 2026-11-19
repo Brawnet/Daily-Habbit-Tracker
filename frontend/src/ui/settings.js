@@ -1,6 +1,6 @@
 /**
  * Habbit Settings UI View (SPEC §8, §10)
- * Manages Sync, Habits, Reminders, PWA Installation, and About info.
+ * Manages Appearance, Sync, Habits, Reminders, PWA Installation, and About info.
  */
 
 import { getConfig, setConfig, isValidGasUrl } from '../data/config.js';
@@ -19,7 +19,114 @@ import {
 import { getInstallState, promptInstall, onInstallStateChange } from '../pwa/install.js';
 import { getPushState, enablePush, sendTestPush } from '../pwa/push.js';
 import { showToast } from './shell.js';
+import { getThemePreference, setThemePreference } from './theme.js';
 import { LINKED_ACTIVITIES } from '../shared/contracts.js';
+
+const THEME_OPTIONS = Object.freeze([
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'system', label: 'System' },
+]);
+
+const THEME_OPTION_BASE_CLASS =
+  'flex-1 min-h-[44px] min-w-[44px] px-3 py-2 text-xs sm:text-sm rounded-lg cursor-pointer select-none transition tactile-spring';
+const THEME_OPTION_ACTIVE_CLASS =
+  'bg-[#FFFFFF] dark:bg-[#22201E] text-[#1C1B18] dark:text-[#F4F1EA] shadow-sm border border-[#E6E4DF] dark:border-[#33302C] font-semibold';
+const THEME_OPTION_INACTIVE_CLASS =
+  'bg-transparent text-[#68655F] dark:text-[#A39E93] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA] border border-transparent font-medium';
+
+/**
+ * Builds the per-Device Appearance card with Light / Dark / System segmented radio control.
+ *
+ * @param {'light' | 'dark' | 'system'} initialPreference
+ * @param {(theme: 'light' | 'dark' | 'system') => void} onSelectTheme
+ * @returns {HTMLElement}
+ */
+function createAppearanceSection(initialPreference, onSelectTheme) {
+  const section = document.createElement('section');
+  section.id = 'settings-appearance';
+  section.className =
+    'editorial-card p-4 sm:p-5 space-y-4 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
+  section.setAttribute('aria-labelledby', 'heading-appearance');
+
+  const titleRow = document.createElement('div');
+  titleRow.className =
+    'flex items-center justify-between border-b border-[#E6E4DF] dark:border-[#33302C] pb-3';
+
+  const heading = document.createElement('h2');
+  heading.id = 'heading-appearance';
+  heading.className = 'text-base font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]';
+  heading.textContent = 'Appearance';
+  titleRow.appendChild(heading);
+
+  const helper = document.createElement('p');
+  helper.className = 'text-xs text-[#68655F] dark:text-[#A39E93]';
+  helper.textContent =
+    'Choose how Habbit looks on this Device. System follows your Device theme.';
+
+  const radioGroup = document.createElement('div');
+  radioGroup.id = 'theme-segmented-control';
+  radioGroup.className =
+    'grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-[#F6F5F2] dark:bg-[#161514] border border-[#E6E4DF] dark:border-[#33302C]';
+  radioGroup.setAttribute('role', 'radiogroup');
+  radioGroup.setAttribute('aria-label', 'Theme');
+
+  const buttons = [];
+
+  function syncSelection(selectedValue) {
+    for (const btn of buttons) {
+      const isSelected = btn.dataset.themeOption === selectedValue;
+      btn.setAttribute('aria-checked', isSelected ? 'true' : 'false');
+      btn.setAttribute('tabindex', isSelected ? '0' : '-1');
+      btn.className = `${THEME_OPTION_BASE_CLASS} ${
+        isSelected ? THEME_OPTION_ACTIVE_CLASS : THEME_OPTION_INACTIVE_CLASS
+      }`;
+    }
+  }
+
+  function selectTheme(value) {
+    syncSelection(value);
+    onSelectTheme(value);
+  }
+
+  THEME_OPTIONS.forEach((option, index) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = `theme-option-${option.value}`;
+    btn.dataset.themeOption = option.value;
+    btn.setAttribute('role', 'radio');
+    btn.textContent = option.label;
+
+    btn.addEventListener('click', () => {
+      selectTheme(option.value);
+    });
+
+    btn.addEventListener('keydown', (e) => {
+      let nextIndex = null;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        nextIndex = (index + 1) % THEME_OPTIONS.length;
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        nextIndex = (index - 1 + THEME_OPTIONS.length) % THEME_OPTIONS.length;
+      }
+      if (nextIndex === null) return;
+      e.preventDefault?.();
+      const targetOption = THEME_OPTIONS[nextIndex];
+      const targetBtn = buttons[nextIndex];
+      targetBtn?.focus?.();
+      selectTheme(targetOption.value);
+    });
+
+    buttons.push(btn);
+    radioGroup.appendChild(btn);
+  });
+
+  syncSelection(initialPreference);
+
+  section.appendChild(titleRow);
+  section.appendChild(helper);
+  section.appendChild(radioGroup);
+  return section;
+}
 
 /**
  * Escapes characters for HTML text insertion
@@ -75,16 +182,27 @@ export function mount(el) {
 
   const currentConfig = getConfig();
 
-  el.innerHTML = `
-    <div class="max-w-2xl mx-auto px-4 py-6 space-y-6 pb-28 text-[#1C1B18] dark:text-[#F4F1EA]">
-      <!-- Header -->
-      <header class="space-y-1">
-        <h1 class="text-2xl font-serif font-semibold tracking-tight text-[#1C1B18] dark:text-[#F4F1EA]">Settings</h1>
-        <p class="text-xs sm:text-sm text-[#6E6A63] dark:text-[#A39E93]">
-          Configure sync, manage habits, reminders, and app preferences.
-        </p>
-      </header>
+  el.innerHTML = '';
 
+  const wrapper = document.createElement('div');
+  wrapper.className = 'max-w-2xl mx-auto px-4 py-6 space-y-6 pb-28 text-[#1C1B18] dark:text-[#F4F1EA]';
+
+  const header = document.createElement('header');
+  header.className = 'space-y-1';
+  header.innerHTML = `
+    <h1 class="text-2xl font-serif font-semibold tracking-tight text-[#1C1B18] dark:text-[#F4F1EA]">Settings</h1>
+    <p class="text-xs sm:text-sm text-[#6E6A63] dark:text-[#A39E93]">
+      Configure appearance, sync, manage habits, reminders, and app preferences.
+    </p>
+  `;
+
+  const appearanceSection = createAppearanceSection(getThemePreference(), (theme) => {
+    setThemePreference(theme);
+  });
+
+  const sectionsContainer = document.createElement('div');
+  sectionsContainer.className = 'space-y-6';
+  sectionsContainer.innerHTML = `
       <!-- Section 1: Sync -->
       <section id="settings-sync" class="editorial-card p-4 sm:p-5 space-y-4 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]" aria-labelledby="heading-sync">
         <div class="flex items-center justify-between border-b border-[#E6E4DF] dark:border-[#33302C] pb-3">
@@ -291,8 +409,12 @@ export function mount(el) {
           </p>
         </div>
       </section>
-    </div>
   `;
+
+  wrapper.appendChild(header);
+  wrapper.appendChild(appearanceSection);
+  wrapper.appendChild(sectionsContainer);
+  el.appendChild(wrapper);
 
   // DOM references
   const syncGasUrlInput = el.querySelector('#sync-gas-url');

@@ -1,6 +1,8 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  color-scheme: light;
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
   --sal: env(safe-area-inset-left, 0px);
@@ -40,29 +42,28 @@
   --shadow-soft: 0 8px 24px -4px rgba(28, 27, 24, 0.06);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-canvas: #161514;          /* Warm Obsidian */
-    --surface-card: #22201E;       /* Dark Espresso */
-    --surface-hover: #2C2926;      /* Warm Slate */
-    --text-primary: #F4F1EA;       /* Warm Alabaster */
-    --text-secondary: #A39E93;     /* Muted Stone */
-    --border-hairline: #33302C;    /* Charcoal Line */
+:root.dark {
+  color-scheme: dark;
+  --bg-canvas: #161514;          /* Warm Obsidian */
+  --surface-card: #22201E;       /* Dark Espresso */
+  --surface-hover: #2C2926;      /* Warm Slate */
+  --text-primary: #F4F1EA;       /* Warm Alabaster */
+  --text-secondary: #A39E93;     /* Muted Stone */
+  --border-hairline: #33302C;    /* Charcoal Line */
 
-    --accent-terracotta: #D97E63;
-    --accent-terracotta-soft: rgba(200, 109, 81, 0.22);
-    --accent-sage: #5F8776;
-    --accent-sage-soft: rgba(74, 107, 93, 0.22);
-    --accent-ochre: #E0A653;
-    --accent-ochre-soft: rgba(212, 154, 69, 0.22);
-    --accent-rose: #C67878;
-    --accent-rose-soft: rgba(181, 101, 101, 0.22);
-    --accent-slate: #5E7796;
-    --accent-slate-soft: rgba(74, 96, 122, 0.22);
+  --accent-terracotta: #D97E63;
+  --accent-terracotta-soft: rgba(200, 109, 81, 0.22);
+  --accent-sage: #5F8776;
+  --accent-sage-soft: rgba(74, 107, 93, 0.22);
+  --accent-ochre: #E0A653;
+  --accent-ochre-soft: rgba(212, 154, 69, 0.22);
+  --accent-rose: #C67878;
+  --accent-rose-soft: rgba(181, 101, 101, 0.22);
+  --accent-slate: #5E7796;
+  --accent-slate-soft: rgba(74, 96, 122, 0.22);
 
-    --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.4);
-    --shadow-soft: 0 8px 24px -4px rgba(0, 0, 0, 0.4);
-  }
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-soft: 0 8px 24px -4px rgba(0, 0, 0, 0.4);
 }
 
 @media all and (display-mode: standalone) {
@@ -84,13 +85,6 @@ html, body {
   color: var(--text-primary);
   font-family: var(--font-sans);
   line-height: 1.65;
-}
-
-@media (prefers-color-scheme: dark) {
-  html, body {
-    background-color: var(--bg-canvas);
-    color: var(--text-primary);
-  }
 }
 
 #app, .shell-layout {
@@ -147,11 +141,14 @@ button, a, input, select, textarea, [role="button"], [role="tab"] {
   border-bottom: 1px solid var(--border-hairline);
 }
 
-@media (prefers-color-scheme: dark) {
-  .editorial-header {
-    background-color: rgba(34, 32, 30, 0.92);
-    border-bottom: 1px solid var(--border-hairline);
-  }
+.dark .editorial-header {
+  background-color: rgba(34, 32, 30, 0.92);
+  border-bottom: 1px solid var(--border-hairline);
+}
+
+/* Inline SVG Artwork Theme Fill */
+.act-logo-fill {
+  fill: var(--surface-card, #FFFFFF);
 }
 
 /* Floating Liquid Glass Bottom Navigation Pill */
@@ -230,37 +227,35 @@ button, a, input, select, textarea, [role="button"], [role="tab"] {
   outline-offset: -2px;
 }
 
-@media (prefers-color-scheme: dark) {
-  .liquid-glass-nav {
-    background: rgba(12, 12, 14, 0.72);
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    box-shadow:
-      0 12px 32px rgba(0, 0, 0, 0.45),
-      0 2px 8px rgba(0, 0, 0, 0.28),
-      inset 0 1px 0 rgba(255, 255, 255, 0.28),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.12),
-      inset 0 0 12px rgba(255, 255, 255, 0.04);
-  }
+.dark .liquid-glass-nav {
+  background: rgba(12, 12, 14, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.45),
+    0 2px 8px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 12px rgba(255, 255, 255, 0.04);
+}
 
-  .liquid-glass-nav::before {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 38%);
-  }
+.dark .liquid-glass-nav::before {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 38%);
+}
 
-  .liquid-glass-indicator {
-    background: rgba(255, 255, 255, 0.16);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.22),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.06);
-  }
+.dark .liquid-glass-indicator {
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+}
 
-  .liquid-glass-tab {
-    color: rgba(255, 255, 255, 0.78);
-  }
+.dark .liquid-glass-tab {
+  color: rgba(255, 255, 255, 0.78);
+}
 
-  .liquid-glass-tab:hover:not(:disabled),
-  .liquid-glass-tab[aria-selected="true"] {
-    color: #FFFFFF;
-  }
+.dark .liquid-glass-tab:hover:not(:disabled),
+.dark .liquid-glass-tab[aria-selected="true"] {
+  color: #FFFFFF;
 }
 
 /* 12px Rounded Paper Cards with 1px Hairline Border */

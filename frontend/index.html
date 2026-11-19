@@ -8,8 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Habbit" />
     <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#09090b" />
+    <meta id="meta-theme-color" name="theme-color" content="#F6F5F2" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <title>Habbit</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -19,6 +18,27 @@
       try {
         if (typeof navigator !== 'undefined' && (navigator.standalone || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches))) {
           document.documentElement.style.setProperty('--app-height', '100vh');
+        }
+      } catch (e) {}
+      try {
+        var savedTheme = null;
+        try {
+          savedTheme = window.localStorage && window.localStorage.getItem('habbit.theme');
+        } catch (err) {}
+        var normalizedTheme = (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system') ? savedTheme : 'system';
+        var systemDark = Boolean(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var resolvedTheme = (normalizedTheme === 'dark' || (normalizedTheme === 'system' && systemDark)) ? 'dark' : 'light';
+        var rootEl = document.documentElement;
+        if (resolvedTheme === 'dark') {
+          rootEl.classList.add('dark');
+        } else {
+          rootEl.classList.remove('dark');
+        }
+        rootEl.setAttribute('data-theme', resolvedTheme);
+        rootEl.style.colorScheme = resolvedTheme;
+        var themeMeta = document.getElementById('meta-theme-color');
+        if (themeMeta) {
+          themeMeta.setAttribute('content', resolvedTheme === 'dark' ? '#161514' : '#F6F5F2');
         }
       } catch (e) {}
     </script>

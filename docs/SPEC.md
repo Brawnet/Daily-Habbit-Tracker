@@ -7,7 +7,7 @@ Sumber kebenaran lain (baca dulu, jangan diduplikasi di sini):
 - `GLOSSARY.md` — istilah domain. Pakai istilah ini **persis** di kode, UI, nama sheet, dan komentar (Habit, Archived Habit, Check-in, Streak, Day, Journal Entry, Diary, Device, Reminder).
 - `docs/adr/0001` offline-first · `0002` Sheets sumber kebenaran, Diary satu arah · `0003` arsitektur Reminder.
 
-Nama aplikasi: **Habbit** (dengan dua "b", disengaja). UI berbahasa **Inggris**. Tema terang/gelap mengikuti sistem.
+Nama aplikasi: **Habbit** (dengan dua "b", disengaja). UI berbahasa **Inggris**. Pengaturan tema per Device tersedia dalam 3 pilihan: `Light`, `Dark`, dan `System` (default mengikuti tema Device).
 
 ---
 
@@ -82,7 +82,7 @@ Google Sheets (dibuat `setup()`; seluruh sheet diformat teks `@` agar tanggal ti
 
 IndexedDB `habbit` (via `idb`): stores `habits` (keyPath `id`), `checkIns` (`id`, index `habitId`), `journalEntries` (`day`), `settings` (`key`), `activities` (`id`), `books` (`id`), `bookChapters` (`id`, index `bookId`), `outbox` (`key` = `${type}:${recordKey}`, nilai = snapshot record terbaru, ter-coalesce), `meta` (`key`: `cursor`, `lastSyncedAt`). Catatan: `books` dan `bookChapters` adalah workspace pembelajaran lokal pada Device dan tidak diantrikan ke outbox sync Google Sheets.
 
-localStorage: `habbit.gasUrl`, `habbit.pin`, `habbit.deviceId` (uuid, dibuat sekali).
+localStorage: `habbit.gasUrl`, `habbit.pin`, `habbit.deviceId` (uuid, dibuat sekali), `habbit.theme` (`'light' | 'dark' | 'system'`, default `'system'`, lokal per Device dan tidak disinkronkan ke Google Sheets).
 
 ## 5. Kontrak API (PWA → Apps Script)
 
@@ -168,7 +168,7 @@ Keluar bila: `nowHHMM < reminderTime`, atau `LAST_REMINDER_DAY === todayJakarta`
 ## 8. PWA & kompatibilitas iOS/Android (wajib semua)
 
 - `<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">` (tanpa `maximum-scale`).
-- `apple-mobile-web-app-capable=yes`, `mobile-web-app-capable=yes`, `apple-mobile-web-app-status-bar-style=black-translucent`, `apple-mobile-web-app-title=Habbit`, `<link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png">`, `theme-color` untuk light & dark (`media="(prefers-color-scheme: …)"`).
+- `apple-mobile-web-app-capable=yes`, `mobile-web-app-capable=yes`, `apple-mobile-web-app-status-bar-style=black-translucent`, `apple-mobile-web-app-title=Habbit`, `<link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png">`, `<meta id="meta-theme-color" name="theme-color">` (`#F6F5F2` light / `#161514` dark) serta CSS `color-scheme` disinkronkan dinamis mengikuti tema aktif (`Light`, `Dark`, atau `System`).
 - Manifest: `name`/`short_name` `Habbit`, `start_url: "/"`, `scope: "/"`, `display: "standalone"`, ikon 192/512/maskable.
 - Header: `padding-top: env(safe-area-inset-top)`; floating bottom nav (`position: absolute` di dalam `.shell-layout`, bukan `position: fixed` sesuai `ADR-0004`): `bottom: max(12px, env(safe-area-inset-bottom, 12px))` serta ruang gulir bawah `#tab-content` `calc(max(12px, env(safe-area-inset-bottom, 12px)) + 88px)`; kiri/kanan juga untuk landscape. Tinggi layout menggunakan arsitektur `--app-height` dalam normal flow (`100dvh` di browser, di-override ke `100vh` saat standalone via `navigator.standalone` / `@media (display-mode: standalone)` dan disinkronisasi dinamis via `computeAppHeight()` piksel aktual untuk mengisi penuh layar tanpa celah status bar maupun pemotongan).
 - Semua `input`, `select`, `textarea`: `font-size: 16px` minimum.
@@ -187,7 +187,7 @@ Keluar bila: `nowHHMM < reminderTime`, atau `LAST_REMINDER_DAY === todayJakarta`
 
 - **Today**: tanggal panjang; progres `3/5 done`; daftar Habit aktif (urut `sortOrder`) dengan tombol Check-in + Streak (`🔥 5`); textarea Journal Entry autosave (debounce 800 ms) dengan status "Saved"; empty state → link ke Manage Habits.
 - **History**: kartu per Habit aktif: heatmap 12 minggu (kolom = minggu, baris Senin–Minggu), Streak saat ini, Streak terpanjang, completion 30 hari (penyebut = Day dalam 30 hari terakhir sejak `createdAt` Habit). Sel hari ini & kemarin bisa di-tap untuk toggle Check-in; lainnya read-only. Bagian "Archived" ter-collapse. Di bawah: kotak search + daftar Journal Entry terbaru dulu (tanggal pendek + cuplikan 2 baris, highlight hasil search); tap → tampilan baca penuh (read-only; bila hari ini → tombol "Edit in Today").
-- **Settings**: *Sync* (URL Web App, PIN `type=password`, Test connection → `ping`, Sync now, last synced, status) · *Manage Habits* (tambah, rename inline, ▲▼, archive/unarchive) · *Reminder* (input jam, Enable notifications, Send test notification, status) · *Install App* (§8) · versi aplikasi.
+- **Settings**: *Appearance* (pilihan tema per Device: `Light` | `Dark` | `System`, berlaku seketika tanpa tombol simpan) · *Sync* (URL Web App, PIN `type=password`, Test connection → `ping`, Sync now, last synced, status) · *Manage Habits* (tambah, rename inline, ▲▼, archive/unarchive) · *Reminder* (input jam, Enable notifications, Send test notification, status) · *Install App* (§8) · versi aplikasi.
 - **Activities**: empty state dengan tombol buat baru; daftar Activity dengan filter status (*All*, *Backlog*, *In Progress*, *Completed*, *Archived*); kartu Activity menampilkan judul, author, badge tipe & status, jumlah halaman, dan ringkasan eksekutif; aksi Edit dan Archive; modal form dengan input terstandar (16px, target sentuh ≥44px).
 
 ## 11. Tes (Vitest) — wajib hijau

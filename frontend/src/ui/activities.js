@@ -41,14 +41,6 @@ import { isBlank, htmlToText, htmlToMarkdownText } from '../domain/text.js';
 import { sanitizeJournalHtml } from '../domain/journal.js';
 export const JOURNALING_LOGO_SVG = `
 <svg class="w-full h-full" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-  <defs>
-    <style>
-      .act-logo-fill { fill: #FFFFFF; }
-      @media (prefers-color-scheme: dark) {
-        .act-logo-fill { fill: #22201E; }
-      }
-    </style>
-  </defs>
   <g transform="rotate(-7.5 46 51)" stroke-width="3.2">
     <rect class="act-logo-fill" x="26" y="22" width="44" height="53" rx="8" />
     <rect x="26" y="22" width="44" height="53" rx="8" fill="none" />
@@ -73,14 +65,6 @@ export const JOURNALING_LOGO_SVG = `
 
 export const BOOKS_SUMMARY_LOGO_SVG = `
 <svg class="w-full h-full" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-  <defs>
-    <style>
-      .act-logo-fill { fill: #FFFFFF; }
-      @media (prefers-color-scheme: dark) {
-        .act-logo-fill { fill: #22201E; }
-      }
-    </style>
-  </defs>
   <g stroke-width="3">
     <path d="M 17 38 C 17 37 18 36 19 36 M 83 38 C 83 37 82 36 81 36" />
     <path d="M 17 38 L 17 67 C 17 73 33 77 50 72 C 67 77 83 73 83 67 L 83 38" />

@@ -353,4 +353,103 @@ test.describe('Habbit App E2E', () => {
     });
     expect(zOrders.modalZ).toBeGreaterThan(zOrders.navZ);
   });
+
+  test('switches per-Device theme across Light, Dark, and System, persists across reload, and follows live OS updates', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.click('button[data-tab="settings"]');
+    await expect(page.locator('#settings-appearance')).toBeVisible();
+    await expect(page.locator('#settings-sync')).toBeVisible();
+
+    // Appearance card sits above Sync card
+    const appearanceBox = await page.locator('#settings-appearance').boundingBox();
+    const syncBox = await page.locator('#settings-sync').boundingBox();
+    expect(appearanceBox).not.toBeNull();
+    expect(syncBox).not.toBeNull();
+    expect(appearanceBox.y).toBeLessThan(syncBox.y);
+
+    // Defaults to System (following light OS)
+    await expect(page.locator('#theme-option-system')).toHaveAttribute('aria-checked', 'true');
+    const initialThemeState = await page.evaluate(() => ({
+      hasDarkClass: document.documentElement.classList.contains('dark'),
+      dataTheme: document.documentElement.getAttribute('data-theme'),
+      colorScheme: getComputedStyle(document.documentElement).colorScheme,
+      metaThemeColor: document.querySelector('meta[name="theme-color"]')?.getAttribute('content'),
+      bodyBg: getComputedStyle(document.body).backgroundColor,
+    }));
+    expect(initialThemeState.hasDarkClass).toBe(false);
+    expect(initialThemeState.dataTheme).toBe('light');
+    expect(initialThemeState.colorScheme).toBe('light');
+    expect(initialThemeState.metaThemeColor).toBe('#F6F5F2');
+    expect(initialThemeState.bodyBg).toBe('rgb(246, 245, 242)');
+
+    // Click Dark while OS is still light -> switches immediately without toast
+    await page.click('#theme-option-dark');
+    await expect(page.locator('#theme-option-dark')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('#toast-container').locator('> *')).toHaveCount(0);
+
+    const darkThemeState = await page.evaluate(() => ({
+      hasDarkClass: document.documentElement.classList.contains('dark'),
+      dataTheme: document.documentElement.getAttribute('data-theme'),
+      colorScheme: getComputedStyle(document.documentElement).colorScheme,
+      metaThemeColor: document.querySelector('meta[name="theme-color"]')?.getAttribute('content'),
+      bodyBg: getComputedStyle(document.body).backgroundColor,
+      storedTheme: localStorage.getItem('habbit.theme'),
+    }));
+    expect(darkThemeState.hasDarkClass).toBe(true);
+    expect(darkThemeState.dataTheme).toBe('dark');
+    expect(darkThemeState.colorScheme).toBe('dark');
+    expect(darkThemeState.metaThemeColor).toBe('#161514');
+    expect(darkThemeState.bodyBg).toBe('rgb(22, 21, 20)');
+    expect(darkThemeState.storedTheme).toBe('dark');
+
+    // Activities inline SVG fill adapts to manual Dark mode even on light OS
+    await page.click('button[data-tab="activities"]');
+    await expect(page.locator('#activities-choice-hub')).toBeVisible();
+    const svgFill = await page.locator('.act-logo-fill').first().evaluate((el) => getComputedStyle(el).fill);
+    expect(svgFill).toBe('rgb(34, 32, 30)');
+
+    // Reload -> persists Dark before paint and keeps Dark radio selected in Settings
+    await page.reload();
+    const afterReloadState = await page.evaluate(() => ({
+      hasDarkClass: document.documentElement.classList.contains('dark'),
+      metaThemeColor: document.querySelector('meta[name="theme-color"]')?.getAttribute('content'),
+    }));
+    expect(afterReloadState.hasDarkClass).toBe(true);
+    expect(afterReloadState.metaThemeColor).toBe('#161514');
+
+    await page.click('button[data-tab="settings"]');
+    await expect(page.locator('#theme-option-dark')).toHaveAttribute('aria-checked', 'true');
+
+    // Emulate dark OS, then click Light -> manual Light overrides dark OS
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.click('#theme-option-light');
+    await expect(page.locator('#theme-option-light')).toHaveAttribute('aria-checked', 'true');
+
+    const forcedLightState = await page.evaluate(() => ({
+      hasDarkClass: document.documentElement.classList.contains('dark'),
+      dataTheme: document.documentElement.getAttribute('data-theme'),
+      metaThemeColor: document.querySelector('meta[name="theme-color"]')?.getAttribute('content'),
+      bodyBg: getComputedStyle(document.body).backgroundColor,
+    }));
+    expect(forcedLightState.hasDarkClass).toBe(false);
+    expect(forcedLightState.dataTheme).toBe('light');
+    expect(forcedLightState.metaThemeColor).toBe('#F6F5F2');
+    expect(forcedLightState.bodyBg).toBe('rgb(246, 245, 242)');
+
+    // Click System -> immediately adopts dark OS, then live-switches to light OS
+    await page.click('#theme-option-system');
+    await expect(page.locator('#theme-option-system')).toHaveAttribute('aria-checked', 'true');
+    expect(await page.evaluate(() => document.documentElement.classList.contains('dark'))).toBe(true);
+
+    await page.emulateMedia({ colorScheme: 'light' });
+    await expect.poll(() =>
+      page.evaluate(() => ({
+        hasDarkClass: document.documentElement.classList.contains('dark'),
+        metaThemeColor: document.querySelector('meta[name="theme-color"]')?.getAttribute('content'),
+      }))
+    ).toEqual({
+      hasDarkClass: false,
+      metaThemeColor: '#F6F5F2',
+    });
+  });
 });

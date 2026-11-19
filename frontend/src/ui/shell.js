@@ -171,7 +171,6 @@ function updateBottomNavSelection() {
       bottomNavIndicatorElement.style.width = `${100 / tabKeys.length}%`;
       bottomNavIndicatorElement.style.transform = `translateX(${activeIndex * 100}%)`;
       bottomNavIndicatorElement.style.opacity = '1';
-      bottomNavIndicatorElement.dataset.activeIndex = String(activeIndex);
     } else {
       bottomNavIndicatorElement.style.opacity = '0';
     }
@@ -183,7 +182,7 @@ function renderBottomNavButtons() {
   bottomNavElement.innerHTML = '';
 
   const track = document.createElement('div');
-  track.className = 'liquid-glass-track relative flex items-center w-full h-12';
+  track.className = 'liquid-glass-track';
 
   bottomNavIndicatorElement = document.createElement('span');
   bottomNavIndicatorElement.id = 'bottom-nav-indicator';
@@ -330,6 +329,17 @@ export function navigate(name, updateUrl = true) {
   }
 }
 
+function createToastContainer() {
+  const container = document.createElement('div');
+  container.id = 'toast-container';
+  container.setAttribute('aria-live', 'polite');
+  container.setAttribute('aria-atomic', 'true');
+  container.className =
+    'fixed left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none w-full max-w-sm px-4';
+  container.style.bottom = TOAST_BOTTOM_OFFSET;
+  return container;
+}
+
 /**
  * Displays an accessible floating toast notification.
  * @param {string} message
@@ -339,13 +349,7 @@ export function navigate(name, updateUrl = true) {
 export function showToast(message, { action } = {}) {
   let container = document.getElementById('toast-container');
   if (!container && rootElement) {
-    container = document.createElement('div');
-    container.id = 'toast-container';
-    container.setAttribute('aria-live', 'polite');
-    container.setAttribute('aria-atomic', 'true');
-    container.className =
-      'fixed left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none w-full max-w-sm px-4';
-    container.style.bottom = TOAST_BOTTOM_OFFSET;
+    container = createToastContainer();
     rootElement.appendChild(container);
   }
 
@@ -500,13 +504,7 @@ export function mountShell(rootEl) {
   tabContentElement.style.paddingBottom = 'calc(max(12px, env(safe-area-inset-bottom, 12px)) + 88px)';
 
   // --- Floating Toast Container ---
-  const toastContainer = document.createElement('div');
-  toastContainer.id = 'toast-container';
-  toastContainer.setAttribute('aria-live', 'polite');
-  toastContainer.setAttribute('aria-atomic', 'true');
-  toastContainer.className =
-    'fixed left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none w-full max-w-sm px-4';
-  toastContainer.style.bottom = TOAST_BOTTOM_OFFSET;
+  const toastContainer = createToastContainer();
 
   // --- Bottom Navigation Bar ---
   bottomNavElement = document.createElement('nav');

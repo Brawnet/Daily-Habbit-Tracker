@@ -25,17 +25,21 @@ describe('PWA & iOS standalone layout contract', () => {
 
     expect(html).toContain('viewport-fit=cover');
     expect(html).toContain('<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />');
-    expect(html).toContain('content="#ffffff"');
-    expect(html).toContain('content="#09090b"');
+    expect(html).toContain('<meta id="meta-theme-color" name="theme-color" content="#F6F5F2" />');
+    expect(html).toContain('habbit.theme');
+    expect(html).toContain('#F6F5F2');
+    expect(html).toContain('#161514');
   });
 
-  it('defines dynamic app-height architecture and safe area variables in styles.css and index.html', async () => {
+  it('defines dynamic app-height architecture, safe area variables, and class-based dark mode in styles.css and index.html', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const html = readFileSync(resolve(__dirname, '../index.html'), 'utf8');
     const css = readFileSync(resolve(__dirname, './styles.css'), 'utf8');
 
     expect(html).toContain("document.documentElement.style.setProperty('--app-height', '100vh')");
+    expect(css).toContain('@custom-variant dark (&:where(.dark, .dark *));');
+    expect(css).not.toContain('@media (prefers-color-scheme: dark)');
     expect(css).toContain('--app-height: 100dvh');
     expect(css).toContain('--app-height: 100vh');
     expect(css).toContain('--sat: env(safe-area-inset-top, 0px)');

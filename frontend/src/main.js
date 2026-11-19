@@ -1,4 +1,5 @@
 import './styles.css';
+import { initTheme } from './ui/theme.js';
 import { mountShell, registerTab, navigate } from './ui/shell.js';
 import { mount as mountToday } from './ui/today.js';
 import { mount as mountHistory } from './ui/history.js';
@@ -86,6 +87,9 @@ registerTab('settings', {
   activeIcon: settingsActiveIcon,
   mount: mountSettings,
 });
+
+// Apply saved per-Device theme & watch live OS preference changes
+initTheme();
 
 // Start background auto sync if available
 try {

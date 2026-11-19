@@ -271,3 +271,13 @@ export class MockDocument {
     return true;
   }
 }
+
+export function createMemoryStorage(initial = {}) {
+  const store = new Map(Object.entries(initial));
+  return {
+    getItem: (key) => (store.has(key) ? store.get(key) : null),
+    setItem: (key, val) => store.set(key, String(val)),
+    removeItem: (key) => store.delete(key),
+    clear: () => store.clear(),
+  };
+}

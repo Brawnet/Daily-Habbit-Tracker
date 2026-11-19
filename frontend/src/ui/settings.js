@@ -19,13 +19,13 @@ import {
 import { getInstallState, promptInstall, onInstallStateChange } from '../pwa/install.js';
 import { getPushState, enablePush, sendTestPush } from '../pwa/push.js';
 import { showToast } from './shell.js';
-import { getThemePreference, setThemePreference } from './theme.js';
+import { THEME_MODES, getThemePreference, setThemePreference } from './theme.js';
 import { LINKED_ACTIVITIES } from '../shared/contracts.js';
 
 const THEME_OPTIONS = Object.freeze([
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-  { value: 'system', label: 'System' },
+  { value: THEME_MODES.LIGHT, label: 'Light' },
+  { value: THEME_MODES.DARK, label: 'Dark' },
+  { value: THEME_MODES.SYSTEM, label: 'System' },
 ]);
 
 const THEME_OPTION_BASE_CLASS =

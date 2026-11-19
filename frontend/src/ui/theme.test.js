@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { MockDocument } from './test-helpers.js';
+import { MockDocument, createMemoryStorage } from './test-helpers.js';
 import {
   THEME_STORAGE_KEY,
   THEME_MODES,
@@ -11,16 +11,6 @@ import {
   applyTheme,
   initTheme,
 } from './theme.js';
-
-function createMemoryStorage(initial = {}) {
-  const store = new Map(Object.entries(initial));
-  return {
-    getItem: (key) => (store.has(key) ? store.get(key) : null),
-    setItem: (key, val) => store.set(key, String(val)),
-    removeItem: (key) => store.delete(key),
-    clear: () => store.clear(),
-  };
-}
 
 function createThemeTestEnv({ initialStorage = {}, prefersDark = false } = {}) {
   const storage = createMemoryStorage(initialStorage);
@@ -220,6 +210,31 @@ describe('ui/theme.js', () => {
 
       cleanup();
       expect(legacyMql.removeListener).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores live OS theme changes after manual selection even when storage.setItem throws', () => {
+      const env = createThemeTestEnv({ prefersDark: false });
+      const readOnlyStorage = {
+        getItem: () => null,
+        setItem: () => {
+          throw new Error('QuotaExceededError');
+        },
+      };
+
+      const cleanup = initTheme({ storage: readOnlyStorage, doc: env.doc, win: env.win });
+      setThemePreference('light', { storage: readOnlyStorage, doc: env.doc, win: env.win });
+
+      env.win._setPrefersDark(true);
+      expect(getThemePreference({ storage: readOnlyStorage })).toBe('light');
+      expect(env.root.classList.contains('dark')).toBe(false);
+      expect(env.meta.getAttribute('content')).toBe('#F6F5F2');
+
+      // Re-selecting 'system' re-enables live OS updates
+      setThemePreference('system', { storage: readOnlyStorage, doc: env.doc, win: env.win });
+      expect(env.root.classList.contains('dark')).toBe(true);
+      expect(env.meta.getAttribute('content')).toBe('#161514');
+
+      cleanup();
     });
   });
 });

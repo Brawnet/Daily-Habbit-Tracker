@@ -49,6 +49,13 @@ export function resolveTheme(preference, systemPrefersDark) {
   return systemPrefersDark ? THEME_MODES.DARK : THEME_MODES.LIGHT;
 }
 
+const inSessionWriteOverrides = new WeakMap();
+const NO_STORAGE_KEY = Object.freeze({});
+
+function getOverrideKey(store) {
+  return store && typeof store === 'object' ? store : NO_STORAGE_KEY;
+}
+
 function resolveSafeStorage(storage) {
   if (storage) return storage;
   try {
@@ -60,6 +67,7 @@ function resolveSafeStorage(storage) {
 
 /**
  * Reads the persisted per-Device theme preference, defaulting safely to 'system'.
+ * Falls back to any in-session override recorded when storage writes failed.
  *
  * @param {{ storage?: Storage }} [options]
  * @returns {'light' | 'dark' | 'system'}
@@ -67,10 +75,12 @@ function resolveSafeStorage(storage) {
 export function getThemePreference({ storage } = {}) {
   try {
     const store = resolveSafeStorage(storage);
+    const override = inSessionWriteOverrides.get(getOverrideKey(store));
+    if (override) return override;
     if (!store || typeof store.getItem !== 'function') return THEME_MODES.SYSTEM;
     return normalizeTheme(store.getItem(THEME_STORAGE_KEY));
   } catch {
-    return THEME_MODES.SYSTEM;
+    return inSessionWriteOverrides.get(NO_STORAGE_KEY) || THEME_MODES.SYSTEM;
   }
 }
 
@@ -126,6 +136,8 @@ export function applyTheme(
 
 /**
  * Persists a per-Device theme preference to local storage and applies it immediately.
+ * If storage writes throw or are unavailable, keeps an in-session override so live OS
+ * preference changes do not silently overwrite the user's explicit choice.
  *
  * @param {'light' | 'dark' | 'system' | string} preference
  * @param {{ storage?: Storage, doc?: Document, win?: Window }} [options]
@@ -133,11 +145,18 @@ export function applyTheme(
  */
 export function setThemePreference(preference, { storage, doc, win } = {}) {
   const normalized = normalizeTheme(preference);
+  const store = resolveSafeStorage(storage);
+  const key = getOverrideKey(store);
   try {
-    const store = resolveSafeStorage(storage);
-    store?.setItem?.(THEME_STORAGE_KEY, normalized);
+    if (store && typeof store.setItem === 'function') {
+      store.setItem(THEME_STORAGE_KEY, normalized);
+      inSessionWriteOverrides.delete(key);
+    } else {
+      inSessionWriteOverrides.set(key, normalized);
+    }
   } catch {
-    // Ignore storage write failures (e.g. private mode / quota limits); still apply DOM theme
+    // Storage write failed (e.g. private mode / quota limits); preserve choice for this session
+    inSessionWriteOverrides.set(key, normalized);
   }
   return applyTheme(normalized, { doc, win });
 }
@@ -162,6 +181,7 @@ export function initTheme(options = {}) {
     win = typeof window !== 'undefined' ? window : undefined,
   } = options || {};
 
+  inSessionWriteOverrides.delete(NO_STORAGE_KEY);
   applyTheme(getThemePreference({ storage }), { doc, win });
 
   let mql = null;

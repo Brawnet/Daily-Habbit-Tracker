@@ -420,7 +420,7 @@ test.describe('Habbit App E2E', () => {
     await page.click('button[data-tab="settings"]');
     await expect(page.locator('#theme-option-dark')).toHaveAttribute('aria-checked', 'true');
 
-    // Emulate dark OS, then click Light -> manual Light overrides dark OS
+    // Emulate dark OS, then click Light -> manual Light overrides dark OS & persists on reload
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.click('#theme-option-light');
     await expect(page.locator('#theme-option-light')).toHaveAttribute('aria-checked', 'true');
@@ -430,11 +430,24 @@ test.describe('Habbit App E2E', () => {
       dataTheme: document.documentElement.getAttribute('data-theme'),
       metaThemeColor: document.querySelector('meta[name="theme-color"]')?.getAttribute('content'),
       bodyBg: getComputedStyle(document.body).backgroundColor,
+      storedTheme: localStorage.getItem('habbit.theme'),
     }));
     expect(forcedLightState.hasDarkClass).toBe(false);
     expect(forcedLightState.dataTheme).toBe('light');
     expect(forcedLightState.metaThemeColor).toBe('#F6F5F2');
     expect(forcedLightState.bodyBg).toBe('rgb(246, 245, 242)');
+    expect(forcedLightState.storedTheme).toBe('light');
+
+    await page.reload();
+    const afterLightReload = await page.evaluate(() => ({
+      hasDarkClass: document.documentElement.classList.contains('dark'),
+      metaThemeColor: document.querySelector('meta[name="theme-color"]')?.getAttribute('content'),
+    }));
+    expect(afterLightReload.hasDarkClass).toBe(false);
+    expect(afterLightReload.metaThemeColor).toBe('#F6F5F2');
+
+    await page.click('button[data-tab="settings"]');
+    await expect(page.locator('#theme-option-light')).toHaveAttribute('aria-checked', 'true');
 
     // Click System -> immediately adopts dark OS, then live-switches to light OS
     await page.click('#theme-option-system');

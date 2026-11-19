@@ -1,16 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { MockElement, MockDocument } from './test-helpers.js';
+import { MockElement, MockDocument, createMemoryStorage } from './test-helpers.js';
 import { THEME_STORAGE_KEY } from './theme.js';
-
-function createMemoryStorage(initial = {}) {
-  const store = new Map(Object.entries(initial));
-  return {
-    getItem: (key) => (store.has(key) ? store.get(key) : null),
-    setItem: (key, val) => store.set(key, String(val)),
-    removeItem: (key) => store.delete(key),
-    clear: () => store.clear(),
-  };
-}
 
 describe('ui/settings.js Appearance section', () => {
   let mockDoc;

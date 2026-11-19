@@ -34,13 +34,17 @@ Engineering conventions and review guidelines for the Habbit codebase.
     flex-direction: column;
     overflow: hidden;
   }
+
+  .shell-layout {
+    position: relative;
+  }
   ```
 - **Status Bar Meta**: Keep `<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />` in `index.html` to allow full-bleed rendering behind the status bar and Dynamic Island notch.
 
 ## 2. Touch Ergonomics & Safe Areas
 
 - **Top Safe Area**: Header must pad for hardware cutouts: `calc(env(safe-area-inset-top, 0px) + 12px)`.
-- **Bottom Safe Area**: Bottom navigation must protect the iOS home gesture indicator: `max(12px, env(safe-area-inset-bottom, 12px))`.
+- **Bottom Safe Area**: Floating `#bottom-nav` anchors with `position: absolute` inside `.shell-layout` (never `position: fixed`, per `ADR-0004`) at `bottom: max(12px, env(safe-area-inset-bottom, 12px))`, with lateral offsets `max(16px, env(safe-area-inset-left/right, 0px))` and `max-width: 380px` centered on wider screens. Scrollable `#tab-content` reserves bottom clearance `calc(max(12px, env(safe-area-inset-bottom, 12px)) + 88px)` and `#toast-container` anchors at `calc(max(12px, env(safe-area-inset-bottom, 12px)) + 84px)`.
 - **Lateral Insets**: Pad lateral edges for landscape orientation: `max(16px, env(safe-area-inset-left, 0px))` / `max(16px, env(safe-area-inset-right, 0px))`.
 - **Touch Target Bounds**: All interactive buttons, tabs, links, and quick-add chips must meet minimum touch targets $\ge 44 \times 44\text{px}$.
 - **Input Font Size**: All text inputs, textareas, and select elements must specify `font-size: 16px` to prevent iOS Safari auto-zooming on focus.

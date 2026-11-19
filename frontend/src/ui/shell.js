@@ -8,7 +8,7 @@ import { today, msUntilNextDay } from '../domain/day.js';
 import { computeAppHeight, isIOSStandalone } from './viewport.js';
 
 /**
- * @typedef {{ title: string, icon: string, mount: (el: HTMLElement) => (() => void) | void }} TabDescriptor
+ * @typedef {{ title: string, icon: string, activeIcon?: string, mount: (el: HTMLElement) => (() => void) | void }} TabDescriptor
  */
 
 /** @type {Record<string, TabDescriptor>} */
@@ -23,6 +23,7 @@ let shellMounted = false;
 let rootElement = null;
 let tabContentElement = null;
 let bottomNavElement = null;
+let bottomNavIndicatorElement = null;
 let syncDotElement = null;
 let syncTextElement = null;
 let syncBadgeElement = null;
@@ -89,6 +90,7 @@ function getCurrentDayString() {
 }
 
 const UNCONFIGURED_SYNC_LABEL = 'Offline / Local';
+const TOAST_BOTTOM_OFFSET = 'calc(max(12px, env(safe-area-inset-bottom, 12px)) + 84px)';
 
 /**
  * Updates header sync indicator UI
@@ -144,35 +146,73 @@ function updateSyncIndicator(status) {
   }
 }
 
+function getTabIconMarkup(tab, isActive) {
+  return isActive && tab?.activeIcon ? tab.activeIcon : (tab?.icon || '');
+}
+
+function updateBottomNavSelection() {
+  if (!bottomNavElement) return;
+
+  const buttons = bottomNavElement.querySelectorAll('button[data-tab]');
+  for (const btn of buttons) {
+    const name = btn.dataset.tab;
+    const isSelected = name === currentTab;
+    btn.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+    const iconSpan = btn.querySelector('.tab-icon');
+    if (iconSpan) {
+      iconSpan.innerHTML = getTabIconMarkup(registeredTabs[name], isSelected);
+    }
+  }
+
+  if (bottomNavIndicatorElement) {
+    const tabKeys = Object.keys(registeredTabs);
+    const activeIndex = tabKeys.indexOf(currentTab);
+    if (tabKeys.length > 0 && activeIndex >= 0) {
+      bottomNavIndicatorElement.style.width = `${100 / tabKeys.length}%`;
+      bottomNavIndicatorElement.style.transform = `translateX(${activeIndex * 100}%)`;
+      bottomNavIndicatorElement.style.opacity = '1';
+    } else {
+      bottomNavIndicatorElement.style.opacity = '0';
+    }
+  }
+}
+
 function renderBottomNavButtons() {
   if (!bottomNavElement) return;
   bottomNavElement.innerHTML = '';
 
+  const track = document.createElement('div');
+  track.className = 'liquid-glass-track';
+
+  bottomNavIndicatorElement = document.createElement('span');
+  bottomNavIndicatorElement.id = 'bottom-nav-indicator';
+  bottomNavIndicatorElement.className = 'liquid-glass-indicator';
+  bottomNavIndicatorElement.setAttribute('aria-hidden', 'true');
+  track.appendChild(bottomNavIndicatorElement);
+
   const tabKeys = Object.keys(registeredTabs);
   for (const name of tabKeys) {
     const tab = registeredTabs[name];
-    const isActive = name === currentTab;
+    const label = tab.title || name;
 
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.role = 'tab';
     btn.id = `tab-btn-${name}`;
     btn.dataset.tab = name;
-    btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+    btn.setAttribute('aria-selected', 'false');
     btn.setAttribute('aria-controls', 'tab-content');
-    btn.className = `flex flex-col items-center justify-center flex-1 min-w-[44px] min-h-[44px] py-1 px-2 text-xs transition-all cursor-pointer select-none tactile-spring ${
-      isActive
-        ? 'text-[#C86D51] dark:text-[#D97E63] font-semibold'
-        : 'text-[#68655F] dark:text-[#A39E93] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA]'
-    }`;
+    btn.className =
+      'liquid-glass-tab relative z-10 flex items-center justify-center flex-1 min-w-[44px] min-h-[44px] h-12 rounded-full cursor-pointer select-none';
 
     const iconSpan = document.createElement('span');
     iconSpan.className = 'tab-icon flex items-center justify-center pointer-events-none w-6 h-6';
-    iconSpan.innerHTML = tab.icon || '';
 
     const labelSpan = document.createElement('span');
-    labelSpan.className = 'tab-title text-[11px] mt-0.5 pointer-events-none';
-    labelSpan.textContent = tab.title || name;
+    labelSpan.className = 'tab-title sr-only';
+    labelSpan.textContent = label;
 
     btn.appendChild(iconSpan);
     btn.appendChild(labelSpan);
@@ -182,8 +222,11 @@ function renderBottomNavButtons() {
       navigate(name);
     });
 
-    bottomNavElement.appendChild(btn);
+    track.appendChild(btn);
   }
+
+  bottomNavElement.appendChild(track);
+  updateBottomNavSelection();
 }
 
 function handleDayChangeCheck() {
@@ -225,8 +268,8 @@ function scheduleMidnightCheck() {
  * @param {string} name
  * @param {TabDescriptor} config
  */
-export function registerTab(name, { title, icon, mount }) {
-  registeredTabs[name] = { title, icon, mount };
+export function registerTab(name, { title, icon, activeIcon, mount }) {
+  registeredTabs[name] = { title, icon, activeIcon: activeIcon || null, mount };
   if (shellMounted) {
     renderBottomNavButtons();
   }
@@ -254,20 +297,7 @@ export function navigate(name, updateUrl = true) {
   currentTab = name;
 
   // Update Bottom Nav active state
-  if (bottomNavElement) {
-    const buttons = bottomNavElement.querySelectorAll('button[data-tab]');
-    for (const btn of buttons) {
-      const isSelected = btn.dataset.tab === name;
-      btn.setAttribute('aria-selected', isSelected ? 'true' : 'false');
-      if (isSelected) {
-        btn.className =
-          'flex flex-col items-center justify-center flex-1 min-w-[44px] min-h-[44px] py-1 px-2 text-xs transition-all cursor-pointer select-none tactile-spring text-[#C86D51] dark:text-[#D97E63] font-semibold';
-      } else {
-        btn.className =
-          'flex flex-col items-center justify-center flex-1 min-w-[44px] min-h-[44px] py-1 px-2 text-xs transition-all cursor-pointer select-none tactile-spring text-[#68655F] dark:text-[#A39E93] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA]';
-      }
-    }
-  }
+  updateBottomNavSelection();
 
   // Update URL parameter
   if (updateUrl && typeof window !== 'undefined' && window.location && window.history) {
@@ -299,6 +329,17 @@ export function navigate(name, updateUrl = true) {
   }
 }
 
+function createToastContainer() {
+  const container = document.createElement('div');
+  container.id = 'toast-container';
+  container.setAttribute('aria-live', 'polite');
+  container.setAttribute('aria-atomic', 'true');
+  container.className =
+    'fixed left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none w-full max-w-sm px-4';
+  container.style.bottom = TOAST_BOTTOM_OFFSET;
+  return container;
+}
+
 /**
  * Displays an accessible floating toast notification.
  * @param {string} message
@@ -308,13 +349,7 @@ export function navigate(name, updateUrl = true) {
 export function showToast(message, { action } = {}) {
   let container = document.getElementById('toast-container');
   if (!container && rootElement) {
-    container = document.createElement('div');
-    container.id = 'toast-container';
-    container.setAttribute('aria-live', 'polite');
-    container.setAttribute('aria-atomic', 'true');
-    container.className =
-      'fixed left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none w-full max-w-sm px-4';
-    container.style.bottom = 'calc(max(12px, env(safe-area-inset-bottom, 12px)) + 64px)';
+    container = createToastContainer();
     rootElement.appendChild(container);
   }
 
@@ -385,7 +420,7 @@ export function mountShell(rootEl) {
   attachAppHeightListeners();
 
   const shellLayout = document.createElement('div');
-  shellLayout.className = 'shell-layout flex flex-col bg-[#F6F5F2] text-[#1C1B18] dark:bg-[#161514] dark:text-[#F4F1EA] antialiased select-none';
+  shellLayout.className = 'shell-layout relative flex flex-col bg-[#F6F5F2] text-[#1C1B18] dark:bg-[#161514] dark:text-[#F4F1EA] antialiased select-none';
   // --- Header ---
   const header = document.createElement('header');
   header.className =
@@ -463,28 +498,23 @@ export function mountShell(rootEl) {
   tabContentElement = document.createElement('main');
   tabContentElement.id = 'tab-content';
   tabContentElement.setAttribute('role', 'tabpanel');
-  tabContentElement.className = 'flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 animate-stagger-in';
+  tabContentElement.className = 'flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pt-4 animate-stagger-in';
   tabContentElement.style.paddingLeft = 'max(16px, env(safe-area-inset-left, 0px))';
   tabContentElement.style.paddingRight = 'max(16px, env(safe-area-inset-right, 0px))';
+  tabContentElement.style.paddingBottom = 'calc(max(12px, env(safe-area-inset-bottom, 12px)) + 88px)';
 
   // --- Floating Toast Container ---
-  const toastContainer = document.createElement('div');
-  toastContainer.id = 'toast-container';
-  toastContainer.setAttribute('aria-live', 'polite');
-  toastContainer.setAttribute('aria-atomic', 'true');
-  toastContainer.className =
-    'fixed left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none w-full max-w-sm px-4';
-  toastContainer.style.bottom = 'calc(max(12px, env(safe-area-inset-bottom, 12px)) + 64px)';
+  const toastContainer = createToastContainer();
+
   // --- Bottom Navigation Bar ---
   bottomNavElement = document.createElement('nav');
   bottomNavElement.id = 'bottom-nav';
   bottomNavElement.setAttribute('role', 'tablist');
   bottomNavElement.setAttribute('aria-label', 'Main Navigation');
-  bottomNavElement.className =
-    'editorial-nav flex items-center justify-around shrink-0 pt-2';
-  bottomNavElement.style.paddingBottom = 'max(12px, env(safe-area-inset-bottom, 12px))';
-  bottomNavElement.style.paddingLeft = 'max(8px, env(safe-area-inset-left, 0px))';
-  bottomNavElement.style.paddingRight = 'max(8px, env(safe-area-inset-right, 0px))';
+  bottomNavElement.className = 'liquid-glass-nav absolute z-30';
+  bottomNavElement.style.bottom = 'max(12px, env(safe-area-inset-bottom, 12px))';
+  bottomNavElement.style.left = 'max(16px, env(safe-area-inset-left, 0px))';
+  bottomNavElement.style.right = 'max(16px, env(safe-area-inset-right, 0px))';
 
   shellLayout.appendChild(header);
   shellLayout.appendChild(tabContentElement);

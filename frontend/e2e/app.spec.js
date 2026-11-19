@@ -262,4 +262,95 @@ test.describe('Habbit App E2E', () => {
     expect(appHeightProp).toMatch(/^100vh$/);
     await verifyNavBounds(page, vp.height);
   });
+
+  test('renders floating Liquid Glass pill icon-only with sliding indicator and accessible labels', async ({ page }) => {
+    await page.setViewportSize({ width: 393, height: 852 });
+
+    const bottomNav = page.locator('#bottom-nav');
+    const indicator = page.locator('#bottom-nav-indicator');
+    await expect(bottomNav).toBeVisible();
+    await expect(indicator).toBeAttached();
+
+    const navPosition = await bottomNav.evaluate((el) => getComputedStyle(el).position);
+    expect(navPosition).toBe('absolute');
+
+    const tabs = [
+      { id: 'today', title: 'Today' },
+      { id: 'activities', title: 'Activities' },
+      { id: 'history', title: 'History' },
+      { id: 'settings', title: 'Settings' },
+    ];
+
+    for (const tab of tabs) {
+      const btn = page.locator(`button[data-tab="${tab.id}"]`);
+      await expect(btn).toHaveAttribute('aria-label', tab.title);
+      const labelBox = await btn.locator('.tab-title').boundingBox();
+      expect(labelBox).not.toBeNull();
+      expect(labelBox.width).toBeLessThanOrEqual(1);
+    }
+
+    const todayBtn = page.locator('button[data-tab="today"]');
+    const activitiesBtn = page.locator('button[data-tab="activities"]');
+    const todayActiveSvg = await todayBtn.locator('.tab-icon').innerHTML();
+    const activitiesInactiveSvg = await activitiesBtn.locator('.tab-icon').innerHTML();
+    const initialIndicatorBox = await indicator.boundingBox();
+
+    await activitiesBtn.click();
+    await page.waitForTimeout(350);
+
+    const todayInactiveSvg = await todayBtn.locator('.tab-icon').innerHTML();
+    const activitiesActiveSvg = await activitiesBtn.locator('.tab-icon').innerHTML();
+    const movedIndicatorBox = await indicator.boundingBox();
+
+    expect(todayInactiveSvg).not.toBe(todayActiveSvg);
+    expect(activitiesActiveSvg).not.toBe(activitiesInactiveSvg);
+    expect(movedIndicatorBox.x).toBeGreaterThan(initialIndicatorBox.x);
+  });
+
+  test('centers compact floating pill on wider viewports', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.waitForTimeout(150);
+
+    const navBox = await page.locator('#bottom-nav').boundingBox();
+    expect(navBox).not.toBeNull();
+    expect(navBox.width).toBeLessThanOrEqual(381);
+
+    const navCenterX = navBox.x + navBox.width / 2;
+    expect(Math.abs(navCenterX - 512)).toBeLessThanOrEqual(2);
+  });
+
+  test('scrolls bottom-most Settings content clear of floating pill and stacks modals above it', async ({ page }) => {
+    await page.setViewportSize({ width: 393, height: 852 });
+
+    // Scroll clearance on Settings
+    await page.click('button[data-tab="settings"]');
+    await expect(page.locator('#settings-about')).toBeVisible();
+
+    await page.evaluate(() => {
+      const main = document.getElementById('tab-content');
+      main.scrollTop = main.scrollHeight;
+    });
+    await page.waitForTimeout(100);
+
+    const aboutBox = await page.locator('#settings-about').boundingBox();
+    const navBox = await page.locator('#bottom-nav').boundingBox();
+    expect(aboutBox).not.toBeNull();
+    expect(navBox).not.toBeNull();
+    expect(aboutBox.y + aboutBox.height).toBeLessThanOrEqual(navBox.y + 2);
+
+    // Full-screen modal stacking above floating pill
+    await page.click('button[data-tab="activities"]');
+    await page.click('#choice-journals');
+    await page.click('#btn-customize-prompts');
+
+    const modal = page.locator('#modal-customize-prompts');
+    await expect(modal).toBeVisible();
+
+    const zOrders = await page.evaluate(() => {
+      const modalZ = Number(getComputedStyle(document.getElementById('modal-customize-prompts')).zIndex || 0);
+      const navZ = Number(getComputedStyle(document.getElementById('bottom-nav')).zIndex || 0);
+      return { modalZ, navZ };
+    });
+    expect(zOrders.modalZ).toBeGreaterThan(zOrders.navZ);
+  });
 });

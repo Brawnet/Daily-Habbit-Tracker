@@ -156,6 +156,7 @@ describe('ui/shell.js', () => {
     const shellLayout = root.children[0];
     expect(shellLayout).toBeDefined();
     expect(shellLayout.className).toContain('shell-layout');
+    expect(shellLayout.className).toContain('relative');
 
     const header = shellLayout.children[0];
     expect(header.tagName).toBe('HEADER');
@@ -163,13 +164,16 @@ describe('ui/shell.js', () => {
     expect(header.style.paddingLeft).toBe('max(16px, env(safe-area-inset-left, 0px))');
     expect(header.style.paddingRight).toBe('max(16px, env(safe-area-inset-right, 0px))');
 
+    const tabContent = mockDoc.getElementById('tab-content');
+    expect(tabContent.style.paddingBottom).toBe('calc(max(12px, env(safe-area-inset-bottom, 12px)) + 88px)');
+
     const bottomNav = mockDoc.getElementById('bottom-nav');
-    expect(bottomNav.style.paddingBottom).toBe('max(12px, env(safe-area-inset-bottom, 12px))');
-    expect(bottomNav.style.paddingLeft).toBe('max(8px, env(safe-area-inset-left, 0px))');
-    expect(bottomNav.style.paddingRight).toBe('max(8px, env(safe-area-inset-right, 0px))');
+    expect(bottomNav.style.bottom).toBe('max(12px, env(safe-area-inset-bottom, 12px))');
+    expect(bottomNav.style.left).toBe('max(16px, env(safe-area-inset-left, 0px))');
+    expect(bottomNav.style.right).toBe('max(16px, env(safe-area-inset-right, 0px))');
 
     const toastContainer = mockDoc.getElementById('toast-container');
-    expect(toastContainer.style.bottom).toBe('calc(max(12px, env(safe-area-inset-bottom, 12px)) + 64px)');
+    expect(toastContainer.style.bottom).toBe('calc(max(12px, env(safe-area-inset-bottom, 12px)) + 84px)');
   });
 
   it('synchronizes --app-height dynamically in standalone mode via syncAppHeight', async () => {
@@ -276,6 +280,103 @@ describe('ui/shell.js', () => {
 
     const tabContent = mockDoc.getElementById('tab-content');
     expect(tabContent.textContent).toBe('Activities View');
+  });
+
+  it('renders icon-only bottom navigation buttons with sr-only labels and aria-label attributes', () => {
+    const root = mockDoc.createElement('div');
+    registerTab('today', { title: 'Today', icon: '<span>t</span>', mount: vi.fn() });
+    registerTab('activities', { title: 'Activities', icon: '<span>a</span>', mount: vi.fn() });
+    registerTab('history', { title: 'History', icon: '<span>h</span>', mount: vi.fn() });
+    registerTab('settings', { title: 'Settings', icon: '<span>s</span>', mount: vi.fn() });
+
+    mountShell(root);
+
+    const expected = [
+      { id: 'today', title: 'Today' },
+      { id: 'activities', title: 'Activities' },
+      { id: 'history', title: 'History' },
+      { id: 'settings', title: 'Settings' },
+    ];
+
+    for (const item of expected) {
+      const btn = mockDoc.getElementById(`tab-btn-${item.id}`);
+      expect(btn.getAttribute('aria-label')).toBe(item.title);
+      expect(btn.title).toBe(item.title);
+      const labelSpan = btn.querySelector('.tab-title');
+      expect(labelSpan).not.toBeNull();
+      expect(labelSpan.classList.contains('sr-only')).toBe(true);
+      expect(labelSpan.textContent).toBe(item.title);
+    }
+  });
+
+  it('swaps between outline and solid-filled icons when switching tabs and falls back to single icon', () => {
+    const root = mockDoc.createElement('div');
+    registerTab('today', {
+      title: 'Today',
+      icon: '<svg data-kind="outline-today"></svg>',
+      activeIcon: '<svg data-kind="solid-today"></svg>',
+      mount: vi.fn(),
+    });
+    registerTab('activities', {
+      title: 'Activities',
+      icon: '<svg data-kind="outline-act"></svg>',
+      activeIcon: '<svg data-kind="solid-act"></svg>',
+      mount: vi.fn(),
+    });
+    registerTab('history', {
+      title: 'History',
+      icon: '<svg data-kind="single-history"></svg>',
+      mount: vi.fn(),
+    });
+
+    mountShell(root);
+
+    const todayIconEl = mockDoc.getElementById('tab-btn-today').querySelector('.tab-icon');
+    const actIconEl = mockDoc.getElementById('tab-btn-activities').querySelector('.tab-icon');
+    const histIconEl = mockDoc.getElementById('tab-btn-history').querySelector('.tab-icon');
+
+    expect(todayIconEl.innerHTML).toContain('solid-today');
+    expect(actIconEl.innerHTML).toContain('outline-act');
+    expect(histIconEl.innerHTML).toContain('single-history');
+
+    navigate('activities');
+    expect(todayIconEl.innerHTML).toContain('outline-today');
+    expect(actIconEl.innerHTML).toContain('solid-act');
+
+    navigate('history');
+    expect(actIconEl.innerHTML).toContain('outline-act');
+    expect(histIconEl.innerHTML).toContain('single-history');
+  });
+
+  it('positions sliding active capsule indicator across navigate and popstate transitions', () => {
+    const root = mockDoc.createElement('div');
+    registerTab('today', { title: 'Today', icon: '<span>t</span>', mount: vi.fn() });
+    registerTab('activities', { title: 'Activities', icon: '<span>a</span>', mount: vi.fn() });
+    registerTab('history', { title: 'History', icon: '<span>h</span>', mount: vi.fn() });
+    registerTab('settings', { title: 'Settings', icon: '<span>s</span>', mount: vi.fn() });
+
+    mountShell(root);
+
+    const bottomNav = mockDoc.getElementById('bottom-nav');
+    const indicator = bottomNav.querySelector('#bottom-nav-indicator');
+    expect(indicator).not.toBeNull();
+    expect(indicator.getAttribute('aria-hidden')).toBe('true');
+    expect(indicator.style.width).toBe('25%');
+    expect(indicator.style.transform).toBe('translateX(0%)');
+
+    navigate('activities');
+    expect(indicator.style.transform).toBe('translateX(100%)');
+
+    navigate('history');
+    expect(indicator.style.transform).toBe('translateX(200%)');
+
+    navigate('settings');
+    expect(indicator.style.transform).toBe('translateX(300%)');
+
+    // Verify browser popstate updates capsule too
+    mockWin.location = new URL('https://habbit.test/?tab=activities');
+    mockWin.dispatchEvent({ type: 'popstate' });
+    expect(indicator.style.transform).toBe('translateX(100%)');
   });
 
   it('updates sync status indicator and pending badge live', () => {

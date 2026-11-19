@@ -248,7 +248,6 @@ export function decompilePromptJournal(htmlContent) {
         answers[sec.id] = sanitizeJournalHtml(sec.contentHtml);
       }
     }
-    return { answers };
   }
 
   return { answers };

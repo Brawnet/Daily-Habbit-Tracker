@@ -311,6 +311,31 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     cleanup();
   });
 
+  it('does not overwrite a same-day notes-only or freeform Journal Entry when customizing prompts', async () => {
+    repoModule.getJournalEntry = vi.fn(async () => ({
+      day: '2026-10-22',
+      content: '<div class="journal-notes-block"><h3 class="font-bold">Additional Notes</h3><div class="journal-notes-answer">Legacy thoughts.</div></div>',
+    }));
+
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 10));
+
+    root.querySelector('#choice-journals').click();
+    await new Promise((r) => setTimeout(r, 10));
+
+    root.querySelector('#btn-customize-prompts').click();
+    const modal = mockDoc.getElementById('modal-customize-prompts');
+    modal.querySelector('#input-add-prompt').value = 'New gratitude prompt?';
+    modal.querySelector('#btn-submit-add-prompt').click();
+    modal.querySelector('#btn-done-customize-modal').click();
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(repoModule.saveJournalEntry).not.toHaveBeenCalled();
+
+    cleanup();
+  });
+
   it('reflects Done badge on Choice Hub when journal has content, and Write Journal when empty', async () => {
     // 1. With empty journal
     repoModule.getJournalEntry = vi.fn(async () => null);

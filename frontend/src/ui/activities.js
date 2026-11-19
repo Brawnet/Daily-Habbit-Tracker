@@ -1229,7 +1229,7 @@ export function mount(rootEl) {
       cachedPrompts = newPrompts;
       prompts = newPrompts;
       saveJournalPrompts(setSetting, newPrompts);
-      if (hasNonEmptyJournalAnswers(answers) || (journalDraft && journalDraft.trim())) {
+      if (hasNonEmptyJournalAnswers(answers)) {
         const compiled = compilePromptJournal(newPrompts, answers);
         journalDraft = compiled;
         saveJournalEntry(today(), compiled).catch(() => {});

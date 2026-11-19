@@ -545,6 +545,18 @@ describe('domain/text', () => {
   });
 });
 
+const HISTORICAL_JOURNAL_HTML = `
+<div class="journal-prompt-block" data-prompt-id="jp_day">
+  <h3 class="font-bold">How was your day?</h3>
+  <div class="journal-prompt-answer">Felt calm and productive.</div>
+</div>
+
+<div class="journal-notes-block">
+  <h3 class="font-bold">Additional Notes</h3>
+  <div class="journal-notes-answer">Read 20 pages.</div>
+</div>
+`.trim();
+
 describe('domain/journal', () => {
   it('compiles answered prompts in order and omits blank prompts', () => {
     const prompts = [
@@ -647,49 +659,25 @@ describe('domain/journal', () => {
     expect(result.answers.jp_improve).toBeUndefined();
     expect('additionalNotes' in result).toBe(false);
 
-    const historicalHtml = `
-<div class="journal-prompt-block" data-prompt-id="jp_day">
-  <h3 class="font-bold">How was your day?</h3>
-  <div class="journal-prompt-answer"><p>Legacy prompt answer</p></div>
-</div>
-
-<div class="journal-notes-block">
-  <h3 class="font-bold">Additional Notes</h3>
-  <div class="journal-notes-answer">Night reflection</div>
-</div>
-`.trim();
-
-    const historicalResult = decompilePromptJournal(historicalHtml);
-    expect(historicalResult.answers.jp_day).toContain('Legacy prompt answer');
+    const historicalResult = decompilePromptJournal(HISTORICAL_JOURNAL_HTML);
+    expect(historicalResult.answers.jp_day).toContain('Felt calm and productive.');
     expect('additionalNotes' in historicalResult).toBe(false);
   });
 
   it('parses structured blocks into array for History reader view', () => {
-    const compiled = `
-<div class="journal-prompt-block" data-prompt-id="jp_day">
-  <h3 class="font-bold">How was your day?</h3>
-  <div class="journal-prompt-answer">Felt calm and productive.</div>
-</div>
-
-<div class="journal-notes-block">
-  <h3 class="font-bold">Additional Notes</h3>
-  <div class="journal-notes-answer">Read 20 pages.</div>
-</div>
-`.trim();
-
-    const blocks = parseStructuredJournalBlocks(compiled);
+    const blocks = parseStructuredJournalBlocks(HISTORICAL_JOURNAL_HTML);
     expect(blocks.length).toBe(2);
     expect(blocks[0].title).toBe('How was your day?');
     expect(blocks[0].contentHtml).toBe('Felt calm and productive.');
     expect(blocks[1].title).toBe('Additional Notes');
     expect(blocks[1].contentHtml).toBe('Read 20 pages.');
 
-    const legacyBlocks = parseStructuredJournalBlocks('<p>Old freeform note.</p>');
+    const legacyBlocks = parseStructuredJournalBlocks('<p>Old freeform Journal Entry.</p>');
     expect(legacyBlocks).toEqual([
       {
         type: 'freeform',
         title: 'Daily Reflection',
-        contentHtml: '<p>Old freeform note.</p>',
+        contentHtml: '<p>Old freeform Journal Entry.</p>',
       },
     ]);
   });

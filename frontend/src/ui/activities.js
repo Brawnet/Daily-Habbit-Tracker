@@ -1204,13 +1204,9 @@ export function mount(rootEl) {
     wrap.className = 'flex flex-col gap-4 animate-in fade-in duration-150 relative';
 
     let prompts = cachedPrompts;
-    const { answers, additionalNotes } = decompilePromptJournal(journalDraft, prompts);
-    let currentNotes = additionalNotes;
+    const { answers } = decompilePromptJournal(journalDraft);
 
-    function handleUpdateAnswers(updatedNotes) {
-      if (typeof updatedNotes === 'string') {
-        currentNotes = updatedNotes;
-      }
+    function handleUpdateAnswers() {
       const statusBadge =
         wrap.querySelector('#journal-status') ||
         wrap.querySelector('#journal-status-badge');
@@ -1219,7 +1215,7 @@ export function mount(rootEl) {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(async () => {
         try {
-          const compiled = compilePromptJournal(prompts, answers, currentNotes);
+          const compiled = compilePromptJournal(prompts, answers);
           journalDraft = compiled;
           await saveJournalEntry(today(), compiled);
           if (statusBadge) statusBadge.textContent = 'Saved';
@@ -1233,8 +1229,8 @@ export function mount(rootEl) {
       cachedPrompts = newPrompts;
       prompts = newPrompts;
       saveJournalPrompts(setSetting, newPrompts);
-      if (hasNonEmptyJournalAnswers(answers, currentNotes) || (journalDraft && journalDraft.trim())) {
-        const compiled = compilePromptJournal(newPrompts, answers, currentNotes);
+      if (hasNonEmptyJournalAnswers(answers)) {
+        const compiled = compilePromptJournal(newPrompts, answers);
         journalDraft = compiled;
         saveJournalEntry(today(), compiled).catch(() => {});
       }
@@ -1254,7 +1250,6 @@ export function mount(rootEl) {
     const cardsEl = renderPromptCardsJournal({
       prompts,
       answers,
-      additionalNotes: currentNotes,
       status: journalStatus,
       onUpdateAnswers: handleUpdateAnswers,
       onOpenCustomizeModal: handleOpenCustomizeModal,

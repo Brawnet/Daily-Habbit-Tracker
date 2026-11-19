@@ -90,7 +90,6 @@ export async function saveJournalPrompts(setSettingFn, prompts) {
 export function renderPromptCardsJournal({
   prompts,
   answers,
-  additionalNotes,
   status,
   onUpdateAnswers,
   onOpenCustomizeModal,
@@ -118,7 +117,7 @@ export function renderPromptCardsJournal({
   const wordBadge = document.createElement('span');
   wordBadge.id = 'journal-total-words';
   wordBadge.className = 'font-mono text-xs text-[#68655F] dark:text-[#A39E93] px-2';
-  wordBadge.textContent = `${computeWordCount(answers, additionalNotes)} words`;
+  wordBadge.textContent = `${computeWordCount(answers)} words`;
 
   const statusBadge = document.createElement('span');
   statusBadge.id = 'journal-status';
@@ -217,7 +216,7 @@ export function renderPromptCardsJournal({
     // Connect editor events
     editor.addEventListener('input', () => {
       answers[p.id] = editor.innerHTML;
-      wordBadge.textContent = `${computeWordCount(answers, additionalNotes)} words`;
+      wordBadge.textContent = `${computeWordCount(answers)} words`;
       onUpdateAnswers();
     });
 
@@ -244,42 +243,6 @@ export function renderPromptCardsJournal({
     card.appendChild(editor);
     container.appendChild(card);
   });
-
-  // 3. Additional Notes Card
-  const notesCard = document.createElement('div');
-  notesCard.id = 'journal-notes-card';
-  notesCard.className =
-    'editorial-card flex flex-col gap-3 p-4 sm:p-5 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
-
-  const notesHeader = document.createElement('div');
-  notesHeader.className = 'flex items-center justify-between';
-  notesHeader.innerHTML = `
-    <div class="flex items-center gap-2">
-      <span class="w-6 h-6 rounded-md bg-[#EFECE6] dark:bg-[#2C2926] text-[#68655F] dark:text-[#A39E93] text-xs font-bold flex items-center justify-center shrink-0">✦</span>
-      <h3 class="text-sm font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]">Additional Notes / Free Reflection</h3>
-    </div>
-    <span class="text-[11px] text-zinc-400">Optional</span>
-  `;
-  notesCard.appendChild(notesHeader);
-
-  const notesEditor = document.createElement('div');
-  notesEditor.id = 'editor-journal-notes';
-  notesEditor.setAttribute('contenteditable', 'true');
-  notesEditor.setAttribute('role', 'textbox');
-  notesEditor.setAttribute('aria-multiline', 'true');
-  notesEditor.setAttribute('aria-label', 'Additional Notes');
-  notesEditor.className =
-    'rich-editor w-full min-h-[90px] p-3 text-base sm:text-sm rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#B56565] focus:bg-white dark:focus:bg-[#161514] transition leading-relaxed outline-none [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-6 [&_ol]:my-1.5 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-6 [&_ul]:my-1.5 [&_p]:my-1';
-  notesEditor.innerHTML = additionalNotes || '';
-
-  notesEditor.addEventListener('input', () => {
-    additionalNotes = notesEditor.innerHTML;
-    wordBadge.textContent = `${computeWordCount(answers, additionalNotes)} words`;
-    onUpdateAnswers(additionalNotes);
-  });
-
-  notesCard.appendChild(notesEditor);
-  container.appendChild(notesCard);
 
   return container;
 }

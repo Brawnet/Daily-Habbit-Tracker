@@ -115,10 +115,9 @@ export function sanitizeJournalHtml(html) {
  * Omits blank/skipped prompts, but preserves answered archived prompts.
  * @param {Array<{ id: string, prompt: string, order: number, archived: boolean }>} prompts
  * @param {Record<string, string>} answers
- * @param {string} [additionalNotes='']
  * @returns {string}
  */
-export function compilePromptJournal(prompts, answers, additionalNotes = '') {
+export function compilePromptJournal(prompts, answers) {
   let out = '';
   const sorted = [...(prompts || [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   for (const p of sorted) {
@@ -131,15 +130,6 @@ export function compilePromptJournal(prompts, answers, additionalNotes = '') {
     out += `  <h3 class="font-bold text-zinc-900 dark:text-zinc-100">${escapeHtml(p.prompt)}</h3>\n`;
     out += `  <div class="journal-prompt-answer">${cleanAns}</div>\n`;
     out += `</div>\n\n`;
-  }
-
-  const cleanNotes = sanitizeJournalHtml(typeof additionalNotes === 'string' ? additionalNotes : '').trim();
-  const notesText = cleanNotes.replace(/<[^>]*>/g, '').trim();
-  if (notesText) {
-    out += `<div class="journal-notes-block">\n`;
-    out += `  <h3 class="font-bold text-zinc-900 dark:text-zinc-100">Additional Notes</h3>\n`;
-    out += `  <div class="journal-notes-answer">${cleanNotes}</div>\n`;
-    out += `</div>\n`;
   }
 
   return out.trim();
@@ -220,17 +210,15 @@ export function parseStructuredJournalBlocks(htmlContent) {
 }
 
 /**
- * Decompiles existing HTML content into prompt answers and additional notes.
+ * Decompiles existing HTML content into prompt answers.
  * @param {string} htmlContent
- * @param {Array} [prompts]
- * @returns {{ answers: Record<string, string>, additionalNotes: string }}
+ * @returns {{ answers: Record<string, string> }}
  */
-export function decompilePromptJournal(htmlContent, prompts) {
+export function decompilePromptJournal(htmlContent) {
   const answers = {};
-  let additionalNotes = '';
 
   if (!htmlContent || typeof htmlContent !== 'string') {
-    return { answers, additionalNotes };
+    return { answers };
   }
 
   // Use DOMParser if available in browser
@@ -247,11 +235,7 @@ export function decompilePromptJournal(htmlContent, prompts) {
             answers[id] = sanitizeJournalHtml(ansEl.innerHTML.trim());
           }
         }
-        const notesEl = doc.querySelector('.journal-notes-block .journal-notes-answer');
-        if (notesEl) {
-          additionalNotes = sanitizeJournalHtml(notesEl.innerHTML.trim());
-        }
-        return { answers, additionalNotes };
+        return { answers };
       }
     } catch {}
   }
@@ -262,45 +246,36 @@ export function decompilePromptJournal(htmlContent, prompts) {
     for (const sec of parsedSections) {
       if (sec.type === 'prompt' && sec.id) {
         answers[sec.id] = sanitizeJournalHtml(sec.contentHtml);
-      } else if (sec.type === 'notes') {
-        additionalNotes = sanitizeJournalHtml(sec.contentHtml);
       }
     }
-    return { answers, additionalNotes };
   }
 
-  // Legacy fallback
-  additionalNotes = sanitizeJournalHtml(htmlContent);
-  return { answers, additionalNotes };
+  return { answers };
 }
 
 /**
- * Computes total word count across all prompt answers and additional notes.
+ * Computes total word count across all prompt answers.
  * @param {Record<string, string>} answers
- * @param {string} [notes]
  * @returns {number}
  */
-export function computeWordCount(answers, notes) {
+export function computeWordCount(answers) {
   let combined = '';
   for (const key of Object.keys(answers || {})) {
     combined += ' ' + (answers[key] || '');
   }
-  combined += ' ' + (notes || '');
   const textOnly = combined.replace(/<[^>]*>/g, ' ').trim();
   return textOnly ? textOnly.split(/\s+/).filter(Boolean).length : 0;
 }
 
 /**
- * Checks whether any prompt answer or notes has meaningful content.
+ * Checks whether any prompt answer has meaningful content.
  * @param {Record<string, string>} answers
- * @param {string} [notes]
  * @returns {boolean}
  */
-export function hasNonEmptyJournalAnswers(answers, notes) {
+export function hasNonEmptyJournalAnswers(answers) {
   for (const key of Object.keys(answers || {})) {
     const val = (answers[key] || '').replace(/<[^>]*>/g, ' ').trim();
     if (val) return true;
   }
-  const cleanNotes = (notes || '').replace(/<[^>]*>/g, ' ').trim();
-  return Boolean(cleanNotes);
+  return false;
 }

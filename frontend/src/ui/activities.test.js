@@ -458,35 +458,77 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
 
     const dateLabel = metaBar.querySelector('label');
     expect(dateLabel).not.toBeNull();
-    expect(dateLabel.getAttribute('for')).toBe('input-journal-date');
+    expect(dateLabel.getAttribute('for')).toBe('btn-journal-day-picker');
     expect(dateLabel.textContent).toBe('Journal Day');
 
-    let dateInput = root.querySelector('#input-journal-date');
-    expect(dateInput).not.toBeNull();
-    expect(dateInput.type).toBe('date');
-    expect(dateInput.getAttribute('aria-label')).toBe('Journal Day');
-    expect(dateInput.value).toBe(todayDay);
-    expect(dateInput.getAttribute('min')).toBe(minDay);
-    expect(dateInput.getAttribute('max')).toBe(todayDay);
-    expect(dateInput.style.fontSize).toBe('16px');
-    expect(dateInput.classList.contains('min-h-[44px]')).toBe(true);
-    expect(dateInput.classList.contains('min-w-[44px]')).toBe(true);
-    expect(dateInput.parentElement.classList.contains('editorial-card')).toBe(false);
+    let dayTrigger = root.querySelector('#btn-journal-day-picker');
+    expect(dayTrigger).not.toBeNull();
+    expect(dayTrigger.type).toBe('button');
+    expect(dayTrigger.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(dayTrigger.getAttribute('aria-expanded')).toBe('false');
+    expect(dayTrigger.textContent).toContain(formatShort(todayDay));
+    expect(dayTrigger.classList.contains('min-h-[44px]')).toBe(true);
+    expect(dayTrigger.classList.contains('min-w-[44px]')).toBe(true);
+    expect(dayTrigger.parentElement.classList.contains('editorial-card')).toBe(false);
+    expect(root.querySelector('#journal-day-calendar-popover')).toBeNull();
     expect(root.querySelector('#btn-customize-prompts')).not.toBeNull();
 
-    // Type without waiting for 800ms debounce, then switch Day -> flushes pending save before loading pastDay
+    const pickDayFromCalendar = (targetDayStr) => {
+      const trigger = root.querySelector('#btn-journal-day-picker');
+      expect(trigger).not.toBeNull();
+      trigger.click();
+      expect(trigger.getAttribute('aria-expanded')).toBe('true');
+
+      const popover = root.querySelector('#journal-day-calendar-popover');
+      expect(popover).not.toBeNull();
+      expect(popover.getAttribute('role')).toBe('dialog');
+
+      const findDayBtn = (dayStr) =>
+        popover.querySelectorAll('.journal-calendar-day-btn').find((b) => b.dataset.day === dayStr) || null;
+
+      let dayBtn = findDayBtn(targetDayStr);
+      if (!dayBtn && targetDayStr < todayDay) {
+        const prevMonthBtn = popover.querySelector('#btn-calendar-prev-month');
+        if (prevMonthBtn && !prevMonthBtn.disabled) {
+          prevMonthBtn.click();
+          dayBtn = findDayBtn(targetDayStr);
+        }
+      }
+      expect(dayBtn).not.toBeNull();
+      expect(dayBtn.disabled).toBe(false);
+      dayBtn.click();
+    };
+
+    // Inspect calendar bounds: today is enabled, tomorrow & day before minDay are disabled
+    dayTrigger.click();
+    const initialPopover = root.querySelector('#journal-day-calendar-popover');
+    expect(initialPopover).not.toBeNull();
+    const allDayBtns = initialPopover.querySelectorAll('.journal-calendar-day-btn');
+    const tomorrowStr = addDays(todayDay, 1);
+    const tomorrowBtn = allDayBtns.find((b) => b.dataset.day === tomorrowStr);
+    if (tomorrowBtn) expect(tomorrowBtn.disabled).toBe(true);
+    const tooOldStr = addDays(minDay, -1);
+    const tooOldBtn = allDayBtns.find((b) => b.dataset.day === tooOldStr);
+    if (tooOldBtn) expect(tooOldBtn.disabled).toBe(true);
+    const minDayBtn = allDayBtns.find((b) => b.dataset.day === minDay);
+    if (minDayBtn) expect(minDayBtn.disabled).toBe(false);
+    // Close via trigger toggle
+    dayTrigger.click();
+    expect(root.querySelector('#journal-day-calendar-popover')).toBeNull();
+
+    // Type without waiting for 800ms debounce, then switch Day via themed calendar -> flushes pending save before loading pastDay
     const todayEditor = root.querySelector('#editor-journal-content');
     todayEditor.innerHTML = '<p>Draft before switching day</p>';
     todayEditor.dispatchEvent({ type: 'input' });
 
-    dateInput.value = pastDay;
-    dateInput.dispatchEvent({ type: 'change' });
+    pickDayFromCalendar(pastDay);
     await new Promise((r) => setTimeout(r, 15));
 
     expect(repoModule.saveJournalEntry).toHaveBeenCalledWith(
       todayDay,
       expect.stringContaining('Draft before switching day')
     );
+    expect(root.querySelector('#btn-journal-day-picker').textContent).toContain(formatShort(pastDay));
     expect(root.querySelector('#btn-customize-prompts')).toBeNull();
     const editor0 = root.querySelector('#editor-journal-content');
     expect(editor0.innerHTML).toBe('Three days ago text');
@@ -500,19 +542,16 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     expect(lastCall[0]).toBe(pastDay);
     expect(lastCall[1]).toContain('Backfilled update for three days ago');
 
-    // Switch to a blank past Day -> renders empty prompt cards and keeps Customize Prompts hidden
-    dateInput = root.querySelector('#input-journal-date');
-    dateInput.value = blankPastDay;
-    dateInput.dispatchEvent({ type: 'change' });
+    // Switch to a blank past Day via calendar -> renders empty prompt cards and keeps Customize Prompts hidden
+    pickDayFromCalendar(blankPastDay);
     await new Promise((r) => setTimeout(r, 15));
 
     expect(root.querySelector('#btn-customize-prompts')).toBeNull();
     expect(root.querySelector('#editor-journal-content').innerHTML).toBe('');
 
-    // Switch back to todayDay -> shows Customize Prompts again
-    dateInput = root.querySelector('#input-journal-date');
-    dateInput.value = todayDay;
-    dateInput.dispatchEvent({ type: 'change' });
+    // Reopen calendar and use Today quick-jump button -> shows Customize Prompts again
+    root.querySelector('#btn-journal-day-picker').click();
+    root.querySelector('#btn-calendar-jump-today').click();
     await new Promise((r) => setTimeout(r, 15));
 
     expect(root.querySelector('#btn-customize-prompts')).not.toBeNull();
@@ -686,6 +725,7 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     await new Promise((r) => setTimeout(r, 15));
 
     expect(root.querySelector('#journal-view')).not.toBeNull();
+    expect(root.querySelector('#btn-journal-day-picker')).toBeNull();
     expect(root.querySelector('#input-journal-date')).toBeNull();
     expect(root.querySelector('#journal-edit-date-banner')).toBeNull();
     expect(root.querySelector('#journal-view').textContent).not.toContain('Editing Journal Entry');

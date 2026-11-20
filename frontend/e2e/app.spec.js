@@ -155,7 +155,7 @@ test.describe('Habbit App E2E', () => {
     await journalEditor.fill(testReflection);
     await expect(page.locator('#journal-status')).toHaveText('Saved', { timeout: 3000 });
 
-    // Backfill yesterday via 7-day date picker
+    // Backfill yesterday via themed 7-day calendar picker
     const yesterday = await page.evaluate(() => {
       const d = new Date();
       d.setDate(d.getDate() - 1);
@@ -164,7 +164,15 @@ test.describe('Habbit App E2E', () => {
       const day = String(d.getDate()).padStart(2, '0');
       return `${y}-${m}-${day}`;
     });
-    await page.fill('#input-journal-date', yesterday);
+    await page.click('#btn-journal-day-picker');
+    const calendarPopover = page.locator('#journal-day-calendar-popover');
+    await expect(calendarPopover).toBeVisible();
+    const yesterdayCell = calendarPopover.locator(`.journal-calendar-day-btn[data-day="${yesterday}"]`);
+    if ((await yesterdayCell.count()) === 0) {
+      await calendarPopover.locator('#btn-calendar-prev-month').click();
+    }
+    await yesterdayCell.click();
+    await expect(calendarPopover).toHaveCount(0);
     await expect(page.locator('#btn-customize-prompts')).toHaveCount(0);
 
     const pastReflection = 'Refleksi kemarin: tetap konsisten menjaga fokus.';
@@ -191,6 +199,7 @@ test.describe('Habbit App E2E', () => {
 
     // Edit past entry and return to refreshed Entry Reader
     await page.click('#btn-edit-journal-entry');
+    await expect(page.locator('#btn-journal-day-picker')).toHaveCount(0);
     await expect(page.locator('#input-journal-date')).toHaveCount(0);
     await expect(page.locator('#btn-customize-prompts')).toHaveCount(0);
     const updatedPastReflection = 'Refleksi kemarin (revisi): selesai lebih cepat.';
@@ -616,7 +625,8 @@ test.describe('Habbit App E2E', () => {
     });
 
     const dayMeta = page.locator('#journal-day-meta');
-    const dateInput = page.getByLabel('Journal Day');
+    const dayPickerTrigger = page.getByLabel('Journal Day');
+    const calendarPopover = page.locator('#journal-day-calendar-popover');
     const cards = page.locator('.journal-entry-item');
     const readerHeader = page.locator('#journal-reader-header');
 
@@ -630,6 +640,20 @@ test.describe('Habbit App E2E', () => {
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)
       ).toBe(true);
+    };
+
+    const selectDayFromCalendar = async (targetDayStr) => {
+      const triggerBox = await dayPickerTrigger.boundingBox();
+      expect(triggerBox).not.toBeNull();
+      // Click the left text area of the field (not just any right-side icon) to verify full-field clickability
+      await page.mouse.click(triggerBox.x + 12, triggerBox.y + triggerBox.height / 2);
+      await expect(calendarPopover).toBeVisible();
+      const dayCell = calendarPopover.locator(`.journal-calendar-day-btn[data-day="${targetDayStr}"]`);
+      if ((await dayCell.count()) === 0) {
+        await calendarPopover.locator('#btn-calendar-prev-month').click();
+      }
+      await dayCell.click();
+      await expect(calendarPopover).toHaveCount(0);
     };
 
     const expectReaderHeaderClean = async (expectedLongDay, expectedShortDay, expectTodayPill) => {
@@ -652,18 +676,34 @@ test.describe('Habbit App E2E', () => {
     await expectCompactDayMetaRow();
     await expectNoHorizontalOverflow();
 
-    await expect(dateInput).toHaveAttribute('id', 'input-journal-date');
-    await expect(dateInput).toHaveAttribute('min', dates.minDayStr);
-    await expect(dateInput).toHaveAttribute('max', dates.todayStr);
-    expect(await dateInput.evaluate((el) => getComputedStyle(el).fontSize)).toBe('16px');
-    const dateBox = await dateInput.boundingBox();
-    expect(dateBox).not.toBeNull();
-    expect(dateBox.width).toBeGreaterThanOrEqual(44);
-    expect(dateBox.height).toBeGreaterThanOrEqual(44);
+    await expect(dayPickerTrigger).toHaveAttribute('id', 'btn-journal-day-picker');
+    await expect(dayPickerTrigger).toContainText(dates.shortToday);
+    await expect(dayPickerTrigger).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+    const triggerBox = await dayPickerTrigger.boundingBox();
+    expect(triggerBox).not.toBeNull();
+    expect(triggerBox.width).toBeGreaterThanOrEqual(44);
+    expect(triggerBox.height).toBeGreaterThanOrEqual(44);
 
-    // Type and immediately switch Day without waiting 800ms -> flushes today's draft
+    // Open calendar by clicking the text side of the field and inspect Light theme + bounds
+    await page.mouse.click(triggerBox.x + 12, triggerBox.y + triggerBox.height / 2);
+    await expect(calendarPopover).toBeVisible();
+    await expect(calendarPopover).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+    await expect(calendarPopover).toHaveCSS('border-top-color', 'rgb(230, 228, 223)');
+    await expect(calendarPopover.locator('.journal-calendar-day-btn[aria-pressed="true"]')).toHaveCSS(
+      'background-color',
+      'rgb(158, 75, 75)'
+    );
+    const todayCellBox = await calendarPopover.locator(`.journal-calendar-day-btn[data-day="${dates.todayStr}"]`).boundingBox();
+    expect(todayCellBox.width).toBeGreaterThanOrEqual(44);
+    expect(todayCellBox.height).toBeGreaterThanOrEqual(44);
+    await expectNoHorizontalOverflow();
+    await page.keyboard.press('Escape');
+    await expect(calendarPopover).toHaveCount(0);
+
+    // Type and immediately switch Day via calendar without waiting 800ms -> flushes today's draft
     await page.locator('#editor-journal-content').fill('Unsaved draft flushed on Day switch');
-    await page.fill('#input-journal-date', dates.yesterdayStr);
+    await selectDayFromCalendar(dates.yesterdayStr);
+    await expect(dayPickerTrigger).toContainText(dates.shortYesterday);
     await expect(page.locator('#btn-customize-prompts')).toHaveCount(0);
     await expect(page.locator('#editor-journal-content')).toHaveText('');
 
@@ -700,13 +740,27 @@ test.describe('Habbit App E2E', () => {
     await expect(page.locator('#theme-option-dark')).toHaveAttribute('aria-checked', 'true');
     await expect(page.locator('html')).toHaveClass(/\bdark\b/);
 
-    // Write a Journal (Dark)
+    // Write a Journal (Dark) + themed calendar popover in Dark mode
     await page.click('button[data-tab="activities"]');
     await page.click('#choice-journals');
     await page.click('#btn-choice-write-journal');
     await expectCompactDayMetaRow();
-    await expect(dateInput).toBeVisible();
+    await expect(dayPickerTrigger).toBeVisible();
+    await expect(dayPickerTrigger).toHaveCSS('background-color', 'rgb(34, 32, 30)');
+    await expect(dayPickerTrigger).toHaveCSS('border-top-color', 'rgb(51, 48, 44)');
+    await expect(dayPickerTrigger).toHaveCSS('color', 'rgb(244, 241, 234)');
+
+    await dayPickerTrigger.click();
+    await expect(calendarPopover).toBeVisible();
+    await expect(calendarPopover).toHaveCSS('background-color', 'rgb(34, 32, 30)');
+    await expect(calendarPopover).toHaveCSS('border-top-color', 'rgb(51, 48, 44)');
+    await expect(calendarPopover.locator('.journal-calendar-day-btn[aria-pressed="true"]')).toHaveCSS(
+      'background-color',
+      'rgb(198, 120, 120)'
+    );
     await expectNoHorizontalOverflow();
+    await page.keyboard.press('Escape');
+    await expect(calendarPopover).toHaveCount(0);
 
     // Journal History (Dark)
     await page.click('#btn-back-from-journal-to-activities');

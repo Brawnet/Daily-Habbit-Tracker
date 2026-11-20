@@ -605,6 +605,22 @@ describe('Pure Functions', () => {
       expect(result.length).toBe(0);
     });
 
+    it('rejects malformed journal entry day with reason LOCKED in mergeRecordsLWW', () => {
+      const incoming = [
+        {
+          day: '2026-02-30',
+          content: 'Invalid calendar day',
+          updatedAt: '2026-10-20T10:00:00.000Z'
+        }
+      ];
+      const now = '2026-10-20T11:00:00.000Z';
+      const result = mergeRecordsLWW([], incoming, now, '2026-10-20');
+      expect(result.rejected).toEqual([
+        { type: 'journalEntries', key: '2026-02-30', reason: 'LOCKED' }
+      ]);
+      expect(result.length).toBe(0);
+    });
+
     it('ignores client-sent printedToDiaryAt and keeps server-owned value', () => {
       const existing = [{ day: '2026-10-20', content: 'Today', updatedAt: '2026-10-20T01:00:00Z', printedToDiaryAt: '' }];
       const incoming = [{ day: '2026-10-20', content: 'Today v2', updatedAt: '2026-10-20T02:00:00Z', printedToDiaryAt: 'spoofed-value' }];
@@ -1037,6 +1053,24 @@ describe('GAS Backend Actions', () => {
       expect(res.ok).toBe(true);
       expect(res.rejected).toEqual([
         { type: 'journalEntries', key: tomorrow, reason: 'LOCKED' }
+      ]);
+    });
+
+    it('rejects malformed journal entry day with reason LOCKED during sync', () => {
+      const syncPayload = {
+        pin: PIN,
+        deviceId: 'dev-1',
+        action: 'sync',
+        changes: {
+          journalEntries: [
+            { day: '2026-02-30', content: 'Bad date note', updatedAt: '2026-10-20T10:00:00Z' }
+          ]
+        }
+      };
+      const res = JSON.parse(env.exports.doPost({ postData: { contents: JSON.stringify(syncPayload) } }).getContent());
+      expect(res.ok).toBe(true);
+      expect(res.rejected).toEqual([
+        { type: 'journalEntries', key: '2026-02-30', reason: 'LOCKED' }
       ]);
     });
 

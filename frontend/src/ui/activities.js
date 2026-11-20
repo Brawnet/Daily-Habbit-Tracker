@@ -196,37 +196,31 @@ export function mount(rootEl) {
     return Boolean(html && htmlToText(html).trim());
   }
 
+  function syncTodayJournalBadge({ renderMenuIfPresent = false } = {}) {
+    getJournalEntry(today())
+      .then((entry) => {
+        const nextContent = entry?.content || '';
+        const prevDone = hasJournalText(journalDraft);
+        const nextDone = hasJournalText(nextContent);
+        journalDraft = nextContent;
+        if (
+          isMounted &&
+          ((currentView === 'home' && nextDone !== prevDone) ||
+            (renderMenuIfPresent && currentView === 'journals-menu' && Boolean(nextContent)))
+        ) {
+          render();
+        }
+      })
+      .catch(() => {});
+  }
+
   // Load initial journal draft for today's badge state
-  getJournalEntry(today())
-    .then((entry) => {
-      const nextContent = entry?.content || '';
-      const prevDone = hasJournalText(journalDraft);
-      const nextDone = hasJournalText(nextContent);
-      journalDraft = nextContent;
-      if (
-        isMounted &&
-        ((currentView === 'home' && nextDone !== prevDone) ||
-          (currentView === 'journals-menu' && Boolean(nextContent)))
-      ) {
-        render();
-      }
-    })
-    .catch(() => {});
+  syncTodayJournalBadge({ renderMenuIfPresent: true });
 
   const unsubscribeRepo = onChange(() => {
     if (!isMounted) return;
     if (currentView === 'home') {
-      getJournalEntry(today())
-        .then((entry) => {
-          const nextContent = entry?.content || '';
-          const prevDone = hasJournalText(journalDraft);
-          const nextDone = hasJournalText(nextContent);
-          journalDraft = nextContent;
-          if (isMounted && currentView === 'home' && nextDone !== prevDone) {
-            render();
-          }
-        })
-        .catch(() => {});
+      syncTodayJournalBadge();
       return;
     }
     if (
@@ -1354,8 +1348,8 @@ export function mount(rootEl) {
       }
     }
 
-    // Legacy freeform/notes fallback only when explicitly editing a non-prompt historical entry
-    if (mode === 'edit' && Object.keys(answers).length === 0) {
+    // Preserve historical freeform/notes blocks in explicit Edit mode so mixed legacy entries never drop content on save
+    if (mode === 'edit') {
       const legacyBlocks = blocks.filter((b) => b.type === 'notes' || b.type === 'freeform');
       if (legacyBlocks.length > 0) {
         const legacyHtml = legacyBlocks.map((b) => b.contentHtml).filter(Boolean).join('\n');
@@ -1369,15 +1363,15 @@ export function mount(rootEl) {
               archived: true,
             });
           }
-          answers[legacyId] = sanitizeJournalHtml(legacyHtml);
+          if (!answers[legacyId]) {
+            answers[legacyId] = sanitizeJournalHtml(legacyHtml);
+          }
         }
       }
     }
 
     async function persistJournalForDay() {
-      const statusBadge =
-        wrap.querySelector('#journal-status') ||
-        wrap.querySelector('#journal-status-badge');
+      const statusBadge = wrap.querySelector('#journal-status');
       try {
         const compiled = compilePromptJournal(prompts, answers);
         if (day === today()) {
@@ -1391,9 +1385,7 @@ export function mount(rootEl) {
     }
 
     function handleUpdateAnswers() {
-      const statusBadge =
-        wrap.querySelector('#journal-status') ||
-        wrap.querySelector('#journal-status-badge');
+      const statusBadge = wrap.querySelector('#journal-status');
       if (statusBadge) statusBadge.textContent = 'Saving...';
 
       pendingJournalFlush = persistJournalForDay;

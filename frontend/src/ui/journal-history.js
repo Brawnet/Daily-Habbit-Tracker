@@ -8,71 +8,60 @@
 import { formatLong, formatShort } from '../domain/day.js';
 import { searchEntries } from '../domain/search.js';
 import {
-  escapeHtml,
   parseStructuredJournalBlocks,
   sanitizeJournalHtml,
 } from '../domain/journal.js';
 import { htmlToText } from '../domain/text.js';
 import { CHEVRON_LEFT_SVG } from './journal-prompts.js';
 
+function isNonEmptyEntry(entry) {
+  return Boolean(entry?.content && htmlToText(entry.content).trim());
+}
+
+function formatEntryCountLabel(count) {
+  return `${count} ${count === 1 ? 'Journal Entry' : 'Journal Entries'}`;
+}
+
+function createBackButton({ id, label, onClick }) {
+  const backBtn = document.createElement('button');
+  backBtn.type = 'button';
+  backBtn.id = id;
+  backBtn.className =
+    'self-start inline-flex items-center gap-1.5 text-sm font-medium text-[#68655F] dark:text-[#A39E93] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA] cursor-pointer py-2 px-1 -ml-1 min-h-[44px] tactile-spring';
+  backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>${label}</span>`;
+  backBtn.addEventListener('click', onClick);
+  return backBtn;
+}
+
 /**
- * Populates snippet text with highlight marks, including mock DOM fallback.
+ * Populates snippet text with highlight marks in a single DOM-node pass.
  * @param {HTMLElement} containerEl
- * @param {string} content
+ * @param {string} plainContent
  * @param {Array<[number, number]>} highlights
  */
-function setSnippetContent(containerEl, content, highlights) {
-  const plainContent = content ? htmlToText(content) : '';
-  if (!plainContent) {
-    containerEl.innerHTML = '<span class="text-zinc-400 italic">No entry text</span>';
-    return;
-  }
-
+function setSnippetContent(containerEl, plainContent, highlights) {
   if (!highlights || highlights.length === 0) {
     containerEl.textContent = plainContent;
     return;
   }
 
-  let html = '';
-  let lastIndex = 0;
+  let idx = 0;
   for (const [start, end] of highlights) {
-    if (start > lastIndex) {
-      html += escapeHtml(plainContent.slice(lastIndex, start));
-    }
-    const matched = plainContent.slice(start, end);
-    html += `<mark class="bg-amber-200 dark:bg-amber-900/60 text-inherit">${escapeHtml(matched)}</mark>`;
-    lastIndex = end;
-  }
-  if (lastIndex < plainContent.length) {
-    html += escapeHtml(plainContent.slice(lastIndex));
-  }
-
-  containerEl.innerHTML = html;
-
-  // Support mock DOM environments that do not build child nodes from innerHTML
-  if (
-    containerEl.children.length === 0 &&
-    typeof document !== 'undefined' &&
-    typeof document.createElement === 'function'
-  ) {
-    let idx = 0;
-    for (const [start, end] of highlights) {
-      if (start > idx) {
-        const span = document.createElement('span');
-        span.textContent = plainContent.slice(idx, start);
-        containerEl.appendChild(span);
-      }
-      const mark = document.createElement('mark');
-      mark.className = 'bg-amber-200 dark:bg-amber-900/60 text-inherit';
-      mark.textContent = plainContent.slice(start, end);
-      containerEl.appendChild(mark);
-      idx = end;
-    }
-    if (idx < plainContent.length) {
+    if (start > idx) {
       const span = document.createElement('span');
-      span.textContent = plainContent.slice(idx);
+      span.textContent = plainContent.slice(idx, start);
       containerEl.appendChild(span);
     }
+    const mark = document.createElement('mark');
+    mark.className = 'bg-amber-200 dark:bg-amber-900/60 text-inherit';
+    mark.textContent = plainContent.slice(start, end);
+    containerEl.appendChild(mark);
+    idx = end;
+  }
+  if (idx < plainContent.length) {
+    const span = document.createElement('span');
+    span.textContent = plainContent.slice(idx);
+    containerEl.appendChild(span);
   }
 }
 
@@ -94,14 +83,14 @@ function createChoiceButton({ id, primary = false, iconSvg, title, description, 
 
   const iconBox = document.createElement('div');
   iconBox.className = primary
-    ? 'w-11 h-11 rounded-lg bg-[#B56565] text-[#FAF8F5] flex items-center justify-center p-2.5 shrink-0 group-hover:scale-105 transition-transform'
+    ? 'w-11 h-11 rounded-lg bg-[#9E4B4B] text-[#FAF8F5] flex items-center justify-center p-2.5 shrink-0 group-hover:scale-105 transition-transform'
     : 'w-11 h-11 rounded-lg bg-[#EFECE6] dark:bg-[#2C2926] text-[#1C1B18] dark:text-[#F4F1EA] flex items-center justify-center p-2.5 shrink-0 group-hover:scale-105 transition-transform';
   iconBox.innerHTML = iconSvg;
 
   const textWrap = document.createElement('div');
   const titleEl = document.createElement('div');
   titleEl.className = primary
-    ? 'font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA] group-hover:text-[#B56565] dark:group-hover:text-[#C67878] transition'
+    ? 'font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA] group-hover:text-[#9E4B4B] dark:group-hover:text-[#D99191] transition'
     : 'font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA] transition';
   titleEl.textContent = title;
 
@@ -116,7 +105,7 @@ function createChoiceButton({ id, primary = false, iconSvg, title, description, 
 
   const badge = document.createElement('span');
   badge.className = primary
-    ? 'px-3.5 py-1.5 rounded-full text-xs font-mono font-semibold bg-[#B56565] text-[#FAF8F5] shrink-0 transition'
+    ? 'px-3.5 py-1.5 rounded-full text-xs font-mono font-semibold bg-[#9E4B4B] text-[#FAF8F5] shrink-0 transition'
     : 'badge-rose px-3.5 py-1.5 rounded-full text-xs font-mono font-semibold transition shrink-0';
   badge.textContent = badgeLabel;
 
@@ -143,21 +132,20 @@ export function renderJournalsChoiceMenu({
   wrap.id = 'journals-menu-view';
   wrap.className = 'flex flex-col gap-5 animate-in fade-in duration-150';
 
-  const backBtn = document.createElement('button');
-  backBtn.type = 'button';
-  backBtn.id = 'btn-back-from-journals-menu';
-  backBtn.className =
-    'self-start inline-flex items-center gap-1.5 text-sm font-medium text-[#68655F] dark:text-[#A39E93] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA] cursor-pointer py-2 px-1 -ml-1 min-h-[44px] tactile-spring';
-  backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>Back to Activities</span>`;
-  backBtn.addEventListener('click', onBack);
-  wrap.appendChild(backBtn);
+  wrap.appendChild(
+    createBackButton({
+      id: 'btn-back-from-journals-menu',
+      label: 'Back to Activities',
+      onClick: onBack,
+    })
+  );
 
   const headerInfo = document.createElement('div');
   headerInfo.className = 'flex flex-col items-center text-center gap-2 py-4 px-2';
 
   const icon = document.createElement('div');
   icon.className =
-    'w-16 h-16 rounded-2xl bg-[#FBF2F2] dark:bg-[rgba(181,101,101,0.2)] text-[#B56565] dark:text-[#C67878] flex items-center justify-center p-3 border border-[#E6E4DF] dark:border-[#33302C] shadow-none mb-2';
+    'w-16 h-16 rounded-2xl bg-[#FBF2F2] dark:bg-[rgba(181,101,101,0.2)] text-[#9E4B4B] dark:text-[#D99191] flex items-center justify-center p-3 border border-[#E6E4DF] dark:border-[#33302C] shadow-none mb-2';
   icon.innerHTML = logoSvg;
 
   const titleH1 = document.createElement('h1');
@@ -174,7 +162,7 @@ export function renderJournalsChoiceMenu({
 
   const countP = document.createElement('p');
   countP.className = 'text-xs font-mono text-[#68655F] dark:text-[#A39E93] mt-1';
-  countP.textContent = `${entryCount} ${entryCount === 1 ? 'entry' : 'entries'} documented`;
+  countP.textContent = `${formatEntryCountLabel(entryCount)} documented`;
 
   headerInfo.appendChild(icon);
   headerInfo.appendChild(titleH1);
@@ -225,9 +213,7 @@ export function renderJournalHistoryView({
   onSelectEntry,
   onWriteToday,
 }) {
-  const nonEmptyEntries = (entries || []).filter((e) =>
-    Boolean(e && e.content && htmlToText(e.content).trim())
-  );
+  const nonEmptyEntries = (entries || []).filter(isNonEmptyEntry);
   let currentQuery = query || '';
 
   const wrap = document.createElement('div');
@@ -237,17 +223,15 @@ export function renderJournalHistoryView({
   const topBar = document.createElement('div');
   topBar.className = 'flex items-center justify-between gap-2';
 
-  const backBtn = document.createElement('button');
-  backBtn.type = 'button';
-  backBtn.id = 'btn-back-from-journal-history';
-  backBtn.className =
-    'inline-flex items-center gap-1.5 text-sm font-medium text-[#68655F] dark:text-[#A39E93] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA] cursor-pointer py-2 px-1 -ml-1 min-h-[44px] tactile-spring';
-  backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>Back to Journals</span>`;
-  backBtn.addEventListener('click', onBack);
+  const backBtn = createBackButton({
+    id: 'btn-back-from-journal-history',
+    label: 'Back to Journals',
+    onClick: onBack,
+  });
 
   const countBadge = document.createElement('span');
   countBadge.className = 'badge-rose px-3 py-1 rounded-full text-xs font-mono font-semibold';
-  countBadge.textContent = `${nonEmptyEntries.length} ${nonEmptyEntries.length === 1 ? 'entry' : 'entries'}`;
+  countBadge.textContent = formatEntryCountLabel(nonEmptyEntries.length);
 
   topBar.appendChild(backBtn);
   topBar.appendChild(countBadge);
@@ -262,11 +246,11 @@ export function renderJournalHistoryView({
   searchInput.type = 'search';
   searchInput.id = 'journal-history-search';
   searchInput.value = currentQuery;
-  searchInput.placeholder = 'Search entries by keyword or date...';
-  searchInput.setAttribute('aria-label', 'Search entries by keyword or date...');
+  searchInput.placeholder = 'Search Journal Entries by keyword or Day...';
+  searchInput.setAttribute('aria-label', 'Search Journal Entries by keyword or Day...');
   searchInput.style.fontSize = '16px';
   searchInput.className =
-    'journal-search-input w-full min-h-[44px] px-4 py-2.5 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#FFFFFF] dark:bg-[#22201E] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F] focus:outline-none focus:ring-2 focus:ring-[#B56565]';
+    'journal-search-input w-full min-h-[44px] px-4 py-2.5 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#FFFFFF] dark:bg-[#22201E] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F] focus:outline-none focus:ring-2 focus:ring-[#9E4B4B]';
   wrap.appendChild(searchInput);
 
   const entriesListEl = document.createElement('div');
@@ -285,13 +269,13 @@ export function renderJournalHistoryView({
 
       const emptyText = document.createElement('p');
       emptyText.className = 'text-sm text-[#68655F] dark:text-[#A39E93]';
-      emptyText.textContent = 'No journal entries yet. Start capturing your reflections today.';
+      emptyText.textContent = 'No Journal Entries yet. Start capturing your reflections today.';
 
       const ctaBtn = document.createElement('button');
       ctaBtn.type = 'button';
       ctaBtn.id = 'btn-empty-write-today-journal';
       ctaBtn.className =
-        'min-h-[44px] min-w-[44px] px-5 py-2.5 rounded-lg text-sm font-semibold bg-[#B56565] text-[#FAF8F5] hover:opacity-90 active:scale-95 transition cursor-pointer tactile-spring';
+        'min-h-[44px] min-w-[44px] px-5 py-2.5 rounded-lg text-sm font-semibold bg-[#9E4B4B] text-[#FAF8F5] hover:opacity-90 active:scale-95 transition cursor-pointer tactile-spring';
       ctaBtn.textContent = "Write Today's Journal";
       ctaBtn.addEventListener('click', onWriteToday);
 
@@ -314,7 +298,7 @@ export function renderJournalHistoryView({
     if (results.length === 0) {
       const noMatch = document.createElement('div');
       noMatch.className = 'text-center py-6 text-sm text-[#68655F] dark:text-[#A39E93]';
-      noMatch.textContent = 'No matching entries found.';
+      noMatch.textContent = 'No matching Journal Entries found.';
       entriesListEl.appendChild(noMatch);
       return;
     }
@@ -325,16 +309,16 @@ export function renderJournalHistoryView({
       const entryBtn = document.createElement('button');
       entryBtn.type = 'button';
       entryBtn.className =
-        'journal-entry-item editorial-card group text-left w-full min-h-[44px] p-4 hover:border-[#B56565] dark:hover:border-[#C67878] transition flex flex-col gap-1.5 cursor-pointer tactile-spring bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
+        'journal-entry-item editorial-card group text-left w-full min-h-[44px] p-4 hover:border-[#9E4B4B] dark:hover:border-[#D99191] transition flex flex-col gap-1.5 cursor-pointer tactile-spring bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
       entryBtn.dataset.day = originalEntry.day;
-      entryBtn.setAttribute('aria-label', `Read journal entry for ${formatShort(originalEntry.day)}`);
+      entryBtn.setAttribute('aria-label', `Read Journal Entry for ${formatShort(originalEntry.day)}`);
 
       const dateHeader = document.createElement('div');
       dateHeader.className = 'flex items-center justify-between gap-2 w-full';
 
       const dateText = document.createElement('span');
       dateText.className =
-        'text-xs font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA] group-hover:text-[#B56565] transition-colors';
+        'text-xs font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA] group-hover:text-[#9E4B4B] dark:group-hover:text-[#D99191] transition-colors';
       dateText.textContent = formatShort(originalEntry.day);
       dateHeader.appendChild(dateText);
 
@@ -350,7 +334,7 @@ export function renderJournalHistoryView({
       const snippetEl = document.createElement('div');
       snippetEl.className =
         'line-clamp-2 text-sm text-[#68655F] dark:text-[#A39E93] break-words whitespace-pre-wrap';
-      setSnippetContent(snippetEl, originalEntry.content || '', highlights);
+      setSnippetContent(snippetEl, entry.content, highlights);
       entryBtn.appendChild(snippetEl);
 
       entryBtn.addEventListener('click', () => {
@@ -384,19 +368,17 @@ export function renderJournalReaderView({ entry, isToday, onBack, onEdit }) {
   const topBar = document.createElement('div');
   topBar.className = 'flex flex-wrap items-center justify-between gap-2';
 
-  const backBtn = document.createElement('button');
-  backBtn.type = 'button';
-  backBtn.id = 'btn-back-from-journal-read';
-  backBtn.className =
-    'inline-flex items-center gap-1.5 text-sm font-medium text-[#68655F] dark:text-[#A39E93] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA] cursor-pointer py-2 px-1 -ml-1 min-h-[44px] tactile-spring';
-  backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>Back to Journal History</span>`;
-  backBtn.addEventListener('click', onBack);
+  const backBtn = createBackButton({
+    id: 'btn-back-from-journal-read',
+    label: 'Back to Journal History',
+    onClick: onBack,
+  });
 
   const editBtn = document.createElement('button');
   editBtn.type = 'button';
   editBtn.id = 'btn-edit-journal-entry';
   editBtn.className =
-    'min-h-[44px] min-w-[44px] inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-mono font-semibold bg-[#B56565] text-[#FAF8F5] hover:opacity-90 active:scale-95 transition cursor-pointer tactile-spring';
+    'min-h-[44px] min-w-[44px] inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-mono font-semibold bg-[#9E4B4B] text-[#FAF8F5] hover:opacity-90 active:scale-95 transition cursor-pointer tactile-spring';
   editBtn.textContent = 'Edit Journal';
   editBtn.addEventListener('click', onEdit);
 
@@ -440,10 +422,10 @@ export function renderJournalReaderView({ entry, isToday, onBack, onEdit }) {
   contentEl.className =
     'journal-reader-text flex flex-col gap-4 text-sm sm:text-base text-[#1C1B18] dark:text-[#F4F1EA] break-words leading-relaxed select-text';
 
-  if (!entry.content || !htmlToText(entry.content).trim()) {
+  if (!isNonEmptyEntry(entry)) {
     const emptyMsg = document.createElement('p');
     emptyMsg.className = 'text-sm text-[#68655F] dark:text-[#A39E93] italic';
-    emptyMsg.textContent = 'No entry text.';
+    emptyMsg.textContent = 'No reflection text.';
     contentEl.appendChild(emptyMsg);
   } else {
     const blocks = parseStructuredJournalBlocks(entry.content);

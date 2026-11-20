@@ -43,6 +43,7 @@ import {
   decompilePromptJournal,
   sanitizeJournalHtml,
 } from '../domain/journal.js';
+import { isBlank } from '../domain/text.js';
 /**
  * Loads current prompts from Settings, or seeds and returns defaults.
  * @param {Function} getSettingFn
@@ -173,7 +174,7 @@ export function renderPromptCardsJournal({
     const dateLabel = document.createElement('label');
     dateLabel.setAttribute('for', 'input-journal-date');
     dateLabel.className = 'text-xs font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]';
-    dateLabel.textContent = 'Journal Date';
+    dateLabel.textContent = 'Journal Day';
 
     const dateHint = document.createElement('span');
     dateHint.className = 'text-[11px] font-mono text-[#68655F] dark:text-[#A39E93]';
@@ -185,7 +186,7 @@ export function renderPromptCardsJournal({
     const dateInput = document.createElement('input');
     dateInput.type = 'date';
     dateInput.id = 'input-journal-date';
-    dateInput.setAttribute('aria-label', 'Journal Date');
+    dateInput.setAttribute('aria-label', 'Journal Day');
     if (minDay) dateInput.setAttribute('min', minDay);
     if (maxDay) dateInput.setAttribute('max', maxDay);
     dateInput.value = targetDay;
@@ -213,8 +214,8 @@ export function renderPromptCardsJournal({
     dateBanner.className =
       'editorial-card flex items-center justify-between px-4 py-3 bg-[#FBF2F2] dark:bg-[rgba(181,101,101,0.16)] border-[#E6E4DF] dark:border-[#33302C] shadow-none';
     const bannerLabel = document.createElement('span');
-    bannerLabel.className = 'text-xs font-mono font-semibold uppercase tracking-wide text-[#B56565] dark:text-[#C67878]';
-    bannerLabel.textContent = 'Editing Entry';
+    bannerLabel.className = 'text-xs font-mono font-semibold uppercase tracking-wide text-[#9E4B4B] dark:text-[#D99191]';
+    bannerLabel.textContent = 'Editing Journal Entry';
     const bannerDate = document.createElement('span');
     bannerDate.className = 'text-sm font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]';
     bannerDate.textContent = dateSubtitle;
@@ -227,8 +228,7 @@ export function renderPromptCardsJournal({
   const visiblePrompts = [...prompts]
     .filter((p) => {
       if (!p.archived) return true;
-      const ans = String(answers?.[p.id] || '').replace(/<[^>]*>/g, '').trim();
-      return Boolean(ans);
+      return !isBlank(answers?.[p.id]);
     })
     .sort((a, b) => a.order - b.order);
 

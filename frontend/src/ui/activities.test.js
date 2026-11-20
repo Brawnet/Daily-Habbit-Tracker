@@ -411,7 +411,7 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
 
     const menu = root.querySelector('#journals-menu-view');
     expect(menu).not.toBeNull();
-    expect(menu.textContent).toContain('2 entries documented');
+    expect(menu.textContent).toContain('2 Journal Entries documented');
     expect(root.querySelector('#btn-choice-write-journal')).not.toBeNull();
     expect(root.querySelector('#btn-choice-journal-history')).not.toBeNull();
     cleanup();
@@ -619,6 +619,56 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     const refreshedReader = root.querySelector('#journal-read-view');
     expect(refreshedReader).not.toBeNull();
     expect(refreshedReader.textContent).toContain('Revised archived reflection');
+
+    cleanup();
+  });
+
+  it('preserves Additional Notes alongside prompt answers when editing mixed historical Journal Entries', async () => {
+    const todayDay = today();
+    const oldDay = addDays(todayDay, -12);
+    repoModule._seedJournalEntry({
+      day: oldDay,
+      content: `
+<div class="journal-prompt-block" data-prompt-id="jp_day">
+  <h3 class="font-bold">How was your day?</h3>
+  <div class="journal-prompt-answer">Steady progress today.</div>
+</div>
+<div class="journal-notes-block">
+  <h3 class="font-bold">Additional Notes</h3>
+  <div class="journal-notes-answer">Kept reading before bed.</div>
+</div>`.trim(),
+    });
+
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 15));
+
+    root.querySelector('#choice-journals').click();
+    await new Promise((r) => setTimeout(r, 15));
+    root.querySelector('#btn-choice-journal-history').click();
+    await new Promise((r) => setTimeout(r, 15));
+
+    root.querySelector('.journal-entry-item').click();
+    await new Promise((r) => setTimeout(r, 15));
+    root.querySelector('#btn-edit-journal-entry').click();
+    await new Promise((r) => setTimeout(r, 15));
+
+    expect(root.querySelector('#journal-notes-card')).toBeNull();
+    expect(root.querySelector('#editor-journal-content').innerHTML).toBe('Steady progress today.');
+    const legacyNotesEditor = root.querySelector('#editor-journal-content-3');
+    expect(legacyNotesEditor).not.toBeNull();
+    expect(legacyNotesEditor.getAttribute('aria-label')).toBe('Additional Notes');
+    expect(legacyNotesEditor.innerHTML).toBe('Kept reading before bed.');
+
+    root.querySelector('#editor-journal-content').innerHTML = '<p>Updated steady progress.</p>';
+    root.querySelector('#editor-journal-content').dispatchEvent({ type: 'input' });
+    root.querySelector('#btn-back-from-journal-to-activities').click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    const lastCall = repoModule.saveJournalEntry.mock.calls.at(-1);
+    expect(lastCall[0]).toBe(oldDay);
+    expect(lastCall[1]).toContain('Updated steady progress.');
+    expect(lastCall[1]).toContain('Kept reading before bed.');
 
     cleanup();
   });

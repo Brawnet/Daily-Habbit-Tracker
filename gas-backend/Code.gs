@@ -262,7 +262,7 @@ function mergeRecordsLWW(existingRecords, incomingRecords, nowMonotonic, todayJa
       }
     }
 
-    if (isJournal && today && key > today) {
+    if (isJournal && (!isValidDayString(key) || (today && key > today))) {
       rejected.push({
         type: 'journalEntries',
         key: key,
@@ -651,8 +651,7 @@ function syncJournalEntries(sheet, incomingJournalEntries, nowMonotonic) {
   const rejected = [];
   for (const entry of incomingJournalEntries) {
     const day = String(entry.day || '').trim();
-    if (!isValidDayString(day)) continue;
-    if (day > todayJakarta) {
+    if (!isValidDayString(day) || day > todayJakarta) {
       rejected.push({
         type: 'journalEntries',
         key: day,

@@ -312,7 +312,7 @@ test.describe('Habbit App E2E', () => {
     await verifyNavBounds(page, vp.height);
   });
 
-  test('renders solid flat floating pill with visible labels, Terracotta active state, pure black Dark mode, and zero glass effects', async ({ page }) => {
+  test('renders solid flat floating pill with visible labels, Terracotta active state, #22201E Dark mode, and zero glass effects', async ({ page }) => {
     await page.setViewportSize({ width: 393, height: 852 });
     await page.emulateMedia({ colorScheme: 'light' });
 
@@ -410,7 +410,7 @@ test.describe('Habbit App E2E', () => {
         inactiveColor: 'rgb(104, 101, 95)',
       });
 
-    // Dark mode: pure solid black (#000000), #33302C hairline border, zero blur/gradient, Terracotta active (#D97E63)
+    // Dark mode: solid #22201E (--surface-card), #33302C hairline border, zero blur/gradient, Terracotta active (#D97E63)
     await page.click('button[data-tab="settings"]');
     await page.click('#theme-option-dark');
     await expect(page.locator('#theme-option-dark')).toHaveAttribute('aria-checked', 'true');
@@ -419,7 +419,7 @@ test.describe('Habbit App E2E', () => {
       .poll(() => readNavStyles('settings', 'today'))
       .toEqual({
         ...flatZeroGlassShape,
-        backgroundColor: 'rgb(0, 0, 0)',
+        backgroundColor: 'rgb(34, 32, 30)',
         borderTopColor: 'rgb(51, 48, 44)',
         activeColor: 'rgb(217, 126, 99)',
         inactiveColor: 'rgb(163, 158, 147)',

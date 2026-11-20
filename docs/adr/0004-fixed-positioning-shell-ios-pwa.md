@@ -33,7 +33,7 @@ Semua perlindungan notch dan home indicator tetap dikelola secara modular oleh n
 - Scroll Clearance (`#tab-content`): `padding-bottom: calc(max(12px, env(safe-area-inset-bottom, 12px)) + 88px)` agar kartu atau editor paling bawah tetap bebas dari area pill saat digulir penuh.
 - Toast Floating Container: `bottom: calc(max(12px, env(safe-area-inset-bottom, 12px)) + 84px)` (dengan `z-index: 50` di atas pill).
 
-Untuk tampilan `#bottom-nav`, implementasi menggunakan pil mengambang solid dan datar tanpa efek kaca (`#FFFFFF` dengan border `#E6E4DF` pada Light mode dan `#000000` solid dengan border `#33302C` pada Dark mode, tanpa `backdrop-filter`, gradasi, maupun bevel inset) agar bersih dari transparansi dan konsisten 60fps di iOS Safari/WebKit maupun Android Chrome.
+Untuk tampilan `#bottom-nav`, implementasi menggunakan pil mengambang solid dan datar tanpa efek kaca (`#FFFFFF` dengan border `#E6E4DF` pada Light mode dan `#22201E` (`--surface-card`) solid dengan border `#33302C` pada Dark mode, tanpa `backdrop-filter`, gradasi, maupun bevel inset) agar bersih dari transparansi dan konsisten 60fps di iOS Safari/WebKit maupun Android Chrome.
 
 ## Considered Options
 
@@ -41,4 +41,4 @@ Untuk tampilan `#bottom-nav`, implementasi menggunakan pil mengambang solid dan 
 - **`calc(100dvh + env(safe-area-inset-top))` dengan `position: fixed`**: ditolak karena `overflow: hidden` pada `html, body` dan batasan clipping fixed WebKit memotong elemen di koordinat 848pt.
 - **`-webkit-fill-available`**: ditolak karena berperilaku tidak konsisten antar versi iOS Safari dan deprecated pada beberapa implementasi modern.
 - **`position: fixed` pada floating `#bottom-nav`**: ditolak karena akan terjebak pada clipping box 848pt di mode standalone WebKit iOS; diganti `position: absolute` di dalam `.shell-layout` (`position: relative`).
-- **Efek kaca tembus pandang (`Liquid Glass` dengan `backdrop-filter` / `::before` gradasi / SVG `feDisplacementMap`)**: ditolak demi permukaan solid datar (`#FFFFFF` Light / `#000000` Dark) yang bebas gradasi, tidak tembus tulisan di belakang bar, dan didukung seragam di semua browser.
+- **Efek kaca tembus pandang (`Liquid Glass` dengan `backdrop-filter` / `::before` gradasi / SVG `feDisplacementMap`)**: ditolak demi permukaan solid datar (`#FFFFFF` Light / `#22201E` Dark) yang bebas gradasi, tidak tembus tulisan di belakang bar, dan didukung seragam di semua browser.

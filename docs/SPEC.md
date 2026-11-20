@@ -183,7 +183,7 @@ Keluar bila: `nowHHMM < reminderTime`, atau `LAST_REMINDER_DAY === todayJakarta`
 - Pemicu: startup, `visibilitychange` → visible, `online`, `scheduleSync`, tombol Sync now. Tanpa config → app tetap berfungsi penuh secara lokal, status "Not configured".
 - Status: `not-configured | idle | syncing | offline | error`, + jumlah pending, ditampilkan kecil di header.
 
-## 10. UI (4 tab, floating icon-only Liquid Glass bottom nav dengan `aria-label` & `sr-only`: Today · Activities · History · Settings; route `?tab=`)
+## 10. UI (4 tab, floating solid flat bottom nav dengan ikon + label terlihat dan warna aktif Terracotta: Today · Activities · History · Settings; route `?tab=`)
 
 - **Today**: tanggal panjang; progres `3/5 done`; daftar Habit aktif (urut `sortOrder`) dengan tombol Check-in + Streak (`🔥 5`); textarea Journal Entry autosave (debounce 800 ms) dengan status "Saved"; empty state → link ke Manage Habits.
 - **History**: khusus riwayat Habit (kartu per Habit aktif: heatmap 12 minggu dengan kolom = minggu dan baris Senin–Minggu, Streak saat ini, Streak terpanjang, completion 30 hari dengan penyebut = Day dalam 30 hari terakhir sejak `createdAt` Habit; sel hari ini & kemarin bisa di-tap untuk toggle Check-in, lainnya read-only; bagian "Archived Habits" ter-collapse).

@@ -282,7 +282,7 @@ describe('ui/shell.js', () => {
     expect(tabContent.textContent).toBe('Activities View');
   });
 
-  it('renders icon-only bottom navigation buttons with sr-only labels and aria-label attributes', () => {
+  it('renders floating solid flat bottom navigation buttons with visible labels, aria-label attributes, and >=44px touch targets', () => {
     const root = mockDoc.createElement('div');
     registerTab('today', { title: 'Today', icon: '<span>t</span>', mount: vi.fn() });
     registerTab('activities', { title: 'Activities', icon: '<span>a</span>', mount: vi.fn() });
@@ -290,6 +290,10 @@ describe('ui/shell.js', () => {
     registerTab('settings', { title: 'Settings', icon: '<span>s</span>', mount: vi.fn() });
 
     mountShell(root);
+
+    const bottomNav = mockDoc.getElementById('bottom-nav');
+    expect(bottomNav.classList.contains('floating-bottom-nav')).toBe(true);
+    expect(bottomNav.classList.contains('liquid-glass-nav')).toBe(false);
 
     const expected = [
       { id: 'today', title: 'Today' },
@@ -300,11 +304,16 @@ describe('ui/shell.js', () => {
 
     for (const item of expected) {
       const btn = mockDoc.getElementById(`tab-btn-${item.id}`);
+      expect(btn.getAttribute('role')).toBe('tab');
       expect(btn.getAttribute('aria-label')).toBe(item.title);
       expect(btn.title).toBe(item.title);
+      expect(btn.classList.contains('floating-bottom-nav-tab')).toBe(true);
+      expect(btn.classList.contains('min-w-[44px]')).toBe(true);
+      expect(btn.classList.contains('min-h-[48px]')).toBe(true);
       const labelSpan = btn.querySelector('.tab-title');
       expect(labelSpan).not.toBeNull();
-      expect(labelSpan.classList.contains('sr-only')).toBe(true);
+      expect(labelSpan.classList.contains('sr-only')).toBe(false);
+      expect(labelSpan.classList.contains('text-[11px]')).toBe(true);
       expect(labelSpan.textContent).toBe(item.title);
     }
   });
@@ -348,7 +357,7 @@ describe('ui/shell.js', () => {
     expect(histIconEl.innerHTML).toContain('single-history');
   });
 
-  it('positions sliding active capsule indicator across navigate and popstate transitions', () => {
+  it('omits sliding indicator capsule and updates aria-selected across navigate and popstate transitions', () => {
     const root = mockDoc.createElement('div');
     registerTab('today', { title: 'Today', icon: '<span>t</span>', mount: vi.fn() });
     registerTab('activities', { title: 'Activities', icon: '<span>a</span>', mount: vi.fn() });
@@ -359,24 +368,27 @@ describe('ui/shell.js', () => {
 
     const bottomNav = mockDoc.getElementById('bottom-nav');
     const indicator = bottomNav.querySelector('#bottom-nav-indicator');
-    expect(indicator).not.toBeNull();
-    expect(indicator.getAttribute('aria-hidden')).toBe('true');
-    expect(indicator.style.width).toBe('25%');
-    expect(indicator.style.transform).toBe('translateX(0%)');
+    expect(indicator).toBeNull();
+
+    expect(mockDoc.getElementById('tab-btn-today').getAttribute('aria-selected')).toBe('true');
 
     navigate('activities');
-    expect(indicator.style.transform).toBe('translateX(100%)');
+    expect(mockDoc.getElementById('tab-btn-today').getAttribute('aria-selected')).toBe('false');
+    expect(mockDoc.getElementById('tab-btn-activities').getAttribute('aria-selected')).toBe('true');
 
     navigate('history');
-    expect(indicator.style.transform).toBe('translateX(200%)');
+    expect(mockDoc.getElementById('tab-btn-activities').getAttribute('aria-selected')).toBe('false');
+    expect(mockDoc.getElementById('tab-btn-history').getAttribute('aria-selected')).toBe('true');
 
     navigate('settings');
-    expect(indicator.style.transform).toBe('translateX(300%)');
+    expect(mockDoc.getElementById('tab-btn-history').getAttribute('aria-selected')).toBe('false');
+    expect(mockDoc.getElementById('tab-btn-settings').getAttribute('aria-selected')).toBe('true');
 
-    // Verify browser popstate updates capsule too
+    // Verify browser popstate updates selected tab too
     mockWin.location = new URL('https://habbit.test/?tab=activities');
     mockWin.dispatchEvent({ type: 'popstate' });
-    expect(indicator.style.transform).toBe('translateX(100%)');
+    expect(mockDoc.getElementById('tab-btn-settings').getAttribute('aria-selected')).toBe('false');
+    expect(mockDoc.getElementById('tab-btn-activities').getAttribute('aria-selected')).toBe('true');
   });
 
   it('updates sync status indicator and pending badge live', () => {

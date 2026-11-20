@@ -312,13 +312,13 @@ test.describe('Habbit App E2E', () => {
     await verifyNavBounds(page, vp.height);
   });
 
-  test('renders floating Liquid Glass pill icon-only with sliding indicator and accessible labels', async ({ page }) => {
+  test('renders solid flat floating pill with visible labels, Terracotta active state, #22201E Dark mode, and zero glass effects', async ({ page }) => {
     await page.setViewportSize({ width: 393, height: 852 });
+    await page.emulateMedia({ colorScheme: 'light' });
 
     const bottomNav = page.locator('#bottom-nav');
-    const indicator = page.locator('#bottom-nav-indicator');
     await expect(bottomNav).toBeVisible();
-    await expect(indicator).toBeAttached();
+    await expect(page.locator('#bottom-nav-indicator')).toHaveCount(0);
 
     const navPosition = await bottomNav.evaluate((el) => getComputedStyle(el).position);
     expect(navPosition).toBe('absolute');
@@ -332,28 +332,98 @@ test.describe('Habbit App E2E', () => {
 
     for (const tab of tabs) {
       const btn = page.locator(`button[data-tab="${tab.id}"]`);
+      await expect(btn).toHaveAttribute('role', 'tab');
       await expect(btn).toHaveAttribute('aria-label', tab.title);
-      const labelBox = await btn.locator('.tab-title').boundingBox();
+      const btnBox = await btn.boundingBox();
+      expect(btnBox).not.toBeNull();
+      expect(btnBox.width).toBeGreaterThanOrEqual(44);
+      expect(btnBox.height).toBeGreaterThanOrEqual(44);
+
+      const labelEl = btn.locator('.tab-title');
+      await expect(labelEl).toHaveText(tab.title);
+      const labelBox = await labelEl.boundingBox();
       expect(labelBox).not.toBeNull();
-      expect(labelBox.width).toBeLessThanOrEqual(1);
+      expect(labelBox.width).toBeGreaterThan(10);
+      expect(labelBox.height).toBeGreaterThanOrEqual(10);
     }
+
+    const readNavStyles = async (activeTabId, inactiveTabId) =>
+      page.evaluate(
+        ({ activeId, inactiveId }) => {
+          const nav = document.getElementById('bottom-nav');
+          const navStyle = getComputedStyle(nav);
+          const beforeStyle = getComputedStyle(nav, '::before');
+          const activeBtn = document.getElementById(`tab-btn-${activeId}`);
+          const inactiveBtn = document.getElementById(`tab-btn-${inactiveId}`);
+          return {
+            backgroundColor: navStyle.backgroundColor,
+            borderTopWidth: navStyle.borderTopWidth,
+            borderTopColor: navStyle.borderTopColor,
+            backdropFilter: navStyle.backdropFilter,
+            backgroundImage: navStyle.backgroundImage,
+            boxShadow: navStyle.boxShadow,
+            beforeContent: beforeStyle.content,
+            activeColor: getComputedStyle(activeBtn).color,
+            inactiveColor: getComputedStyle(inactiveBtn).color,
+          };
+        },
+        { activeId: activeTabId, inactiveId: inactiveTabId }
+      );
+
+    const flatZeroGlassShape = {
+      borderTopWidth: '1px',
+      backdropFilter: 'none',
+      backgroundImage: 'none',
+      boxShadow: expect.not.stringMatching(/inset|^none$/),
+      beforeContent: 'none',
+    };
+
+    // Light mode: solid Crisp White (#FFFFFF), #E6E4DF hairline border, zero glass/gradient, Terracotta active (#C86D51)
+    expect(await readNavStyles('today', 'activities')).toEqual({
+      ...flatZeroGlassShape,
+      backgroundColor: 'rgb(255, 255, 255)',
+      borderTopColor: 'rgb(230, 228, 223)',
+      activeColor: 'rgb(200, 109, 81)',
+      inactiveColor: 'rgb(104, 101, 95)',
+    });
 
     const todayBtn = page.locator('button[data-tab="today"]');
     const activitiesBtn = page.locator('button[data-tab="activities"]');
     const todayActiveSvg = await todayBtn.locator('.tab-icon').innerHTML();
     const activitiesInactiveSvg = await activitiesBtn.locator('.tab-icon').innerHTML();
-    const initialIndicatorBox = await indicator.boundingBox();
 
     await activitiesBtn.click();
-    await page.waitForTimeout(350);
+    await expect(activitiesBtn).toHaveAttribute('aria-selected', 'true');
 
     const todayInactiveSvg = await todayBtn.locator('.tab-icon').innerHTML();
     const activitiesActiveSvg = await activitiesBtn.locator('.tab-icon').innerHTML();
-    const movedIndicatorBox = await indicator.boundingBox();
-
     expect(todayInactiveSvg).not.toBe(todayActiveSvg);
     expect(activitiesActiveSvg).not.toBe(activitiesInactiveSvg);
-    expect(movedIndicatorBox.x).toBeGreaterThan(initialIndicatorBox.x);
+
+    await expect
+      .poll(async () => {
+        const s = await readNavStyles('activities', 'today');
+        return { activeColor: s.activeColor, inactiveColor: s.inactiveColor };
+      })
+      .toEqual({
+        activeColor: 'rgb(200, 109, 81)',
+        inactiveColor: 'rgb(104, 101, 95)',
+      });
+
+    // Dark mode: solid #22201E (--surface-card), #33302C hairline border, zero blur/gradient, Terracotta active (#D97E63)
+    await page.click('button[data-tab="settings"]');
+    await page.click('#theme-option-dark');
+    await expect(page.locator('#theme-option-dark')).toHaveAttribute('aria-checked', 'true');
+
+    await expect
+      .poll(() => readNavStyles('settings', 'today'))
+      .toEqual({
+        ...flatZeroGlassShape,
+        backgroundColor: 'rgb(34, 32, 30)',
+        borderTopColor: 'rgb(51, 48, 44)',
+        activeColor: 'rgb(217, 126, 99)',
+        inactiveColor: 'rgb(163, 158, 147)',
+      });
   });
 
   test('centers compact floating pill on wider viewports', async ({ page }) => {
@@ -455,8 +525,7 @@ test.describe('Habbit App E2E', () => {
     // Activities inline SVG fill adapts to manual Dark mode even on light OS
     await page.click('button[data-tab="activities"]');
     await expect(page.locator('#activities-choice-hub')).toBeVisible();
-    const svgFill = await page.locator('.act-logo-fill').first().evaluate((el) => getComputedStyle(el).fill);
-    expect(svgFill).toBe('rgb(34, 32, 30)');
+    await expect(page.locator('.act-logo-fill').first()).toHaveCSS('fill', 'rgb(34, 32, 30)');
 
     // Reload -> persists Dark before paint and keeps Dark radio selected in Settings
     await page.reload();

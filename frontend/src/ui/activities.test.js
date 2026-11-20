@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MockElement, MockDocument } from './test-helpers.js';
+import { today, addDays } from '../domain/day.js';
 
 describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
   let mockDoc;
@@ -72,17 +73,23 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
           .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
       ),
       getJournalEntry: vi.fn(async (day) => journalEntries[day] || null),
+      listJournalEntries: vi.fn(async () =>
+        Object.values(journalEntries).sort((a, b) => b.day.localeCompare(a.day))
+      ),
       saveJournalEntry: vi.fn(async (day, content) => {
         const entry = {
           day,
           content: String(content ?? ''),
           updatedAt: new Date().toISOString(),
-          printedToDiaryAt: '',
+          printedToDiaryAt: journalEntries[day]?.printedToDiaryAt || '',
         };
         journalEntries[day] = entry;
         for (const l of listeners) l();
         return entry;
       }),
+      _seedJournalEntry: (entry) => {
+        journalEntries[entry.day] = entry;
+      },
       getSetting: vi.fn(async (key) => settings[key] || null),
       setSetting: vi.fn(async (key, val) => {
         settings[key] = val;
@@ -101,6 +108,7 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
 
   afterEach(() => {
     delete global.document;
+    delete global.window;
     delete global.HTMLElement;
     vi.restoreAllMocks();
   });
@@ -129,14 +137,20 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     cleanup();
   });
 
-  it('navigates to Journals view, renders Prompt Cards Stack with defaults and formatting shortcuts', async () => {
+  it('navigates through Journals Choice Hub to Write a Journal, renders Prompt Cards Stack with defaults and formatting shortcuts', async () => {
     const root = mockDoc.createElement('div');
     const cleanup = mount(root);
     await new Promise((r) => setTimeout(r, 10));
 
-    // Open Journals
+    // Open Journals Menu
     const journalBtn = root.querySelector('#choice-journals');
     journalBtn.click();
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(root.querySelector('#journals-menu-view')).not.toBeNull();
+    const writeBtn = root.querySelector('#btn-choice-write-journal');
+    expect(writeBtn).not.toBeNull();
+    writeBtn.click();
     await new Promise((r) => setTimeout(r, 10));
 
     const journalView = root.querySelector('#journal-view');
@@ -166,10 +180,16 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     const numberBtn = root.querySelector('#btn-journal-number');
     expect(numberBtn).not.toBeNull();
 
-    // Back to activities
+    // Back to Journals Menu, then back to Activities Choice Hub
     const backBtn = root.querySelector('#btn-back-from-journal-to-activities');
     expect(backBtn).not.toBeNull();
     backBtn.click();
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(root.querySelector('#journals-menu-view')).not.toBeNull();
+    const backToActivitiesBtn = root.querySelector('#btn-back-from-journals-menu');
+    expect(backToActivitiesBtn).not.toBeNull();
+    backToActivitiesBtn.click();
     await new Promise((r) => setTimeout(r, 10));
 
     expect(root.querySelector('#activities-choice-hub')).not.toBeNull();
@@ -182,6 +202,8 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     await new Promise((r) => setTimeout(r, 10));
 
     root.querySelector('#choice-journals').click();
+    await new Promise((r) => setTimeout(r, 10));
+    root.querySelector('#btn-choice-write-journal').click();
     await new Promise((r) => setTimeout(r, 10));
 
     const editor0 = root.querySelector('#editor-journal-content');
@@ -207,6 +229,7 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
 
     expect(repoModule.saveJournalEntry).toHaveBeenCalled();
     const lastCall = repoModule.saveJournalEntry.mock.calls.at(-1);
+    expect(lastCall[0]).toBe(today());
     expect(lastCall[1]).toContain('data-prompt-id="jp_day"');
     expect(lastCall[1]).toContain('How was your day?');
     expect(lastCall[1]).toContain('Had a productive planning session');
@@ -240,7 +263,7 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
 `.trim();
 
     repoModule.getJournalEntry = vi.fn(async () => ({
-      day: '2026-10-22',
+      day: today(),
       content: compiledEntry,
     }));
 
@@ -249,6 +272,8 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     await new Promise((r) => setTimeout(r, 10));
 
     root.querySelector('#choice-journals').click();
+    await new Promise((r) => setTimeout(r, 10));
+    root.querySelector('#btn-choice-write-journal').click();
     await new Promise((r) => setTimeout(r, 10));
 
     const editor0 = root.querySelector('#editor-journal-content');
@@ -270,6 +295,8 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     await new Promise((r) => setTimeout(r, 10));
 
     root.querySelector('#choice-journals').click();
+    await new Promise((r) => setTimeout(r, 10));
+    root.querySelector('#btn-choice-write-journal').click();
     await new Promise((r) => setTimeout(r, 10));
 
     // Open Customize Prompts modal
@@ -313,7 +340,7 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
 
   it('does not overwrite a same-day notes-only or freeform Journal Entry when customizing prompts', async () => {
     repoModule.getJournalEntry = vi.fn(async () => ({
-      day: '2026-10-22',
+      day: today(),
       content: '<div class="journal-notes-block"><h3 class="font-bold">Additional Notes</h3><div class="journal-notes-answer">Legacy thoughts.</div></div>',
     }));
 
@@ -322,6 +349,8 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     await new Promise((r) => setTimeout(r, 10));
 
     root.querySelector('#choice-journals').click();
+    await new Promise((r) => setTimeout(r, 10));
+    root.querySelector('#btn-choice-write-journal').click();
     await new Promise((r) => setTimeout(r, 10));
 
     root.querySelector('#btn-customize-prompts').click();
@@ -336,7 +365,7 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     cleanup();
   });
 
-  it('reflects Done badge on Choice Hub when journal has content, and Write Journal when empty', async () => {
+  it('reflects Done badge on Choice Hub when journal has content, and Open Journals when empty', async () => {
     // 1. With empty journal
     repoModule.getJournalEntry = vi.fn(async () => null);
     const root1 = mockDoc.createElement('div');
@@ -344,13 +373,13 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     await new Promise((r) => setTimeout(r, 10));
 
     const journalBtn1 = root1.querySelector('#choice-journals');
-    expect(journalBtn1.textContent).toContain('Write Journal →');
+    expect(journalBtn1.textContent).toContain('Open Journals →');
     expect(journalBtn1.textContent).not.toContain('Done ✓');
     cleanup1();
 
     // 2. With answered journal
     repoModule.getJournalEntry = vi.fn(async () => ({
-      day: '2026-10-22',
+      day: today(),
       content: '<div class="journal-prompt-block"><p>Reflected</p></div>',
     }));
     const root2 = mockDoc.createElement('div');
@@ -360,6 +389,288 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     const journalBtn2 = root2.querySelector('#choice-journals');
     expect(journalBtn2.textContent).toContain('Done ✓');
     cleanup2();
+  });
+
+  it('shows today status and total Journal Entry count on Journals Choice Menu, and preserves subview=journal deep link', async () => {
+    const todayDay = today();
+    repoModule._seedJournalEntry({
+      day: todayDay,
+      content: '<div class="journal-prompt-block" data-prompt-id="jp_day"><h3>How was your day?</h3><div class="journal-prompt-answer">Solid focus</div></div>',
+    });
+    repoModule._seedJournalEntry({
+      day: addDays(todayDay, -10),
+      content: '<div class="journal-prompt-block" data-prompt-id="jp_day"><h3>How was your day?</h3><div class="journal-prompt-answer">Earlier day</div></div>',
+    });
+
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 15));
+
+    root.querySelector('#choice-journals').click();
+    await new Promise((r) => setTimeout(r, 15));
+
+    const menu = root.querySelector('#journals-menu-view');
+    expect(menu).not.toBeNull();
+    expect(menu.textContent).toContain('2 Journal Entries documented');
+    expect(root.querySelector('#btn-choice-write-journal')).not.toBeNull();
+    expect(root.querySelector('#btn-choice-journal-history')).not.toBeNull();
+    cleanup();
+
+    // Deep link skips Journals Choice Menu directly to Write a Journal
+    global.window = { location: { search: '?tab=activities&subview=journal' } };
+    const deepRoot = mockDoc.createElement('div');
+    const deepCleanup = mount(deepRoot);
+    await new Promise((r) => setTimeout(r, 15));
+
+    expect(deepRoot.querySelector('#journals-menu-view')).toBeNull();
+    expect(deepRoot.querySelector('#journal-view')).not.toBeNull();
+    deepCleanup();
+  });
+
+  it('supports bounded 7-day backfill date picker in Write a Journal and saves to selected past Day', async () => {
+    const todayDay = today();
+    const pastDay = addDays(todayDay, -3);
+    const minDay = addDays(todayDay, -7);
+
+    repoModule._seedJournalEntry({
+      day: todayDay,
+      content: '<div class="journal-prompt-block" data-prompt-id="jp_day"><h3>How was your day?</h3><div class="journal-prompt-answer">Today notes</div></div>',
+    });
+    repoModule._seedJournalEntry({
+      day: pastDay,
+      content: '<div class="journal-prompt-block" data-prompt-id="jp_day"><h3>How was your day?</h3><div class="journal-prompt-answer">Three days ago text</div></div>',
+    });
+
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 15));
+
+    root.querySelector('#choice-journals').click();
+    await new Promise((r) => setTimeout(r, 15));
+    root.querySelector('#btn-choice-write-journal').click();
+    await new Promise((r) => setTimeout(r, 15));
+
+    const dateInput = root.querySelector('#input-journal-date');
+    expect(dateInput).not.toBeNull();
+    expect(dateInput.value).toBe(todayDay);
+    expect(dateInput.getAttribute('min')).toBe(minDay);
+    expect(dateInput.getAttribute('max')).toBe(todayDay);
+    expect(dateInput.style.fontSize).toBe('16px');
+    expect(root.querySelector('#btn-customize-prompts')).not.toBeNull();
+
+    // Switch to 3 days ago -> loads existing entry and hides Customize Prompts
+    dateInput.value = pastDay;
+    dateInput.dispatchEvent({ type: 'change' });
+    await new Promise((r) => setTimeout(r, 15));
+
+    expect(root.querySelector('#btn-customize-prompts')).toBeNull();
+    const editor0 = root.querySelector('#editor-journal-content');
+    expect(editor0.innerHTML).toBe('Three days ago text');
+
+    // Edit and autosave -> saves specifically to pastDay
+    editor0.innerHTML = '<p>Backfilled update for three days ago</p>';
+    editor0.dispatchEvent({ type: 'input' });
+    await new Promise((r) => setTimeout(r, 850));
+
+    const lastCall = repoModule.saveJournalEntry.mock.calls.at(-1);
+    expect(lastCall[0]).toBe(pastDay);
+    expect(lastCall[1]).toContain('Backfilled update for three days ago');
+
+    cleanup();
+  });
+
+  it('renders Journal History empty state CTA, keyword search highlights, and separate in-page Entry Reader', async () => {
+    // 1. Empty state CTA jumps straight to Write a Journal
+    const rootEmpty = mockDoc.createElement('div');
+    const cleanupEmpty = mount(rootEmpty);
+    await new Promise((r) => setTimeout(r, 15));
+
+    rootEmpty.querySelector('#choice-journals').click();
+    await new Promise((r) => setTimeout(r, 15));
+    rootEmpty.querySelector('#btn-choice-journal-history').click();
+    await new Promise((r) => setTimeout(r, 15));
+
+    expect(rootEmpty.querySelector('#journal-history-view')).not.toBeNull();
+    const emptyWriteBtn = rootEmpty.querySelector('#btn-empty-write-today-journal');
+    expect(emptyWriteBtn).not.toBeNull();
+    emptyWriteBtn.click();
+    await new Promise((r) => setTimeout(r, 15));
+    expect(rootEmpty.querySelector('#journal-view')).not.toBeNull();
+    cleanupEmpty();
+
+    // 2. Populated list with search highlights & separate in-page reader
+    const todayDay = today();
+    const olderDay = addDays(todayDay, -15);
+    repoModule._seedJournalEntry({
+      day: todayDay,
+      content: '<div class="journal-prompt-block" data-prompt-id="jp_day"><h3>How was your day?</h3><div class="journal-prompt-answer">Morning coffee walk</div></div>',
+    });
+    repoModule._seedJournalEntry({
+      day: olderDay,
+      content: '<div class="journal-prompt-block" data-prompt-id="jp_day"><h3>How was your day?</h3><div class="journal-prompt-answer">Read stoic philosophy</div></div>',
+    });
+
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 15));
+
+    root.querySelector('#choice-journals').click();
+    await new Promise((r) => setTimeout(r, 15));
+    root.querySelector('#btn-choice-journal-history').click();
+    await new Promise((r) => setTimeout(r, 15));
+
+    let items = root.querySelectorAll('.journal-entry-item');
+    expect(items.length).toBe(2);
+    expect(items[0].dataset.day).toBe(todayDay);
+    expect(items[1].dataset.day).toBe(olderDay);
+
+    const searchInput = root.querySelector('#journal-history-search');
+    expect(searchInput).not.toBeNull();
+    expect(searchInput.style.fontSize).toBe('16px');
+
+    searchInput.value = 'stoic';
+    searchInput.dispatchEvent({ type: 'input' });
+    await new Promise((r) => setTimeout(r, 10));
+
+    items = root.querySelectorAll('.journal-entry-item');
+    expect(items.length).toBe(1);
+    expect(items[0].dataset.day).toBe(olderDay);
+    const markEl = items[0].querySelector('mark');
+    expect(markEl).not.toBeNull();
+    expect(markEl.textContent.toLowerCase()).toBe('stoic');
+
+    // Open separate in-page Entry Reader
+    items[0].click();
+    await new Promise((r) => setTimeout(r, 15));
+
+    const readerView = root.querySelector('#journal-read-view');
+    expect(readerView).not.toBeNull();
+    expect(root.querySelector('#journal-history-view')).toBeNull();
+    expect(root.querySelector('#journal-reader-card').textContent).toContain('Read stoic philosophy');
+    expect(root.querySelector('#btn-back-from-journal-read')).not.toBeNull();
+    expect(root.querySelector('#btn-edit-journal-entry')).not.toBeNull();
+
+    cleanup();
+  });
+
+  it('allows editing an old past Journal Entry from Entry Reader, preserves answered archived prompts, and returns to updated reader', async () => {
+    const oldDay = addDays(today(), -20);
+    await repoModule.setSetting(
+      'journalPrompts',
+      JSON.stringify([
+        { id: 'jp_day', prompt: 'How was your day?', order: 0, archived: false },
+        { id: 'jp_old', prompt: 'Legacy Evening Question?', order: 1, archived: true },
+      ])
+    );
+
+    repoModule._seedJournalEntry({
+      day: oldDay,
+      content: `
+<div class="journal-prompt-block" data-prompt-id="jp_day">
+  <h3 class="font-bold">How was your day?</h3>
+  <div class="journal-prompt-answer">Quiet Sunday</div>
+</div>
+<div class="journal-prompt-block" data-prompt-id="jp_old">
+  <h3 class="font-bold">Legacy Evening Question?</h3>
+  <div class="journal-prompt-answer">Original archived answer</div>
+</div>
+      `.trim(),
+    });
+
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 15));
+
+    root.querySelector('#choice-journals').click();
+    await new Promise((r) => setTimeout(r, 15));
+    root.querySelector('#btn-choice-journal-history').click();
+    await new Promise((r) => setTimeout(r, 15));
+
+    root.querySelector('.journal-entry-item').click();
+    await new Promise((r) => setTimeout(r, 15));
+
+    // Enter Edit Journal mode from Entry Reader
+    root.querySelector('#btn-edit-journal-entry').click();
+    await new Promise((r) => setTimeout(r, 15));
+
+    expect(root.querySelector('#journal-view')).not.toBeNull();
+    expect(root.querySelector('#input-journal-date')).toBeNull();
+    expect(root.querySelector('#btn-customize-prompts')).toBeNull();
+
+    // Archived prompt with saved answer MUST be rendered and editable
+    const archivedEditor = root.querySelector('#editor-journal-content-1');
+    expect(archivedEditor).not.toBeNull();
+    expect(archivedEditor.getAttribute('aria-label')).toBe('Legacy Evening Question?');
+    expect(archivedEditor.innerHTML).toBe('Original archived answer');
+    expect(root.querySelector('#journal-view').textContent).toContain('Archived');
+
+    // Edit archived answer and immediately tap Done/Back -> flushes save and returns to refreshed reader
+    archivedEditor.innerHTML = '<p>Revised archived reflection</p>';
+    archivedEditor.dispatchEvent({ type: 'input' });
+
+    root.querySelector('#btn-back-from-journal-to-activities').click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(repoModule.saveJournalEntry).toHaveBeenCalledWith(
+      oldDay,
+      expect.stringContaining('Revised archived reflection')
+    );
+
+    const refreshedReader = root.querySelector('#journal-read-view');
+    expect(refreshedReader).not.toBeNull();
+    expect(refreshedReader.textContent).toContain('Revised archived reflection');
+
+    cleanup();
+  });
+
+  it('preserves Additional Notes alongside prompt answers when editing mixed historical Journal Entries', async () => {
+    const todayDay = today();
+    const oldDay = addDays(todayDay, -12);
+    repoModule._seedJournalEntry({
+      day: oldDay,
+      content: `
+<div class="journal-prompt-block" data-prompt-id="jp_day">
+  <h3 class="font-bold">How was your day?</h3>
+  <div class="journal-prompt-answer">Steady progress today.</div>
+</div>
+<div class="journal-notes-block">
+  <h3 class="font-bold">Additional Notes</h3>
+  <div class="journal-notes-answer">Kept reading before bed.</div>
+</div>`.trim(),
+    });
+
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 15));
+
+    root.querySelector('#choice-journals').click();
+    await new Promise((r) => setTimeout(r, 15));
+    root.querySelector('#btn-choice-journal-history').click();
+    await new Promise((r) => setTimeout(r, 15));
+
+    root.querySelector('.journal-entry-item').click();
+    await new Promise((r) => setTimeout(r, 15));
+    root.querySelector('#btn-edit-journal-entry').click();
+    await new Promise((r) => setTimeout(r, 15));
+
+    expect(root.querySelector('#journal-notes-card')).toBeNull();
+    expect(root.querySelector('#editor-journal-content').innerHTML).toBe('Steady progress today.');
+    const legacyNotesEditor = root.querySelector('#editor-journal-content-3');
+    expect(legacyNotesEditor).not.toBeNull();
+    expect(legacyNotesEditor.getAttribute('aria-label')).toBe('Additional Notes');
+    expect(legacyNotesEditor.innerHTML).toBe('Kept reading before bed.');
+
+    root.querySelector('#editor-journal-content').innerHTML = '<p>Updated steady progress.</p>';
+    root.querySelector('#editor-journal-content').dispatchEvent({ type: 'input' });
+    root.querySelector('#btn-back-from-journal-to-activities').click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    const lastCall = repoModule.saveJournalEntry.mock.calls.at(-1);
+    expect(lastCall[0]).toBe(oldDay);
+    expect(lastCall[1]).toContain('Updated steady progress.');
+    expect(lastCall[1]).toContain('Kept reading before bed.');
+
+    cleanup();
   });
 
   it('navigates to Books list, shows empty state, and adds a new book', async () => {

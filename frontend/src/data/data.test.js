@@ -223,9 +223,13 @@ describe('Data Layer - Local CRUD & Outbox Coalescing', () => {
     );
   });
 
-  it('handles journal entries and editable window enforcement', async () => {
+  it('handles journal entries, 7-day backfill cap for new entries, and unlimited edit window for existing entries', async () => {
     const today = '2026-10-20';
     const yesterday = '2026-10-19';
+    const sevenDaysAgo = '2026-10-13';
+    const eightDaysAgo = '2026-10-12';
+    const twentyDaysAgo = '2026-09-30';
+    const tomorrow = '2026-10-21';
 
     // Save journal entry for today
     const entry = await saveJournalEntry(today, 'Wrote code all day.');
@@ -236,13 +240,37 @@ describe('Data Layer - Local CRUD & Outbox Coalescing', () => {
     const fetched = await getJournalEntry(today);
     expect(fetched.content).toBe('Wrote code all day.');
 
-    // Save journal entry for yesterday -> throws
-    await expect(saveJournalEntry(yesterday, 'Old thoughts')).rejects.toThrow(
+    // Save brand-new journal entry for yesterday and exactly 7 days ago -> succeeds
+    const yEntry = await saveJournalEntry(yesterday, 'Yesterday reflection');
+    expect(yEntry.day).toBe(yesterday);
+    const wEntry = await saveJournalEntry(sevenDaysAgo, 'One week ago reflection');
+    expect(wEntry.day).toBe(sevenDaysAgo);
+
+    // Save brand-new journal entry 8 days ago -> throws
+    await expect(saveJournalEntry(eightDaysAgo, 'Too old to backfill')).rejects.toThrow(
+      'New journal entries can only be created within the last 7 days'
+    );
+
+    // Save future journal entry -> throws
+    await expect(saveJournalEntry(tomorrow, 'Future thoughts')).rejects.toThrow(
       'Journal entry is read-only'
     );
 
+    // Editing an existing entry older than 7 days succeeds and preserves printedToDiaryAt
+    const db = await getDb();
+    await db.put(STORES.JOURNAL_ENTRIES, {
+      day: twentyDaysAgo,
+      content: 'Old September entry',
+      updatedAt: '2026-09-30T20:00:00Z',
+      printedToDiaryAt: '2026-10-01T02:00:00Z',
+    });
+
+    const editedOld = await saveJournalEntry(twentyDaysAgo, 'Updated September entry');
+    expect(editedOld.content).toBe('Updated September entry');
+    expect(editedOld.printedToDiaryAt).toBe('2026-10-01T02:00:00Z');
+
     const entries = await listJournalEntries();
-    expect(entries.length).toBe(1);
+    expect(entries.length).toBe(4);
     expect(entries[0].day).toBe(today);
   });
 
@@ -1007,5 +1035,24 @@ describe('Data Layer - API & Sync Flow', () => {
     await triggerActivityUncheck('journal');
     checkIns = await getCheckInDays(habit.id);
     expect(checkIns.has('2026-10-20')).toBe(false);
+  });
+
+  it('does NOT auto-check-in or uncheck linked habits when editing or backfilling a past Day', async () => {
+    const habit = await addHabit('Daily Reflection', { linkedActivity: 'journal' });
+
+    // Backfilling a past day does not mark today done
+    await saveJournalEntry('2026-10-18', '<p>Past reflection</p>');
+    let checkIns = await getCheckInDays(habit.id);
+    expect(checkIns.has('2026-10-20')).toBe(false);
+    expect(checkIns.has('2026-10-18')).toBe(false);
+
+    // Even if today is checked in, editing/clearing a past entry does not uncheck today
+    await saveJournalEntry('2026-10-20', '<p>Today entry</p>');
+    checkIns = await getCheckInDays(habit.id);
+    expect(checkIns.has('2026-10-20')).toBe(true);
+
+    await saveJournalEntry('2026-10-18', '');
+    checkIns = await getCheckInDays(habit.id);
+    expect(checkIns.has('2026-10-20')).toBe(true);
   });
 });

@@ -1,97 +1,19 @@
 /**
  * Habbit History UI Tab (SPEC §10)
  * Renders active habits with 12-week heatmap, streaks, 30-day completion rate,
- * collapsible archived habits section, and journal search & history with full reader view.
+ * and collapsible archived habits section.
  */
 
-import { today, formatShort, formatLong } from '../domain/day.js';
+import { today } from '../domain/day.js';
 import { currentStreak, longestStreak } from '../domain/streak.js';
 import { completionRate, heatmapWeeks } from '../domain/stats.js';
-import { searchEntries } from '../domain/search.js';
 import {
   listHabits,
   getCheckInDays,
   toggleCheckIn,
-  listJournalEntries,
   onChange,
 } from '../data/repo.js';
-import { navigate, showToast } from './shell.js';
-import { parseStructuredJournalBlocks, sanitizeJournalHtml } from '../domain/journal.js';
-import { htmlToText } from '../domain/text.js';
-
-/**
- * Escapes unsafe HTML characters.
- * @param {string} str
- * @returns {string}
- */
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-/**
- * Sets snippet text with highlights.
- * Uses both innerHTML for HTML rendering and DOM nodes for mock environments.
- * @param {HTMLElement} containerEl
- * @param {string} content
- * @param {Array<[number, number]>} highlights
- */
-function setSnippetContent(containerEl, content, highlights) {
-  const plainContent = content ? htmlToText(content) : '';
-  if (!plainContent) {
-    containerEl.innerHTML = '<span class="text-zinc-400 italic">No entry text</span>';
-    return;
-  }
-  content = plainContent;
-
-  if (!highlights || highlights.length === 0) {
-    containerEl.textContent = content;
-    return;
-  }
-
-  let html = '';
-  let lastIndex = 0;
-  for (const [start, end] of highlights) {
-    if (start > lastIndex) {
-      html += escapeHtml(content.slice(lastIndex, start));
-    }
-    const matched = content.slice(start, end);
-    html += `<mark class="bg-amber-200 dark:bg-amber-900/60 text-inherit">${escapeHtml(matched)}</mark>`;
-    lastIndex = end;
-  }
-  if (lastIndex < content.length) {
-    html += escapeHtml(content.slice(lastIndex));
-  }
-
-  containerEl.innerHTML = html;
-
-  // Support mock DOM environments that don't construct child elements from innerHTML
-  if (containerEl.children.length === 0 && typeof document !== 'undefined' && typeof document.createElement === 'function') {
-    let idx = 0;
-    for (const [start, end] of highlights) {
-      if (start > idx) {
-        const span = document.createElement('span');
-        span.textContent = content.slice(idx, start);
-        containerEl.appendChild(span);
-      }
-      const mark = document.createElement('mark');
-      mark.className = 'bg-amber-200 dark:bg-amber-900/60 text-inherit';
-      mark.textContent = content.slice(start, end);
-      containerEl.appendChild(mark);
-      idx = end;
-    }
-    if (idx < content.length) {
-      const span = document.createElement('span');
-      span.textContent = content.slice(idx);
-      containerEl.appendChild(span);
-    }
-  }
-}
+import { showToast } from './shell.js';
 
 /**
  * Mounts the History tab into the provided container element.
@@ -107,10 +29,6 @@ export function mount(el) {
 
   let isMounted = true;
   let currentRenderId = 0;
-  let cachedEntries = [];
-  let currentQuery = '';
-  let currentReaderEl = null;
-  let removeKeydownListener = null;
 
   // Root wrapper
   const root = document.createElement('div');
@@ -143,186 +61,7 @@ export function mount(el) {
   archivedDetails.appendChild(archivedHabitsList);
   root.appendChild(archivedDetails);
 
-  // --- 3. Journal Search & History Section ---
-  const journalSection = document.createElement('section');
-  journalSection.className = 'journal-history-section flex flex-col gap-3';
-
-  const journalHeading = document.createElement('h2');
-  journalHeading.className = 'text-lg font-serif font-semibold tracking-tight text-[#1C1B18] dark:text-[#F4F1EA]';
-  journalHeading.textContent = 'Journal History';
-  journalSection.appendChild(journalHeading);
-
-  // Search input box
-  const searchWrapper = document.createElement('div');
-  searchWrapper.className = 'relative w-full';
-
-  const searchInput = document.createElement('input');
-  searchInput.type = 'search';
-  searchInput.placeholder = 'Search entries by keyword or date...';
-  searchInput.setAttribute('aria-label', 'Search entries by keyword or date...');
-  searchInput.className = 'journal-search-input w-full px-4 py-2.5 rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F] focus:outline-none focus:ring-2 focus:ring-[#C86D51] text-base';
-  searchInput.style.fontSize = '16px';
-  searchWrapper.appendChild(searchInput);
-  journalSection.appendChild(searchWrapper);
-
-  searchInput.addEventListener('input', () => {
-    currentQuery = searchInput.value;
-    renderJournalList();
-  });
-
-  // Journal entries list container
-  const journalEntriesList = document.createElement('div');
-  journalEntriesList.className = 'journal-entries-list flex flex-col gap-2.5';
-  journalSection.appendChild(journalEntriesList);
-  root.appendChild(journalSection);
-
   el.appendChild(root);
-
-  /**
-   * Closes reader view if open.
-   */
-  function closeReaderView() {
-    if (removeKeydownListener) {
-      removeKeydownListener();
-    }
-    if (currentReaderEl) {
-      currentReaderEl.remove();
-      currentReaderEl = null;
-    }
-  }
-
-  /**
-   * Opens full reader view modal.
-   * @param {import('../shared/contracts.js').JournalEntry} entry
-   */
-  function openReaderView(entry) {
-    closeReaderView();
-
-    const isToday = entry.day === today();
-
-    const backdrop = document.createElement('div');
-    backdrop.className = 'reader-modal-backdrop fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4';
-    backdrop.setAttribute('role', 'dialog');
-    backdrop.setAttribute('aria-modal', 'true');
-    backdrop.setAttribute('aria-label', `Journal entry for ${formatShort(entry.day)}`);
-
-    const dialog = document.createElement('div');
-    dialog.className = 'reader-dialog editorial-card bg-[#FFFFFF] dark:bg-[#161514] max-w-lg w-full max-h-[85vh] flex flex-col shadow-xl border border-[#E6E4DF] dark:border-[#33302C] overflow-hidden';
-
-    // Header
-    const header = document.createElement('div');
-    header.className = 'flex items-center justify-between px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 shrink-0';
-
-    const titleWrap = document.createElement('div');
-    const title = document.createElement('h3');
-    title.className = 'font-serif font-semibold text-base text-[#1C1B18] dark:text-[#F4F1EA]';
-    title.textContent = formatLong(entry.day);
-    const subtitle = document.createElement('p');
-    subtitle.className = 'text-xs font-mono text-[#68655F] dark:text-[#A39E93]';
-    subtitle.textContent = formatShort(entry.day);
-    titleWrap.appendChild(title);
-    titleWrap.appendChild(subtitle);
-    header.appendChild(titleWrap);
-
-    const closeIconBtn = document.createElement('button');
-    closeIconBtn.type = 'button';
-    closeIconBtn.className = 'reader-close-btn p-2 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center';
-    closeIconBtn.setAttribute('aria-label', 'Close reader');
-    closeIconBtn.innerHTML = `
-      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-      </svg>
-    `;
-    closeIconBtn.addEventListener('click', closeReaderView);
-    header.appendChild(closeIconBtn);
-    dialog.appendChild(header);
-
-    // Body
-    const body = document.createElement('div');
-    body.className = 'p-5 overflow-y-auto flex-1';
-    const contentEl = document.createElement('div');
-    contentEl.className = 'journal-reader-text flex flex-col gap-4 text-sm sm:text-base text-zinc-800 dark:text-zinc-200 break-words leading-relaxed select-text';
-
-    if (!entry.content || !entry.content.trim()) {
-      contentEl.textContent = 'No entry text';
-    } else {
-      const blocks = parseStructuredJournalBlocks(entry.content);
-      if (blocks.length === 1 && blocks[0].type === 'freeform') {
-        const p = document.createElement('div');
-        p.className = 'whitespace-pre-wrap';
-        p.textContent = blocks[0].contentHtml;
-        contentEl.appendChild(p);
-      } else {
-        for (const block of blocks) {
-          const sectionEl = document.createElement('section');
-          sectionEl.className = 'journal-reader-section flex flex-col gap-1.5 p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800';
-
-          const h4 = document.createElement('h4');
-          h4.className = 'font-bold text-sm text-zinc-900 dark:text-zinc-100 leading-snug';
-          h4.textContent = block.title;
-          sectionEl.appendChild(h4);
-
-          const answerDiv = document.createElement('div');
-          answerDiv.className = 'journal-reader-answer text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed [&_ol]:list-decimal [&_ol]:list-outside [&_ol]:pl-6 [&_ol]:my-1.5 [&_ul]:list-disc [&_ul]:list-outside [&_ul]:pl-6 [&_ul]:my-1.5 [&_p]:my-1';
-          answerDiv.innerHTML = sanitizeJournalHtml(block.contentHtml);
-          if (answerDiv.children.length === 0 && !answerDiv.textContent) {
-            answerDiv.textContent = block.contentHtml.replace(/<[^>]*>/g, '').trim();
-          }
-          sectionEl.appendChild(answerDiv);
-          contentEl.appendChild(sectionEl);
-        }
-      }
-    }
-    dialog.appendChild(body);
-
-    // Footer
-    const footer = document.createElement('div');
-    footer.className = 'flex items-center justify-end gap-3 px-5 py-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 shrink-0';
-
-    if (isToday) {
-      const editBtn = document.createElement('button');
-      editBtn.type = 'button';
-      editBtn.className = 'btn-edit-today btn-terracotta px-4 py-2 text-sm font-semibold rounded-lg transition cursor-pointer min-h-[44px] flex items-center justify-center tactile-spring';
-      editBtn.textContent = 'Edit in Today';
-      editBtn.addEventListener('click', () => {
-        closeReaderView();
-        navigate('today');
-      });
-      footer.appendChild(editBtn);
-    }
-
-    const closeBtn = document.createElement('button');
-    closeBtn.type = 'button';
-    closeBtn.className = 'btn-close btn-secondary-surface px-4 py-2 text-sm font-medium rounded-lg transition cursor-pointer min-h-[44px] flex items-center justify-center tactile-spring';
-    closeBtn.textContent = 'Close';
-    closeBtn.addEventListener('click', closeReaderView);
-    footer.appendChild(closeBtn);
-
-    dialog.appendChild(footer);
-    backdrop.appendChild(dialog);
-
-    backdrop.addEventListener('click', (e) => {
-      if (e.target === backdrop) {
-        closeReaderView();
-      }
-    });
-
-    const onKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        closeReaderView();
-      }
-    };
-    if (typeof document !== 'undefined') {
-      document.addEventListener('keydown', onKeyDown);
-      removeKeydownListener = () => {
-        document.removeEventListener('keydown', onKeyDown);
-        removeKeydownListener = null;
-      };
-    }
-
-    currentReaderEl = backdrop;
-    el.appendChild(backdrop);
-  }
 
   /**
    * Renders a habit history card (for active or archived habit).
@@ -464,68 +203,12 @@ export function mount(el) {
   }
 
   /**
-   * Renders journal entries list filtered by current query.
-   */
-  function renderJournalList() {
-    journalEntriesList.innerHTML = '';
-
-    const results = searchEntries(cachedEntries, currentQuery);
-
-    if (cachedEntries.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'text-center py-6 text-sm text-zinc-500 dark:text-zinc-400';
-      empty.textContent = 'No journal entries yet.';
-      journalEntriesList.appendChild(empty);
-      return;
-    }
-
-    if (results.length === 0) {
-      const noMatch = document.createElement('div');
-      noMatch.className = 'text-center py-6 text-sm text-zinc-500 dark:text-zinc-400';
-      noMatch.textContent = 'No matching entries found.';
-      journalEntriesList.appendChild(noMatch);
-      return;
-    }
-
-    for (const item of results) {
-      const { entry, highlights } = item;
-      const entryBtn = document.createElement('button');
-      entryBtn.type = 'button';
-      entryBtn.className = 'journal-entry-item editorial-card group text-left w-full p-3.5 hover:border-[#68655F] dark:hover:border-[#A39E93] transition flex flex-col gap-1.5 cursor-pointer tactile-spring bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
-      entryBtn.dataset.day = entry.day;
-      entryBtn.setAttribute('aria-label', `Read journal entry for ${formatShort(entry.day)}`);
-
-      const dateHeader = document.createElement('div');
-      dateHeader.className = 'flex items-center justify-between w-full';
-      const dateText = document.createElement('span');
-      dateText.className = 'text-xs font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA] group-hover:text-[#C86D51] transition-colors';
-      dateText.textContent = formatShort(entry.day);
-      dateHeader.appendChild(dateText);
-      entryBtn.appendChild(dateHeader);
-
-      const snippetEl = document.createElement('div');
-      snippetEl.className = 'line-clamp-2 text-sm text-zinc-700 dark:text-zinc-300 break-words whitespace-pre-wrap';
-      setSnippetContent(snippetEl, entry.content || '', highlights);
-      entryBtn.appendChild(snippetEl);
-
-      entryBtn.addEventListener('click', () => {
-        openReaderView(entry);
-      });
-
-      journalEntriesList.appendChild(entryBtn);
-    }
-  }
-
-  /**
-   * Fetches latest habits, check-ins, and journal entries, then updates DOM.
+   * Fetches latest habits and check-ins, then updates DOM.
    */
   async function loadDataAndRender() {
     const renderId = ++currentRenderId;
     try {
-      const [allHabits, allEntries] = await Promise.all([
-        listHabits({ includeArchived: true }),
-        listJournalEntries(),
-      ]);
+      const allHabits = await listHabits({ includeArchived: true });
 
       if (!isMounted || renderId !== currentRenderId) return;
 
@@ -571,10 +254,6 @@ export function mount(el) {
           archivedHabitsList.appendChild(renderHabitCard(habit, checkInDays, true));
         }
       }
-
-      // Render Journal Entries
-      cachedEntries = allEntries;
-      renderJournalList();
     } catch (err) {
       if (!isMounted) return;
       console.error('Failed to load history data', err);
@@ -595,7 +274,6 @@ export function mount(el) {
     if (typeof unsubscribe === 'function') {
       unsubscribe();
     }
-    closeReaderView();
     el.innerHTML = '';
   };
 }

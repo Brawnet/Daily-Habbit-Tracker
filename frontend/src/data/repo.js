@@ -1,7 +1,7 @@
 import { getDb } from './db.js';
 import { STORES, ACTIVITY_STATUS, LINKED_ACTIVITIES } from '../shared/contracts.js';
 import { scheduleSync } from './sync.js';
-import { isCheckInEditable, isJournalEditable, today } from '../domain/day.js';
+import { isCheckInEditable, isJournalCreatable, isJournalEditable, today } from '../domain/day.js';
 import { isBlank } from '../domain/text.js';
 
 const changeListeners = new Set();
@@ -341,6 +341,9 @@ export async function saveJournalEntry(day, content) {
 
   const db = await getDb();
   const existing = await db.get(STORES.JOURNAL_ENTRIES, day);
+  if (!existing && !isJournalCreatable(day, currentDay)) {
+    throw new Error('New journal entries can only be created within the last 7 days');
+  }
   const now = new Date().toISOString();
 
   /** @type {import('../shared/contracts.js').JournalEntry} */

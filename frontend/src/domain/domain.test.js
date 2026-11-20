@@ -6,6 +6,8 @@ import {
   compareDays,
   isCheckInEditable,
   isJournalEditable,
+  isJournalCreatable,
+  isValidDayString,
   formatLong,
   formatShort,
   msUntilNextDay,
@@ -114,15 +116,51 @@ describe('domain/day', () => {
     });
   });
 
+  describe('isValidDayString', () => {
+    it('validates strict YYYY-MM-DD calendar strings', () => {
+      expect(isValidDayString('2026-10-20')).toBe(true);
+      expect(isValidDayString('2024-02-29')).toBe(true);
+      expect(isValidDayString('2026-02-30')).toBe(false);
+      expect(isValidDayString('2026-13-01')).toBe(false);
+      expect(isValidDayString('')).toBe(false);
+      expect(isValidDayString('invalid')).toBe(false);
+    });
+  });
+
   describe('isJournalEditable', () => {
-    it('is true only for today (SPEC §1)', () => {
+    it('is true for today and any valid past day, false for future or malformed dates', () => {
       const todayDay = '2026-10-20';
       const yesterday = '2026-10-19';
+      const oldDay = '2026-09-01';
       const tomorrow = '2026-10-21';
 
       expect(isJournalEditable(todayDay, todayDay)).toBe(true);
-      expect(isJournalEditable(yesterday, todayDay)).toBe(false);
+      expect(isJournalEditable(yesterday, todayDay)).toBe(true);
+      expect(isJournalEditable(oldDay, todayDay)).toBe(true);
       expect(isJournalEditable(tomorrow, todayDay)).toBe(false);
+      expect(isJournalEditable('', todayDay)).toBe(false);
+      expect(isJournalEditable('2026-02-30', todayDay)).toBe(false);
+      expect(isJournalEditable('invalid', todayDay)).toBe(false);
+    });
+  });
+
+  describe('isJournalCreatable', () => {
+    it('allows creating new entries within [today - 7 days, today] inclusive', () => {
+      const todayDay = '2026-10-20';
+      expect(isJournalCreatable(todayDay, todayDay)).toBe(true);
+      expect(isJournalCreatable('2026-10-19', todayDay)).toBe(true);
+      expect(isJournalCreatable('2026-10-13', todayDay)).toBe(true); // exactly 7 days back
+      expect(isJournalCreatable('2026-10-12', todayDay)).toBe(false); // 8 days back
+      expect(isJournalCreatable('2026-10-21', todayDay)).toBe(false); // future
+      expect(isJournalCreatable('2026-02-30', todayDay)).toBe(false);
+      expect(isJournalCreatable('invalid', todayDay)).toBe(false);
+    });
+
+    it('respects 7-day window across month and year boundaries', () => {
+      expect(isJournalCreatable('2026-10-25', '2026-11-01')).toBe(true);
+      expect(isJournalCreatable('2026-10-24', '2026-11-01')).toBe(false);
+      expect(isJournalCreatable('2026-12-25', '2027-01-01')).toBe(true);
+      expect(isJournalCreatable('2026-12-24', '2027-01-01')).toBe(false);
     });
   });
 

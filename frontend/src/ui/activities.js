@@ -16,6 +16,7 @@ import {
   saveBookChapter,
   listBookChapters,
   getJournalEntry,
+  listJournalEntries,
   saveJournalEntry,
   getSetting,
   setSetting,
@@ -31,11 +32,17 @@ import {
   saveJournalPrompts,
   compilePromptJournal,
   decompilePromptJournal,
+  parseStructuredJournalBlocks,
   renderPromptCardsJournal,
   openCustomizePromptsModal,
   hasNonEmptyJournalAnswers,
 } from './journal-prompts.js';
-import { today } from '../domain/day.js';
+import {
+  renderJournalsChoiceMenu,
+  renderJournalHistoryView,
+  renderJournalReaderView,
+} from './journal-history.js';
+import { addDays, formatLong, today } from '../domain/day.js';
 import { showToast } from './shell.js';
 import { isBlank, htmlToText, htmlToMarkdownText } from '../domain/text.js';
 import { sanitizeJournalHtml } from '../domain/journal.js';
@@ -146,7 +153,7 @@ export function mount(rootEl) {
   let renderToken = 0;
   let debounceTimer = null;
 
-  // View state: 'home' | 'journal' | 'books-list' | 'book-menu' | 'book-edit' | 'book-read'
+  // View state: 'home' | 'journals-menu' | 'journal' | 'journal-history' | 'journal-read' | 'journal-edit' | 'books-list' | 'book-menu' | 'book-edit' | 'book-read'
   let currentView = 'home';
   try {
     if (typeof window !== 'undefined' && window.location) {
@@ -160,6 +167,10 @@ export function mount(rootEl) {
   let selectedBookId = null;
   let selectedChapterId = 'new'; // 'new' | chapterId
   let isAddingBook = false;
+  let activeJournalDay = today();
+  let selectedJournalDay = null;
+  let journalSearchQuery = '';
+  let pendingJournalFlush = null;
 
   // Transient drafts
   let newChapterTitle = '';
@@ -168,13 +179,10 @@ export function mount(rootEl) {
   let journalStatus = 'Saved';
   let chapterStatus = 'Saved';
   let cachedPrompts = JSON.parse(JSON.stringify(DEFAULT_JOURNAL_PROMPTS));
-  loadJournalPrompts(getSetting, setSetting)
+  const promptsReady = loadJournalPrompts(getSetting, setSetting)
     .then((p) => {
       if (Array.isArray(p) && p.length > 0) {
         cachedPrompts = p;
-        if (isMounted && currentView === 'journal') {
-          render();
-        }
       }
     })
     .catch(() => {});
@@ -184,32 +192,74 @@ export function mount(rootEl) {
   container.className = 'activities-view flex flex-col gap-6 max-w-lg mx-auto w-full pb-20 pt-2 px-4';
   rootEl.appendChild(container);
 
-  // Load initial journal draft
-  getJournalEntry(today())
-    .then((entry) => {
-      if (entry?.content) {
-        journalDraft = entry.content;
-        if (isMounted) {
+  function hasJournalText(html) {
+    return Boolean(html && htmlToText(html).trim());
+  }
+
+  function syncTodayJournalBadge({ renderMenuIfPresent = false } = {}) {
+    getJournalEntry(today())
+      .then((entry) => {
+        const nextContent = entry?.content || '';
+        const prevDone = hasJournalText(journalDraft);
+        const nextDone = hasJournalText(nextContent);
+        journalDraft = nextContent;
+        if (
+          isMounted &&
+          ((currentView === 'home' && nextDone !== prevDone) ||
+            (renderMenuIfPresent && currentView === 'journals-menu' && Boolean(nextContent)))
+        ) {
           render();
         }
-      }
-    })
-    .catch(() => {});
+      })
+      .catch(() => {});
+  }
+
+  // Load initial journal draft for today's badge state
+  syncTodayJournalBadge({ renderMenuIfPresent: true });
 
   const unsubscribeRepo = onChange(() => {
-    if (isMounted && currentView !== 'book-edit' && currentView !== 'journal') {
+    if (!isMounted) return;
+    if (currentView === 'home') {
+      syncTodayJournalBadge();
+      return;
+    }
+    if (
+      currentView !== 'book-edit' &&
+      currentView !== 'journal' &&
+      currentView !== 'journal-edit' &&
+      currentView !== 'journal-history'
+    ) {
       render();
     }
   });
 
+  async function flushPendingJournalSave() {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
+    if (typeof pendingJournalFlush === 'function') {
+      const flushFn = pendingJournalFlush;
+      pendingJournalFlush = null;
+      await flushFn();
+    }
+  }
+
   async function render() {
     const token = ++renderToken;
-    container.innerHTML = '';
 
     let contentEl = null;
     try {
-      if (currentView === 'journal') {
-        contentEl = await renderJournalView();
+      if (currentView === 'journals-menu') {
+        contentEl = await renderJournalsMenuContainerView();
+      } else if (currentView === 'journal') {
+        contentEl = await renderJournalEditorView({ targetDay: activeJournalDay, mode: 'write' });
+      } else if (currentView === 'journal-history') {
+        contentEl = await renderJournalHistoryContainerView();
+      } else if (currentView === 'journal-read') {
+        contentEl = await renderJournalReadContainerView();
+      } else if (currentView === 'journal-edit') {
+        contentEl = await renderJournalEditorView({ targetDay: selectedJournalDay || today(), mode: 'edit' });
       } else if (currentView === 'books-list') {
         contentEl = await renderBooksListView();
       } else if (currentView === 'book-menu') {
@@ -229,6 +279,7 @@ export function mount(rootEl) {
     }
 
     if (!isMounted || token !== renderToken) return;
+    container.innerHTML = '';
     if (contentEl) {
       container.appendChild(contentEl);
     }
@@ -331,7 +382,7 @@ export function mount(rootEl) {
     leftJ.appendChild(textJ);
 
     const actionJ = document.createElement('span');
-    const isTodayJournalDone = Boolean(journalDraft && journalDraft.trim());
+    const isTodayJournalDone = hasJournalText(journalDraft);
     if (isTodayJournalDone) {
       actionJ.className =
         'badge-sage inline-flex items-center gap-1 px-3.5 py-1.5 rounded-full text-xs font-mono font-semibold transition-colors shrink-0';
@@ -339,12 +390,12 @@ export function mount(rootEl) {
     } else {
       actionJ.className =
         'badge-rose inline-flex items-center gap-1 px-3.5 py-1.5 rounded-full text-xs font-mono font-semibold transition-all shrink-0';
-      actionJ.textContent = 'Write Journal →';
+      actionJ.textContent = 'Open Journals →';
     }
     btnJournal.appendChild(leftJ);
     btnJournal.appendChild(actionJ);
     btnJournal.addEventListener('click', () => {
-      currentView = 'journal';
+      currentView = 'journals-menu';
       render();
     });
 
@@ -1181,51 +1232,192 @@ export function mount(rootEl) {
     return wrap;
   }
 
-  // --- 6. Journals View (Prototype) ---
-  async function renderJournalView() {
+  // --- 6. Journals Hub, History, Reader, & Editor Views ---
+  async function renderJournalsMenuContainerView() {
+    const todayDay = today();
+    const [todayEntry, allEntries] = await Promise.all([
+      getJournalEntry(todayDay),
+      listJournalEntries(),
+    ]);
+    journalDraft = todayEntry?.content || '';
+    const nonEmptyCount = (allEntries || []).filter((e) =>
+      Boolean(e && e.content && htmlToText(e.content).trim())
+    ).length;
+
+    return renderJournalsChoiceMenu({
+      isTodayDone: Boolean(journalDraft && htmlToText(journalDraft).trim()),
+      entryCount: nonEmptyCount,
+      logoSvg: JOURNALING_LOGO_SVG,
+      pencilSvg: PENCIL_WRITE_SVG,
+      bookSvg: BOOK_OPEN_SVG,
+      onBack: () => {
+        currentView = 'home';
+        render();
+      },
+      onWriteJournal: () => {
+        activeJournalDay = today();
+        currentView = 'journal';
+        render();
+      },
+      onOpenHistory: () => {
+        currentView = 'journal-history';
+        render();
+      },
+    });
+  }
+
+  async function renderJournalHistoryContainerView() {
+    const entries = await listJournalEntries();
+    return renderJournalHistoryView({
+      entries,
+      todayDay: today(),
+      query: journalSearchQuery,
+      onQueryChange: (q) => {
+        journalSearchQuery = q;
+      },
+      onBack: () => {
+        currentView = 'journals-menu';
+        render();
+      },
+      onSelectEntry: (entry) => {
+        selectedJournalDay = entry.day;
+        currentView = 'journal-read';
+        render();
+      },
+      onWriteToday: () => {
+        activeJournalDay = today();
+        currentView = 'journal';
+        render();
+      },
+    });
+  }
+
+  async function renderJournalReadContainerView() {
+    const day = selectedJournalDay || today();
+    const entry = await getJournalEntry(day);
+    if (!entry) {
+      currentView = 'journal-history';
+      return renderJournalHistoryContainerView();
+    }
+    return renderJournalReaderView({
+      entry,
+      isToday: entry.day === today(),
+      onBack: () => {
+        currentView = 'journal-history';
+        render();
+      },
+      onEdit: () => {
+        selectedJournalDay = entry.day;
+        currentView = 'journal-edit';
+        render();
+      },
+    });
+  }
+
+  async function renderJournalEditorView({ targetDay, mode }) {
+    await promptsReady;
+    const todayDay = today();
+    const day = targetDay || todayDay;
+    const isTodayTarget = day === todayDay;
+    const existingEntry = await getJournalEntry(day);
+    const rawContent = existingEntry?.content || '';
+    if (isTodayTarget) {
+      journalDraft = rawContent;
+    }
+
     const wrap = document.createElement('div');
     wrap.id = 'journal-view';
     wrap.className = 'flex flex-col gap-4 animate-in fade-in duration-150 relative';
 
-    let prompts = cachedPrompts;
-    const { answers } = decompilePromptJournal(journalDraft);
+    let prompts = [...cachedPrompts];
+    const blocks = parseStructuredJournalBlocks(rawContent);
+    const { answers } = decompilePromptJournal(rawContent);
+
+    // Ensure archived or historical prompt IDs present in this entry remain editable
+    const knownIds = new Set(prompts.map((p) => p.id));
+    let syntheticOrder = 900;
+    for (const block of blocks) {
+      if (block.type === 'prompt' && block.id && !knownIds.has(block.id)) {
+        knownIds.add(block.id);
+        prompts.push({
+          id: block.id,
+          prompt: block.title || 'Archived Prompt',
+          order: syntheticOrder++,
+          archived: true,
+        });
+      }
+    }
+
+    // Preserve historical freeform/notes blocks in explicit Edit mode so mixed legacy entries never drop content on save
+    if (mode === 'edit') {
+      const legacyBlocks = blocks.filter((b) => b.type === 'notes' || b.type === 'freeform');
+      if (legacyBlocks.length > 0) {
+        const legacyHtml = legacyBlocks.map((b) => b.contentHtml).filter(Boolean).join('\n');
+        if (legacyHtml.trim()) {
+          const legacyId = 'legacy_reflection';
+          if (!knownIds.has(legacyId)) {
+            prompts.push({
+              id: legacyId,
+              prompt: legacyBlocks[0].title || 'Daily Reflection',
+              order: 999,
+              archived: true,
+            });
+          }
+          if (!answers[legacyId]) {
+            answers[legacyId] = sanitizeJournalHtml(legacyHtml);
+          }
+        }
+      }
+    }
+
+    async function persistJournalForDay() {
+      const statusBadge = wrap.querySelector('#journal-status');
+      try {
+        const compiled = compilePromptJournal(prompts, answers);
+        if (day === today()) {
+          journalDraft = compiled;
+        }
+        await saveJournalEntry(day, compiled);
+        if (statusBadge) statusBadge.textContent = 'Saved';
+      } catch {
+        if (statusBadge) statusBadge.textContent = 'Error';
+      }
+    }
 
     function handleUpdateAnswers() {
-      const statusBadge =
-        wrap.querySelector('#journal-status') ||
-        wrap.querySelector('#journal-status-badge');
+      const statusBadge = wrap.querySelector('#journal-status');
       if (statusBadge) statusBadge.textContent = 'Saving...';
 
+      pendingJournalFlush = persistJournalForDay;
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(async () => {
-        try {
-          const compiled = compilePromptJournal(prompts, answers);
-          journalDraft = compiled;
-          await saveJournalEntry(today(), compiled);
-          if (statusBadge) statusBadge.textContent = 'Saved';
-        } catch {
-          if (statusBadge) statusBadge.textContent = 'Error';
-        }
+        pendingJournalFlush = null;
+        await persistJournalForDay();
       }, 800);
     }
 
     function handleSavePrompts(newPrompts) {
       cachedPrompts = newPrompts;
-      prompts = newPrompts;
+      prompts = [...newPrompts];
       saveJournalPrompts(setSetting, newPrompts);
       if (hasNonEmptyJournalAnswers(answers)) {
         const compiled = compilePromptJournal(newPrompts, answers);
-        journalDraft = compiled;
-        saveJournalEntry(today(), compiled).catch(() => {});
+        if (day === today()) {
+          journalDraft = compiled;
+        }
+        saveJournalEntry(day, compiled).catch(() => {});
       }
     }
+
     function handleOpenCustomizeModal() {
+      const flushPromise = flushPendingJournalSave().catch(() => {});
       openCustomizePromptsModal({
-        prompts,
+        prompts: cachedPrompts,
         onSave: (p) => {
           handleSavePrompts(p);
         },
-        onClose: () => {
+        onClose: async () => {
+          await flushPromise;
           render();
         },
       });
@@ -1235,10 +1427,27 @@ export function mount(rootEl) {
       prompts,
       answers,
       status: journalStatus,
+      targetDay: day,
+      backLabel: mode === 'edit' ? 'Done · Back to Entry' : 'Back to Journals',
+      showDatePicker: mode === 'write',
+      minDay: addDays(todayDay, -7),
+      maxDay: todayDay,
+      onChangeDay: async (nextDay) => {
+        await flushPendingJournalSave();
+        activeJournalDay = nextDay;
+        render();
+      },
+      showCustomizeButton: mode === 'write' && isTodayTarget,
+      dateSubtitle: mode === 'edit' ? formatLong(day) : '',
       onUpdateAnswers: handleUpdateAnswers,
       onOpenCustomizeModal: handleOpenCustomizeModal,
-      onBack: () => {
-        currentView = 'home';
+      onBack: async () => {
+        await flushPendingJournalSave();
+        if (mode === 'edit') {
+          currentView = 'journal-read';
+        } else {
+          currentView = 'journals-menu';
+        }
         render();
       },
     });
@@ -1253,6 +1462,11 @@ export function mount(rootEl) {
   return () => {
     isMounted = false;
     clearTimeout(debounceTimer);
+    if (typeof pendingJournalFlush === 'function') {
+      const flushFn = pendingJournalFlush;
+      pendingJournalFlush = null;
+      flushFn().catch(() => {});
+    }
 
     unsubscribeRepo();
   };

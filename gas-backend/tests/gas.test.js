@@ -564,7 +564,7 @@ describe('Pure Functions', () => {
       expect(result[0].serverUpdatedAt).toBe('server-1');
     });
 
-    it('rejects update with reason LOCKED when journal entry has printedToDiaryAt set', () => {
+    it('allows updating existing past journal entry even when printedToDiaryAt is set', () => {
       const existing = [
         {
           day: '2026-10-18',
@@ -577,16 +577,48 @@ describe('Pure Functions', () => {
       const incoming = [
         {
           day: '2026-10-18',
-          content: 'Attempted edit of printed entry',
+          content: 'Edited past entry',
           updatedAt: '2026-10-20T10:00:00.000Z'
         }
       ];
       const now = '2026-10-20T11:00:00.000Z';
-      const result = mergeRecordsLWW(existing, incoming, now);
+      const result = mergeRecordsLWW(existing, incoming, now, '2026-10-20');
+      expect(result.rejected).toEqual([]);
+      expect(result[0].content).toBe('Edited past entry');
+      expect(result[0].printedToDiaryAt).toBe('2026-10-19T02:00:00.000Z');
+      expect(result[0].serverUpdatedAt).toBe(now);
+    });
+
+    it('rejects future-dated journal entry with reason LOCKED in mergeRecordsLWW', () => {
+      const incoming = [
+        {
+          day: '2026-10-22',
+          content: 'Future entry',
+          updatedAt: '2026-10-20T10:00:00.000Z'
+        }
+      ];
+      const now = '2026-10-20T11:00:00.000Z';
+      const result = mergeRecordsLWW([], incoming, now, '2026-10-20');
       expect(result.rejected).toEqual([
-        { type: 'journalEntries', key: '2026-10-18', reason: 'LOCKED' }
+        { type: 'journalEntries', key: '2026-10-22', reason: 'LOCKED' }
       ]);
-      expect(result[0].content).toBe('Original Journal Entry');
+      expect(result.length).toBe(0);
+    });
+
+    it('rejects malformed journal entry day with reason LOCKED in mergeRecordsLWW', () => {
+      const incoming = [
+        {
+          day: '2026-02-30',
+          content: 'Invalid calendar day',
+          updatedAt: '2026-10-20T10:00:00.000Z'
+        }
+      ];
+      const now = '2026-10-20T11:00:00.000Z';
+      const result = mergeRecordsLWW([], incoming, now, '2026-10-20');
+      expect(result.rejected).toEqual([
+        { type: 'journalEntries', key: '2026-02-30', reason: 'LOCKED' }
+      ]);
+      expect(result.length).toBe(0);
     });
 
     it('ignores client-sent printedToDiaryAt and keeps server-owned value', () => {
@@ -860,8 +892,8 @@ describe('GAS Backend Actions', () => {
       expect(resp2.changes.journalEntries.length).toBe(0);
     });
 
-    it('rejects edit to journal entry that was printed to diary (LOCKED)', () => {
-      // Create initial journal entry
+    it('allows editing already-printed past journal entry and updates Google Doc Diary in-place on next export', () => {
+      // Create initial past journal entry
       const sync1 = {
         pin: PIN,
         deviceId: 'dev-1',
@@ -875,13 +907,14 @@ describe('GAS Backend Actions', () => {
       };
       env.exports.doPost({ postData: { contents: JSON.stringify(sync1) } });
 
-      // Mark as printedToDiaryAt in the sheet
+      // Export to Diary Doc so printedToDiaryAt is populated
+      env.exports.printDiary();
       const jSheet = env.ss.getSheetByName('Journal_Entries');
-      const rows = jSheet.getDataRange().getValues();
-      rows[1][3] = '2026-10-19T02:00:00Z'; // printedToDiaryAt
-      jSheet.getRange(1, 1, rows.length, 5).setValues(rows);
+      const rowsAfterFirstPrint = jSheet.getDataRange().getValues();
+      const firstPrintedAt = rowsAfterFirstPrint[1][3];
+      expect(firstPrintedAt).not.toBe('');
 
-      // Attempt to sync an update to that journal entry
+      // Sync an update to that past journal entry
       const sync2 = {
         pin: PIN,
         deviceId: 'dev-1',
@@ -889,19 +922,32 @@ describe('GAS Backend Actions', () => {
         since: null,
         changes: {
           journalEntries: [
-            { day: '2026-10-18', content: 'Tampered content', updatedAt: '2026-10-20T10:00:00Z' }
+            { day: '2026-10-18', content: 'Updated past reflection', updatedAt: '2026-10-20T10:00:00Z' }
           ]
         }
       };
       const res2 = JSON.parse(env.exports.doPost({ postData: { contents: JSON.stringify(sync2) } }).getContent());
       expect(res2.ok).toBe(true);
-      expect(res2.rejected).toEqual([
-        { type: 'journalEntries', key: '2026-10-18', reason: 'LOCKED' }
-      ]);
+      expect(res2.rejected).toEqual([]);
 
-      // Verify content in sheet was not changed
-      const rowsAfter = jSheet.getDataRange().getValues();
-      expect(rowsAfter[1][1]).toBe('Original content');
+      // Verify content in sheet was updated and printedToDiaryAt preserved until next Diary sync
+      const rowsAfterSync = jSheet.getDataRange().getValues();
+      expect(rowsAfterSync[1][1]).toBe('Updated past reflection');
+      expect(rowsAfterSync[1][3]).toBe(firstPrintedAt);
+
+      // Next printDiary run updates the Google Doc in-place without duplicate headings
+      env.exports.printDiary();
+      const docs = Array.from(env.docs.values());
+      expect(docs.length).toBe(1);
+      const body = docs[0].getBody();
+      const childrenText = [];
+      for (let i = 0; i < body.getNumChildren(); i++) {
+        childrenText.push(body.getChild(i).getText());
+      }
+      const headingMatches = childrenText.filter((t) => t === 'Sunday, 18 October 2026');
+      expect(headingMatches.length).toBe(1);
+      expect(childrenText).toContain('Updated past reflection');
+      expect(childrenText).not.toContain('Original content');
     });
 
     it('allows editing today journal entry even when printedToDiaryAt is set', () => {
@@ -1007,6 +1053,24 @@ describe('GAS Backend Actions', () => {
       expect(res.ok).toBe(true);
       expect(res.rejected).toEqual([
         { type: 'journalEntries', key: tomorrow, reason: 'LOCKED' }
+      ]);
+    });
+
+    it('rejects malformed journal entry day with reason LOCKED during sync', () => {
+      const syncPayload = {
+        pin: PIN,
+        deviceId: 'dev-1',
+        action: 'sync',
+        changes: {
+          journalEntries: [
+            { day: '2026-02-30', content: 'Bad date note', updatedAt: '2026-10-20T10:00:00Z' }
+          ]
+        }
+      };
+      const res = JSON.parse(env.exports.doPost({ postData: { contents: JSON.stringify(syncPayload) } }).getContent());
+      expect(res.ok).toBe(true);
+      expect(res.rejected).toEqual([
+        { type: 'journalEntries', key: '2026-02-30', reason: 'LOCKED' }
       ]);
     });
 

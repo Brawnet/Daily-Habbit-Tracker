@@ -23,7 +23,6 @@ let shellMounted = false;
 let rootElement = null;
 let tabContentElement = null;
 let bottomNavElement = null;
-let bottomNavIndicatorElement = null;
 let syncDotElement = null;
 let syncTextElement = null;
 let syncBadgeElement = null;
@@ -163,18 +162,6 @@ function updateBottomNavSelection() {
       iconSpan.innerHTML = getTabIconMarkup(registeredTabs[name], isSelected);
     }
   }
-
-  if (bottomNavIndicatorElement) {
-    const tabKeys = Object.keys(registeredTabs);
-    const activeIndex = tabKeys.indexOf(currentTab);
-    if (tabKeys.length > 0 && activeIndex >= 0) {
-      bottomNavIndicatorElement.style.width = `${100 / tabKeys.length}%`;
-      bottomNavIndicatorElement.style.transform = `translateX(${activeIndex * 100}%)`;
-      bottomNavIndicatorElement.style.opacity = '1';
-    } else {
-      bottomNavIndicatorElement.style.opacity = '0';
-    }
-  }
 }
 
 function renderBottomNavButtons() {
@@ -182,13 +169,7 @@ function renderBottomNavButtons() {
   bottomNavElement.innerHTML = '';
 
   const track = document.createElement('div');
-  track.className = 'liquid-glass-track';
-
-  bottomNavIndicatorElement = document.createElement('span');
-  bottomNavIndicatorElement.id = 'bottom-nav-indicator';
-  bottomNavIndicatorElement.className = 'liquid-glass-indicator';
-  bottomNavIndicatorElement.setAttribute('aria-hidden', 'true');
-  track.appendChild(bottomNavIndicatorElement);
+  track.className = 'floating-bottom-nav-track';
 
   const tabKeys = Object.keys(registeredTabs);
   for (const name of tabKeys) {
@@ -205,13 +186,13 @@ function renderBottomNavButtons() {
     btn.setAttribute('aria-selected', 'false');
     btn.setAttribute('aria-controls', 'tab-content');
     btn.className =
-      'liquid-glass-tab relative z-10 flex items-center justify-center flex-1 min-w-[44px] min-h-[44px] h-12 rounded-full cursor-pointer select-none';
+      'floating-bottom-nav-tab relative z-10 flex flex-col items-center justify-center flex-1 min-w-[44px] min-h-[48px] py-1 px-1 rounded-full cursor-pointer select-none';
 
     const iconSpan = document.createElement('span');
     iconSpan.className = 'tab-icon flex items-center justify-center pointer-events-none w-6 h-6';
 
     const labelSpan = document.createElement('span');
-    labelSpan.className = 'tab-title sr-only';
+    labelSpan.className = 'tab-title text-[11px] leading-tight mt-0.5 pointer-events-none';
     labelSpan.textContent = label;
 
     btn.appendChild(iconSpan);
@@ -511,7 +492,7 @@ export function mountShell(rootEl) {
   bottomNavElement.id = 'bottom-nav';
   bottomNavElement.setAttribute('role', 'tablist');
   bottomNavElement.setAttribute('aria-label', 'Main Navigation');
-  bottomNavElement.className = 'liquid-glass-nav absolute z-30';
+  bottomNavElement.className = 'floating-bottom-nav absolute z-30';
   bottomNavElement.style.bottom = 'max(12px, env(safe-area-inset-bottom, 12px))';
   bottomNavElement.style.left = 'max(16px, env(safe-area-inset-left, 0px))';
   bottomNavElement.style.right = 'max(16px, env(safe-area-inset-right, 0px))';

@@ -9,15 +9,44 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 const SCHEMA = {
   Habits: ['id', 'name', 'sortOrder', 'archived', 'createdAt', 'updatedAt', 'serverUpdatedAt'],
   Check_Ins: ['id', 'habitId', 'day', 'deleted', 'updatedAt', 'serverUpdatedAt'],
-  Journal_Entries: ['day', 'content', 'updatedAt', 'printedToDiaryAt', 'serverUpdatedAt'],
+  Journal_Entries: ['day', 'content', 'updatedAt', 'printedToDiaryAt', 'serverUpdatedAt', 'title'],
   Settings: ['key', 'value', 'updatedAt', 'serverUpdatedAt'],
   Push_Subscriptions: ['deviceId', 'endpoint', 'p256dh', 'auth', 'createdAt'],
   Activities: ['id', 'title', 'author', 'type', 'status', 'totalPages', 'summary', 'archived', 'createdAt', 'updatedAt', 'serverUpdatedAt']
 };
 
+const JOURNAL_TITLE_MAX_LENGTH = 120;
+
 // ==========================================
 // Pure Logic Functions
 // ==========================================
+
+function normalizeJournalTitle(title) {
+  if (title === null || title === undefined) return '';
+  return String(title)
+    .replace(/[\r\n]+/g, ' ')
+    .trim()
+    .slice(0, JOURNAL_TITLE_MAX_LENGTH)
+    .trim();
+}
+
+function isBlankText(str) {
+  if (str === null || str === undefined) return true;
+  return String(str).replace(/<[^>]*>/g, ' ').trim() === '';
+}
+
+function isJournalEntryWritten(entry) {
+  if (!entry) return false;
+  return normalizeJournalTitle(entry.title) !== '' || !isBlankText(entry.content);
+}
+
+function sanitizeJournalTitle(title) {
+  return sanitizeFormulaInjection(normalizeJournalTitle(title));
+}
+
+function desanitizeJournalTitle(rawTitle) {
+  return normalizeJournalTitle(desanitizeFormulaInjection(rawTitle || ''));
+}
 
 /**
  * Formats 'YYYY-MM-DD' into 'Tuesday, 20 October 2026' (Heading 2 format)
@@ -154,12 +183,7 @@ function decideReminder({
   const habitsLeft = habits.filter(h => !checkedInHabitIds.has(h.id)).length;
 
   // Journal entry today
-  const journalWritten = Boolean(
-    journalEntryToday &&
-    journalEntryToday.content &&
-    typeof journalEntryToday.content === 'string' &&
-    journalEntryToday.content.trim() !== ''
-  );
+  const journalWritten = isJournalEntryWritten(journalEntryToday);
   const journalLeft = !journalWritten;
 
   if (habitsLeft === 0 && !journalLeft) {
@@ -278,6 +302,9 @@ function mergeRecordsLWW(existingRecords, incomingRecords, nowMonotonic, todayJa
       };
       if (isJournal) {
         toWrite.printedToDiaryAt = existing ? (existing.printedToDiaryAt || '') : '';
+        toWrite.title = incoming.title !== undefined
+          ? normalizeJournalTitle(incoming.title)
+          : (existing ? normalizeJournalTitle(existing.title) : '');
       }
       resultMap.set(key, toWrite);
       updatedList.push(toWrite);
@@ -411,15 +438,25 @@ function createJsonResponse(data) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+function ensureSheetHeaders(sheet, headers, force) {
+  const needsHeaderUpgrade =
+    Boolean(force) ||
+    sheet.getLastRow() === 0 ||
+    (typeof sheet.getLastColumn === 'function' && sheet.getLastColumn() < headers.length);
+  if (needsHeaderUpgrade) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    const maxRows = Math.max(sheet.getMaxRows(), 1);
+    const maxCols = Math.max(sheet.getMaxColumns(), headers.length);
+    sheet.getRange(1, 1, maxRows, maxCols).setNumberFormat('@');
+  }
+}
+
 function getOrCreateSheet(ss, name, headers) {
   let sheet = ss.getSheetByName(name);
   if (!sheet) {
     sheet = ss.insertSheet(name);
   }
-  if (sheet.getLastRow() === 0) {
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    sheet.getRange(1, 1, Math.max(sheet.getMaxRows(), 1), Math.max(sheet.getMaxColumns(), headers.length)).setNumberFormat('@');
-  }
+  ensureSheetHeaders(sheet, headers, false);
   return sheet;
 }
 
@@ -475,7 +512,8 @@ function readAllJournalEntries(sheet) {
       content: desanitizeFormulaInjection(row[1] || ''),
       updatedAt: String(row[2] || ''),
       printedToDiaryAt: String(row[3] || ''),
-      serverUpdatedAt: String(row[4] || '')
+      serverUpdatedAt: String(row[4] || ''),
+      title: desanitizeJournalTitle(row[5])
     });
   }
   return list;
@@ -641,7 +679,16 @@ function syncCheckIns(sheet, incomingCheckIns, nowMonotonic) {
 
 function syncJournalEntries(sheet, incomingJournalEntries, nowMonotonic) {
   const data = sheet.getDataRange().getValues();
-  const headers = data[0] || SCHEMA.Journal_Entries;
+  const expectedCols = SCHEMA.Journal_Entries.length;
+  if (!data[0] || data[0].length < expectedCols) {
+    data[0] = [...SCHEMA.Journal_Entries];
+  }
+  for (let i = 1; i < data.length; i++) {
+    while (data[i].length < expectedCols) {
+      data[i].push('');
+    }
+  }
+
   const rowMap = new Map();
   for (let i = 1; i < data.length; i++) {
     if (data[i][0]) rowMap.set(String(data[i][0]), i);
@@ -667,6 +714,9 @@ function syncJournalEntries(sheet, incomingJournalEntries, nowMonotonic) {
         data[rowIndex][1] = sanitizeFormulaInjection(entry.content || '');
         data[rowIndex][2] = clientUpdatedAt;
         data[rowIndex][4] = nowMonotonic;
+        if (entry.title !== undefined) {
+          data[rowIndex][5] = sanitizeJournalTitle(entry.title);
+        }
       }
     } else {
       const newRow = [
@@ -674,14 +724,15 @@ function syncJournalEntries(sheet, incomingJournalEntries, nowMonotonic) {
         sanitizeFormulaInjection(entry.content || ''),
         clientUpdatedAt,
         '',
-        nowMonotonic
+        nowMonotonic,
+        sanitizeJournalTitle(entry.title)
       ];
       data.push(newRow);
       rowMap.set(day, data.length - 1);
     }
   }
-  sheet.getRange(1, 1, data.length, headers.length).setNumberFormat('@');
-  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
+  sheet.getRange(1, 1, data.length, expectedCols).setNumberFormat('@');
+  sheet.getRange(1, 1, data.length, expectedCols).setValues(data);
   return rejected;
 }
 
@@ -939,6 +990,13 @@ function getOrCreateDiaryDoc(folder, year, props) {
   return doc;
 }
 
+function appendOrInsertParagraph(body, startIndex, text, heading) {
+  const pos = startIndex === undefined ? -1 : startIndex;
+  const paragraph = pos === -1 ? body.appendParagraph(text) : body.insertParagraph(pos, text);
+  paragraph.setHeading(heading);
+  return { paragraph, nextPos: pos === -1 ? -1 : pos + 1 };
+}
+
 function writeEntryParagraphs(body, startIndex, lines) {
   let pos = startIndex;
   for (const rawLine of lines) {
@@ -949,10 +1007,10 @@ function writeEntryParagraphs(body, startIndex, lines) {
     const h3Match = trimmed.match(/<h3[^>]*>([\s\S]*?)<\/h3>/i) || trimmed.match(/^###\s*(.*)$/);
     if (h3Match) {
       const headingText = h3Match[1].replace(/<[^>]*>/g, '').trim();
-      const p = pos === -1 ? body.appendParagraph(headingText) : body.insertParagraph(pos++, headingText);
-      p.setHeading(DocumentApp.ParagraphHeading.NORMAL);
-      if (typeof p.setBold === 'function') {
-        p.setBold(true);
+      const { paragraph, nextPos } = appendOrInsertParagraph(body, pos, headingText, DocumentApp.ParagraphHeading.NORMAL);
+      pos = nextPos;
+      if (typeof paragraph.setBold === 'function') {
+        paragraph.setBold(true);
       }
       continue;
     }
@@ -967,18 +1025,28 @@ function writeEntryParagraphs(body, startIndex, lines) {
       ? line.replace(/<[^>]*>/g, '').trim()
       : line;
 
-    const p = pos === -1 ? body.appendParagraph(cleanText) : body.insertParagraph(pos++, cleanText);
-    p.setHeading(DocumentApp.ParagraphHeading.NORMAL);
-    if (typeof p.setBold === 'function') {
-      p.setBold(false);
+    const { paragraph, nextPos } = appendOrInsertParagraph(body, pos, cleanText, DocumentApp.ParagraphHeading.NORMAL);
+    pos = nextPos;
+    if (typeof paragraph.setBold === 'function') {
+      paragraph.setBold(false);
     }
   }
-  const blank = pos === -1 ? body.appendParagraph('') : body.insertParagraph(pos++, '');
-  blank.setHeading(DocumentApp.ParagraphHeading.NORMAL);
-  return pos;
+  return appendOrInsertParagraph(body, pos, '', DocumentApp.ParagraphHeading.NORMAL).nextPos;
 }
 
-function insertEntryIntoDoc(doc, entry) {
+function writeEntryBody(body, startIndex, entry) {
+  let pos = startIndex;
+  const titleText = desanitizeJournalTitle(entry && entry.title);
+  if (titleText) {
+    pos = appendOrInsertParagraph(body, pos, titleText, DocumentApp.ParagraphHeading.HEADING_3).nextPos;
+  }
+  if (!isBlankText(entry && entry.content)) {
+    return writeEntryParagraphs(body, pos, String(entry.content).split('\n'));
+  }
+  return appendOrInsertParagraph(body, pos, '', DocumentApp.ParagraphHeading.NORMAL).nextPos;
+}
+
+function upsertEntryInDoc(doc, entry) {
   const body = doc.getBody();
   const existingHeadings = [];
   for (let i = 0; i < body.getNumChildren(); i++) {
@@ -995,74 +1063,65 @@ function insertEntryIntoDoc(doc, entry) {
   }
 
   const existingIndex = existingHeadings.findIndex(h => h.day === entry.day);
-  const hasContent = entry.content && String(entry.content).trim() !== '';
+  const isWritten = isJournalEntryWritten(entry);
 
   if (existingIndex !== -1) {
     const currentHeading = existingHeadings[existingIndex];
     const nextHeading = existingHeadings[existingIndex + 1];
     const endIndex = nextHeading ? nextHeading.childIndex : body.getNumChildren();
 
-    if (!hasContent) {
-      // Content cleared: remove heading and all following paragraphs for this entry
+    if (!isWritten) {
+      // Title and content both cleared: remove heading and all following paragraphs for this entry
       for (let i = endIndex - 1; i >= currentHeading.childIndex; i--) {
         if (body.getNumChildren() > 1) {
           body.removeChild(body.getChild(i));
         } else {
-          const blank = body.appendParagraph('');
-          blank.setHeading(DocumentApp.ParagraphHeading.NORMAL);
+          appendOrInsertParagraph(body, -1, '', DocumentApp.ParagraphHeading.NORMAL);
           body.removeChild(body.getChild(i));
         }
       }
       return;
     }
 
-    // Content updated: remove previous body paragraphs and insert updated content
+    // Entry updated: remove previous body paragraphs (including any prior Heading 3) and re-write
     for (let i = endIndex - 1; i > currentHeading.childIndex; i--) {
       body.removeChild(body.getChild(i));
     }
 
-    const lines = (entry.content || '').split('\n');
-    writeEntryParagraphs(body, currentHeading.childIndex + 1, lines);
+    writeEntryBody(body, currentHeading.childIndex + 1, entry);
     return;
   }
 
-  // Not in doc yet: if no content, do not insert empty section
-  if (!hasContent) {
+  // Not in doc yet: if neither title nor content present, do not insert empty section
+  if (!isWritten) {
     return;
   }
 
   const insertIndex = findChronologicalInsertIndex(existingHeadings, entry.day);
   const headingText = formatDiaryHeading(entry.day);
-  const lines = (entry.content || '').split('\n');
-
-  if (insertIndex === -1) {
-    const h2 = body.appendParagraph(headingText);
-    h2.setHeading(DocumentApp.ParagraphHeading.HEADING_2);
-    writeEntryParagraphs(body, -1, lines);
-  } else {
-    let pos = insertIndex;
-    const h2 = body.insertParagraph(pos++, headingText);
-    h2.setHeading(DocumentApp.ParagraphHeading.HEADING_2);
-    writeEntryParagraphs(body, pos, lines);
-  }
+  const { nextPos } = appendOrInsertParagraph(body, insertIndex, headingText, DocumentApp.ParagraphHeading.HEADING_2);
+  writeEntryBody(body, nextPos, entry);
 }
 
-const upsertEntryInDoc = insertEntryIntoDoc;
+const insertEntryIntoDoc = upsertEntryInDoc;
 
 function updateJournalEntryInSheet(sheet, entry) {
+  ensureSheetHeaders(sheet, SCHEMA.Journal_Entries, false);
   const data = sheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][0]) === entry.day) {
-      data[i][1] = entry.content || '';
-      data[i][2] = entry.updatedAt;
-      data[i][3] = entry.printedToDiaryAt || '';
-      data[i][4] = entry.serverUpdatedAt || '';
-      sheet.getRange(i + 1, 1, 1, 5).setValues([[
+      const sanitizedContent = sanitizeFormulaInjection(entry.content || '');
+      const sanitizedTitle = entry.title !== undefined
+        ? sanitizeJournalTitle(entry.title)
+        : sanitizeJournalTitle(desanitizeJournalTitle(data[i][5]));
+      sheet.getRange(i + 1, 1, 1, SCHEMA.Journal_Entries.length).setNumberFormat('@');
+      sheet.getRange(i + 1, 1, 1, SCHEMA.Journal_Entries.length).setValues([[
         entry.day,
-        entry.content || '',
+        sanitizedContent,
         entry.updatedAt,
         entry.printedToDiaryAt || '',
-        entry.serverUpdatedAt || ''
+        entry.serverUpdatedAt || '',
+        sanitizedTitle
       ]]);
       return;
     }
@@ -1264,10 +1323,7 @@ function setup() {
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
     }
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    const maxRows = Math.max(sheet.getMaxRows(), 1);
-    const maxCols = Math.max(sheet.getMaxColumns(), headers.length);
-    sheet.getRange(1, 1, maxRows, maxCols).setNumberFormat('@');
+    ensureSheetHeaders(sheet, headers, true);
   }
 
   // Folder 'Habbit Diary'
@@ -1373,9 +1429,9 @@ function syncDiaryEntries(ss, props, options) {
       if (e.day > todayJakarta) return false;
       if (!includeToday && e.day === todayJakarta) return false;
       const notPrinted = !e.printedToDiaryAt || String(e.printedToDiaryAt).trim() === '';
-      const hasContent = e.content && String(e.content).trim() !== '';
+      const isWritten = isJournalEntryWritten(e);
       if (notPrinted) {
-        return hasContent;
+        return isWritten;
       }
       return Boolean(e.serverUpdatedAt && e.serverUpdatedAt > e.printedToDiaryAt);
     });
@@ -1394,7 +1450,7 @@ function syncDiaryEntries(ss, props, options) {
       try {
         const doc = getOrCreateDiaryDoc(folder, year, props);
         for (const entry of entriesForYear) {
-          insertEntryIntoDoc(doc, entry);
+          upsertEntryInDoc(doc, entry);
         }
         doc.saveAndClose();
 
@@ -1537,6 +1593,12 @@ if (typeof module !== 'undefined' && module.exports) {
     DAYS,
     MONTHS,
     SCHEMA,
+    JOURNAL_TITLE_MAX_LENGTH,
+    normalizeJournalTitle,
+    isBlankText,
+    isJournalEntryWritten,
+    sanitizeJournalTitle,
+    desanitizeJournalTitle,
     formatDiaryHeading,
     parseDiaryHeading,
     findChronologicalInsertIndex,
@@ -1553,6 +1615,7 @@ if (typeof module !== 'undefined' && module.exports) {
     isValidPushEndpoint,
     timingSafeEqualPin,
     createJsonResponse,
+    ensureSheetHeaders,
     getOrCreateSheet,
     readAllHabits,
     readAllCheckIns,
@@ -1570,6 +1633,7 @@ if (typeof module !== 'undefined' && module.exports) {
     handleUnsubscribePush,
     handleTestPush,
     getOrCreateDiaryDoc,
+    writeEntryBody,
     insertEntryIntoDoc,
     upsertEntryInDoc,
     updateJournalEntryInSheet,

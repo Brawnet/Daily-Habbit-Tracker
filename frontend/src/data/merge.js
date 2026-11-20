@@ -1,4 +1,5 @@
 import { STORES } from '../shared/contracts.js';
+import { normalizeJournalTitle } from '../domain/journal.js';
 
 export const TYPE_CONFIG = Object.freeze({
   habits: {
@@ -134,6 +135,7 @@ export function mergeRecord(type, incoming, local, outboxEntry, isLocked = false
     if (serverPrintedAt) {
       resultRecord.printedToDiaryAt = serverPrintedAt;
     }
+    resultRecord.title = normalizeJournalTitle(resultRecord.title);
   }
 
   return {

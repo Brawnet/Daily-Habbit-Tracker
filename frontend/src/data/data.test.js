@@ -274,6 +274,33 @@ describe('Data Layer - Local CRUD & Outbox Coalescing', () => {
     expect(entries[0].day).toBe(today);
   });
 
+  it('normalizes, preserves, and clears optional Journal Entry title across saveJournalEntry calls', async () => {
+    const today = '2026-10-20';
+    const yesterday = '2026-10-19';
+
+    // Default when 3rd arg omitted on new entry -> title: ''
+    const untitled = await saveJournalEntry(today, 'Notes without title');
+    expect(untitled.title).toBe('');
+
+    // Save trimmed & 120-char-capped title
+    const overLongTitle = '  ' + 'X'.repeat(130) + '  ';
+    const titled = await saveJournalEntry(today, 'Notes with title', { title: overLongTitle });
+    expect(titled.title).toBe('X'.repeat(120));
+    expect((await getJournalEntry(today)).title).toBe('X'.repeat(120));
+
+    // Omitting options on an existing titled entry preserves its title
+    const updatedContent = await saveJournalEntry(today, 'Updated body only');
+    expect(updatedContent.title).toBe('X'.repeat(120));
+
+    // Explicit whitespace-only or '' clears title
+    const cleared = await saveJournalEntry(today, 'Updated body only', { title: '   ' });
+    expect(cleared.title).toBe('');
+
+    // Whitespace-only on new entry stores ''
+    const blankNew = await saveJournalEntry(yesterday, 'Some body', { title: '  \t ' });
+    expect(blankNew.title).toBe('');
+  });
+
   it('handles settings get and set', async () => {
     expect(await getSetting('reminderTime')).toBeNull();
 
@@ -491,6 +518,35 @@ describe('Data Layer - LWW Merge and LOCKED Precedence', () => {
     expect(m2.winner).toBe('local');
     expect(m2.record.content).toBe('New local edit');
     expect(m2.record.printedToDiaryAt).toBe('2026-10-19T02:00:00Z');
+  });
+
+  it('merges and normalizes optional title on journalEntries via LWW and LOCKED precedence', () => {
+    // Incoming wins and adopts normalized title
+    const mWin = mergeRecord(
+      'journalEntries',
+      { day: '2026-10-18', title: '  Server Headline  ', content: '', updatedAt: '2026-10-20T12:00:00Z', printedToDiaryAt: '' },
+      { day: '2026-10-18', title: 'Local Old', content: '', updatedAt: '2026-10-19T12:00:00Z', printedToDiaryAt: '' }
+    );
+    expect(mWin.winner).toBe('incoming');
+    expect(mWin.record.title).toBe('Server Headline');
+
+    // Local outbox wins -> keeps local title
+    const mLocal = mergeRecord(
+      'journalEntries',
+      { day: '2026-10-18', title: 'Server Old', content: '', updatedAt: '2026-10-19T12:00:00Z', printedToDiaryAt: '' },
+      { day: '2026-10-18', title: 'Local Newer', content: '', updatedAt: '2026-10-20T12:00:00Z', printedToDiaryAt: '' },
+      { updatedAt: '2026-10-20T12:00:00Z' }
+    );
+    expect(mLocal.winner).toBe('local');
+    expect(mLocal.record.title).toBe('Local Newer');
+
+    // Missing incoming title normalizes to ''
+    const mMissing = mergeRecord(
+      'journalEntries',
+      { day: '2026-10-17', content: 'Legacy entry', updatedAt: '2026-10-17T10:00:00Z', printedToDiaryAt: '' },
+      null
+    );
+    expect(mMissing.record.title).toBe('');
   });
 
   it('handles applyIncomingChanges with LOCKED and LWW in IndexedDB', async () => {
@@ -1054,5 +1110,67 @@ describe('Data Layer - API & Sync Flow', () => {
     await saveJournalEntry('2026-10-18', '');
     checkIns = await getCheckInDays(habit.id);
     expect(checkIns.has('2026-10-20')).toBe(true);
+  });
+
+  it('triggers Linked Activity check-in for title-only today entries and unchecks only when both title and content are blank', async () => {
+    const habit = await addHabit('Daily Reflection', { linkedActivity: 'journal' });
+
+    // Past Day title-only entry must NOT check in today's linked habit
+    await saveJournalEntry('2026-10-18', '', { title: 'Past milestone' });
+    expect((await getCheckInDays(habit.id)).has('2026-10-20')).toBe(false);
+
+    // Today title-only entry checks in linked habit
+    await saveJournalEntry('2026-10-20', '', { title: 'Big breakthrough' });
+    expect((await getCheckInDays(habit.id)).has('2026-10-20')).toBe(true);
+
+    // Clearing content while keeping title keeps linked habit checked in
+    await saveJournalEntry('2026-10-20', 'Body', { title: 'Big breakthrough' });
+    await saveJournalEntry('2026-10-20', '', { title: 'Big breakthrough' });
+    expect((await getCheckInDays(habit.id)).has('2026-10-20')).toBe(true);
+
+    // Clearing both title and content unchecks linked habit
+    await saveJournalEntry('2026-10-20', '', { title: '' });
+    expect((await getCheckInDays(habit.id)).has('2026-10-20')).toBe(false);
+  });
+
+  it('serializes journalEntries title in syncNow outbound payload and persists incoming server titles', async () => {
+    await saveJournalEntry('2026-10-20', '<p>Reflected</p>', { title: 'Local Sync Title' });
+
+    let sentBody = null;
+    globalThis.fetch = vi.fn().mockImplementation(async (url, init) => {
+      sentBody = JSON.parse(init.body);
+      return {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          cursor: '2026-10-20T15:00:00Z',
+          changes: {
+            habits: [],
+            checkIns: [],
+            journalEntries: [
+              {
+                day: '2026-10-19',
+                title: '  Remote Title  ',
+                content: '<p>From another Device</p>',
+                updatedAt: '2026-10-19T21:00:00Z',
+                printedToDiaryAt: '',
+              },
+            ],
+            settings: [],
+            activities: [],
+          },
+          rejected: [],
+        }),
+      };
+    });
+
+    await syncNow();
+
+    expect(sentBody.changes.journalEntries).toHaveLength(1);
+    expect(sentBody.changes.journalEntries[0].title).toBe('Local Sync Title');
+
+    const incomingEntry = await getJournalEntry('2026-10-19');
+    expect(incomingEntry).not.toBeNull();
+    expect(incomingEntry.title).toBe('Remote Title');
   });
 });

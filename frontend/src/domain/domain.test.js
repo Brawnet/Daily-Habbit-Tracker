@@ -18,12 +18,16 @@ import { searchEntries } from './search.js';
 import { isBlank, htmlToText, htmlToMarkdownText } from './text.js';
 import {
   DEFAULT_JOURNAL_PROMPTS,
+  JOURNAL_TITLE_MAX_LENGTH,
   compilePromptJournal,
   decompilePromptJournal,
   parseStructuredJournalBlocks,
   sanitizeJournalHtml,
   computeWordCount,
   hasNonEmptyJournalAnswers,
+  normalizeJournalTitle,
+  isJournalEntryWritten,
+  resolveJournalDisplayHeader,
 } from './journal.js';
 
 describe('domain/day', () => {
@@ -530,6 +534,59 @@ describe('domain/search', () => {
     expect(searchEntries(null, 'test')).toEqual([]);
     expect(searchEntries(undefined, 'test')).toEqual([]);
   });
+
+  it('matches tokens in entry title, supports AND combinations across title/content/day, and returns titleHighlights', () => {
+    const titledEntries = [
+      { day: '2026-10-20', title: 'Café Morning Run', content: 'Felt energized after stretching.' }, // Tuesday
+      { day: '2026-10-19', title: 'Quiet Focus', content: '' }, // title-only
+      { day: '2026-10-18', content: 'Legacy entry without title field' }, // undefined title
+    ];
+
+    // Empty query includes titleHighlights: []
+    const emptyRes = searchEntries(titledEntries, '');
+    expect(emptyRes).toHaveLength(3);
+    expect(emptyRes[0].titleHighlights).toEqual([]);
+    expect(emptyRes[0].highlights).toEqual([]);
+
+    // Diacritic- and case-insensitive match in title only
+    const resCafe = searchEntries(titledEntries, 'cafe');
+    expect(resCafe).toHaveLength(1);
+    expect(resCafe[0].entry.day).toBe('2026-10-20');
+    expect(resCafe[0].titleHighlights).toEqual([[0, 4]]);
+    expect(resCafe[0].highlights).toEqual([]);
+
+    // Cross-field AND across title + content
+    const resCross = searchEntries(titledEntries, 'morning energized');
+    expect(resCross).toHaveLength(1);
+    expect(resCross[0].entry.day).toBe('2026-10-20');
+    expect(
+      titledEntries[0].title.slice(resCross[0].titleHighlights[0][0], resCross[0].titleHighlights[0][1])
+    ).toBe('Morning');
+    expect(
+      titledEntries[0].content.slice(resCross[0].highlights[0][0], resCross[0].highlights[0][1])
+    ).toBe('energized');
+
+    // Cross-field AND across title + Day representation
+    const resDayTitle = searchEntries(titledEntries, 'tuesday café');
+    expect(resDayTitle).toHaveLength(1);
+    expect(resDayTitle[0].entry.day).toBe('2026-10-20');
+    expect(
+      titledEntries[0].title.slice(resDayTitle[0].titleHighlights[0][0], resDayTitle[0].titleHighlights[0][1])
+    ).toBe('Café');
+
+    // Title-only entry match
+    const resTitleOnly = searchEntries(titledEntries, 'focus');
+    expect(resTitleOnly).toHaveLength(1);
+    expect(resTitleOnly[0].entry.day).toBe('2026-10-19');
+    expect(resTitleOnly[0].titleHighlights).toEqual([[6, 11]]);
+    expect(resTitleOnly[0].highlights).toEqual([]);
+
+    // Entry missing title still works cleanly
+    const resLegacy = searchEntries(titledEntries, 'legacy');
+    expect(resLegacy).toHaveLength(1);
+    expect(resLegacy[0].entry.day).toBe('2026-10-18');
+    expect(resLegacy[0].titleHighlights).toEqual([]);
+  });
 });
 
 describe('domain/text', () => {
@@ -733,5 +790,61 @@ describe('domain/journal', () => {
     expect(hasNonEmptyJournalAnswers({ p1: '<p><br></p>' })).toBe(false);
     expect(hasNonEmptyJournalAnswers({})).toBe(false);
     expect(hasNonEmptyJournalAnswers({ p1: 'Hello' })).toBe(true);
+  });
+
+  it('normalizes optional Journal Entry titles cleanly with 120-char max length', () => {
+    expect(JOURNAL_TITLE_MAX_LENGTH).toBe(120);
+    expect(normalizeJournalTitle(null)).toBe('');
+    expect(normalizeJournalTitle(undefined)).toBe('');
+    expect(normalizeJournalTitle('')).toBe('');
+    expect(normalizeJournalTitle('   \t  ')).toBe('');
+    expect(normalizeJournalTitle('  Deep Work\r\nMorning  ')).toBe('Deep Work Morning');
+    expect(normalizeJournalTitle('  <3 morning coffee  ')).toBe('<3 morning coffee');
+
+    const overLong = 'a'.repeat(119) + '  bbbbb';
+    const normalized = normalizeJournalTitle(overLong);
+    expect(normalized.length).toBeLessThanOrEqual(120);
+    expect(normalized).toBe('a'.repeat(119));
+  });
+
+  it('treats Journal Entry as written when either title or content is non-blank', () => {
+    expect(isJournalEntryWritten(null)).toBe(false);
+    expect(isJournalEntryWritten({ day: '2026-10-20', title: '', content: '' })).toBe(false);
+    expect(isJournalEntryWritten({ day: '2026-10-20', title: '   ', content: '<p><br></p>' })).toBe(false);
+    expect(isJournalEntryWritten({ day: '2026-10-20', title: 'Big Day', content: '' })).toBe(true);
+    expect(isJournalEntryWritten({ day: '2026-10-20', title: '', content: '<p>Hello</p>' })).toBe(true);
+    expect(isJournalEntryWritten({ day: '2026-10-20', title: 'Big Day', content: '<p>Hello</p>' })).toBe(true);
+    expect(isJournalEntryWritten({ day: '2026-10-20', content: '<p>Legacy content</p>' })).toBe(true);
+  });
+
+  it('resolves Journal Entry display header dynamically with Day fallback when title is blank', () => {
+    const titled = { day: '2026-10-18', title: '  Weekend Hike  ', content: '' };
+    expect(resolveJournalDisplayHeader(titled, 'long')).toEqual({
+      headline: 'Weekend Hike',
+      daySubtitle: 'Sunday, 18 October 2026',
+      hasCustomTitle: true,
+    });
+    expect(resolveJournalDisplayHeader(titled, 'short')).toEqual({
+      headline: 'Weekend Hike',
+      daySubtitle: 'Sun, 18 Oct 2026',
+      hasCustomTitle: true,
+    });
+
+    const untitled = { day: '2026-10-18', title: '   ', content: '<p>Notes</p>' };
+    expect(resolveJournalDisplayHeader(untitled, 'long')).toEqual({
+      headline: 'Sunday, 18 October 2026',
+      daySubtitle: null,
+      hasCustomTitle: false,
+    });
+    expect(resolveJournalDisplayHeader({ day: '2026-10-18', content: '<p>Notes</p>' }, 'short')).toEqual({
+      headline: 'Sun, 18 Oct 2026',
+      daySubtitle: null,
+      hasCustomTitle: false,
+    });
+  });
+
+  it('keeps computeWordCount strictly scoped to reflection prompt answers', () => {
+    const answers = { p1: '<p>Quiet reflection</p>' };
+    expect(computeWordCount(answers, 'Ignored Title Words')).toBe(2);
   });
 });

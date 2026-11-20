@@ -141,7 +141,7 @@ function createGasEnv(initialProps = {}) {
   };
 
   const documentApp = {
-    ParagraphHeading: { HEADING_2: 'HEADING_2', NORMAL: 'Normal' },
+    ParagraphHeading: { HEADING_2: 'HEADING_2', HEADING_3: 'HEADING_3', NORMAL: 'Normal' },
     ElementType: { PARAGRAPH: 'PARAGRAPH' },
     create: (name) => {
       const id = 'doc_' + Math.random().toString(36).slice(2, 9);
@@ -531,6 +531,26 @@ describe('Pure Functions', () => {
       expect(res.shouldSend).toBe(true);
       expect(res.body).toBe('1 habit left');
     });
+
+    it('counts title-only journalEntryToday as written and ignores blank title + blank HTML', () => {
+      const titleOnlyRes = decideReminder({
+        ...baseParams,
+        activeHabits: [{ id: 'h1', archived: false }],
+        checkInsToday: [{ habitId: 'h1', deleted: false }],
+        journalEntryToday: { title: 'Quiet milestone', content: '' }
+      });
+      expect(titleOnlyRes.shouldSend).toBe(false);
+      expect(titleOnlyRes.reason).toBe('ALL_COMPLETED');
+
+      const blankRes = decideReminder({
+        ...baseParams,
+        activeHabits: [{ id: 'h1', archived: false }],
+        checkInsToday: [{ habitId: 'h1', deleted: false }],
+        journalEntryToday: { title: '   ', content: '<p><br></p>' }
+      });
+      expect(blankRes.shouldSend).toBe(true);
+      expect(blankRes.body).toBe('Journal not written yet');
+    });
   });
 
   describe('mergeRecordsLWW', () => {
@@ -654,6 +674,71 @@ describe('Pure Functions', () => {
       expect(result[0].printedToDiaryAt).toBe('2026-10-21T08:10:00Z');
       expect(result[0].serverUpdatedAt).toBe(now);
     });
+
+    it('normalizes, preserves, and clears optional title on journal entries in mergeRecordsLWW', () => {
+      const existing = [
+        {
+          day: '2026-10-20',
+          title: 'Initial Title',
+          content: 'Morning notes',
+          updatedAt: '2026-10-20T08:00:00Z',
+          printedToDiaryAt: '',
+        }
+      ];
+
+      // 1. Incoming with title updates and normalizes (trims + caps at 120)
+      const res1 = mergeRecordsLWW(
+        existing,
+        [{ day: '2026-10-20', title: '  ' + 'T'.repeat(130) + '  ', content: 'Morning notes', updatedAt: '2026-10-20T09:00:00Z' }],
+        '2026-10-20T09:05:00Z',
+        '2026-10-20'
+      );
+      expect(res1[0].title).toBe('T'.repeat(120));
+
+      // 2. Legacy incoming omitting title preserves existing title
+      const res2 = mergeRecordsLWW(
+        existing,
+        [{ day: '2026-10-20', content: 'Updated content', updatedAt: '2026-10-20T10:00:00Z' }],
+        '2026-10-20T10:05:00Z',
+        '2026-10-20'
+      );
+      expect(res2[0].title).toBe('Initial Title');
+
+      // 3. Explicit empty title clears title
+      const res3 = mergeRecordsLWW(
+        existing,
+        [{ day: '2026-10-20', title: '', content: 'Updated content', updatedAt: '2026-10-20T11:00:00Z' }],
+        '2026-10-20T11:05:00Z',
+        '2026-10-20'
+      );
+      expect(res3[0].title).toBe('');
+    });
+
+    it('does not misclassify Activity records with title as Journal Entry records in mergeRecordsLWW', () => {
+      const activity = { id: 'act-1', title: 'Deep Work', updatedAt: '2026-10-20T10:00:00Z' };
+      const now = '2026-10-20T10:05:00Z';
+
+      // Array form
+      const arrayRes = mergeRecordsLWW([], [activity], now, '2026-10-20');
+      expect(arrayRes.rejected).toEqual([]);
+      expect(arrayRes).toHaveLength(1);
+      expect(arrayRes[0].id).toBe('act-1');
+      expect(arrayRes[0].title).toBe('Deep Work');
+      expect('printedToDiaryAt' in arrayRes[0]).toBe(false);
+
+      // Store-map form
+      const storeRes = mergeRecordsLWW(
+        { activities: [] },
+        { activities: [activity] },
+        now,
+        '2026-10-20'
+      );
+      expect(storeRes.rejected).toEqual([]);
+      expect(storeRes.merged.activities).toHaveLength(1);
+      expect(storeRes.merged.activities[0].id).toBe('act-1');
+      expect(storeRes.merged.activities[0].title).toBe('Deep Work');
+      expect('printedToDiaryAt' in storeRes.merged.activities[0]).toBe(false);
+    });
   });
 
   describe('Pure Helper Functions', () => {
@@ -726,7 +811,12 @@ describe('Pure Functions', () => {
         'sanitizeFormulaInjection',
         'desanitizeFormulaInjection',
         'isValidPushEndpoint',
-        'timingSafeEqualPin'
+        'timingSafeEqualPin',
+        'normalizeJournalTitle',
+        'isBlankText',
+        'isJournalEntryWritten',
+        'sanitizeJournalTitle',
+        'desanitizeJournalTitle'
       ];
 
       const bannedAmbientSymbols = [
@@ -1096,6 +1186,92 @@ describe('GAS Backend Actions', () => {
       const rawRows = jSheet.getDataRange().getValues();
       expect(rawRows[1][1].startsWith("'")).toBe(true);
     });
+
+    it('syncs Journal Entry title via Column 6 with formula protection, and upgrades legacy 5-column sheets automatically', () => {
+      const jSheet = env.ss.getSheetByName('Journal_Entries');
+      expect(jSheet.getDataRange().getValues()[0]).toEqual([
+        'day',
+        'content',
+        'updatedAt',
+        'printedToDiaryAt',
+        'serverUpdatedAt',
+        'title',
+      ]);
+
+      const today = env.exports.getTodayJakarta();
+      const sync1 = {
+        pin: PIN,
+        deviceId: 'dev-1',
+        action: 'sync',
+        changes: {
+          journalEntries: [
+            { day: today, title: '=Dangerous Title', content: 'Body text', updatedAt: `${today}T10:00:00Z` }
+          ]
+        }
+      };
+      const res1 = JSON.parse(env.exports.doPost({ postData: { contents: JSON.stringify(sync1) } }).getContent());
+      expect(res1.ok).toBe(true);
+      expect(res1.changes.journalEntries[0].title).toBe('=Dangerous Title');
+      expect(jSheet.getDataRange().getValues()[1][5]).toBe("'=Dangerous Title");
+
+      const createLegacyFiveColEnv = () => {
+        const legEnv = createGasEnv({ PIN });
+        const legSheet = legEnv.ss.insertSheet('Journal_Entries');
+        legSheet.getRange(1, 1, 2, 5).setValues([
+          ['day', 'content', 'updatedAt', 'printedToDiaryAt', 'serverUpdatedAt'],
+          ['2026-10-18', 'Legacy body', '2026-10-18T10:00:00Z', '', '2026-10-18T10:00:00Z'],
+        ]);
+        return { legEnv, legSheet };
+      };
+
+      // Simulate legacy 5-column Journal_Entries sheet from before Issue #56
+      const { legEnv: legacyEnv, legSheet: legacySheet } = createLegacyFiveColEnv();
+
+      // Reading legacy 5-col rows yields title: ''
+      const readLegacy = legacyEnv.exports.readAllJournalEntries(legacySheet);
+      expect(readLegacy[0].title).toBe('');
+
+      // setup() expands Row 1 to 6 columns without losing existing 5-col rows
+      legacyEnv.exports.setup();
+      expect(legacySheet.getDataRange().getValues()[0]).toEqual([
+        'day',
+        'content',
+        'updatedAt',
+        'printedToDiaryAt',
+        'serverUpdatedAt',
+        'title',
+      ]);
+      expect(legacySheet.getDataRange().getValues()[1][1]).toBe('Legacy body');
+
+      // Also test direct sync on un-upgraded 5-col sheet automatically expands Row 1 to 6 columns and writes Column 6
+      const { legEnv: legacyEnv2, legSheet: legacySheet2 } = createLegacyFiveColEnv();
+      const syncRes = JSON.parse(legacyEnv2.exports.doPost({
+        postData: {
+          contents: JSON.stringify({
+            pin: PIN,
+            deviceId: 'dev-1',
+            action: 'sync',
+            changes: {
+              journalEntries: [
+                { day: today, title: '  Fresh Title  ', content: '', updatedAt: `${today}T12:00:00Z` }
+              ]
+            }
+          })
+        }
+      }).getContent());
+      expect(syncRes.ok).toBe(true);
+      const upgradedRows = legacySheet2.getDataRange().getValues();
+      expect(upgradedRows[0]).toEqual([
+        'day',
+        'content',
+        'updatedAt',
+        'printedToDiaryAt',
+        'serverUpdatedAt',
+        'title',
+      ]);
+      expect(upgradedRows[1][5]).toBe('');
+      expect(upgradedRows[2][5]).toBe('Fresh Title');
+    });
   });
 
   describe('Push Subscription Management', () => {
@@ -1454,6 +1630,86 @@ describe('GAS Backend Actions', () => {
         }
       }
       expect(headings).toEqual(['Sunday, 18 October 2026', 'Monday, 19 October 2026']);
+    });
+
+    it('renders optional title as Heading 3 below Heading 2 in Diary, omits when blank, supports title-only entries, and updates in-place cleanly', () => {
+      const doc = env.context.DocumentApp.create('Habbit – Diary 2026');
+
+      // 1. Titled entry with content -> H2, H3, content, blank separator
+      env.exports.upsertEntryInDoc(doc, {
+        day: '2026-10-20',
+        title: 'Breakthrough Morning',
+        content: 'Shipped the feature.'
+      });
+      let body = doc.getBody();
+      expect(body.getNumChildren()).toBe(4);
+      expect(body.getChild(0).getText()).toBe('Tuesday, 20 October 2026');
+      expect(body.getChild(0).getHeading()).toBe('HEADING_2');
+      expect(body.getChild(1).getText()).toBe('Breakthrough Morning');
+      expect(body.getChild(1).getHeading()).toBe('HEADING_3');
+      expect(body.getChild(2).getText()).toBe('Shipped the feature.');
+      expect(body.getChild(2).getHeading()).toBe('Normal');
+      expect(body.getChild(3).getText()).toBe('');
+
+      // 2. Remove title in-place while keeping content -> H3 omitted, single H2 preserved
+      env.exports.upsertEntryInDoc(doc, {
+        day: '2026-10-20',
+        title: '',
+        content: 'Updated reflection.'
+      });
+      expect(body.getNumChildren()).toBe(3);
+      expect(body.getChild(0).getHeading()).toBe('HEADING_2');
+      expect(body.getChild(1).getText()).toBe('Updated reflection.');
+      expect(body.getChild(1).getHeading()).toBe('Normal');
+
+      // 3. Clear content while adding/keeping title (title-only) -> H2, H3, single blank separator
+      env.exports.upsertEntryInDoc(doc, {
+        day: '2026-10-20',
+        title: 'Title Only Survivor',
+        content: ''
+      });
+      expect(body.getNumChildren()).toBe(3);
+      expect(body.getChild(0).getText()).toBe('Tuesday, 20 October 2026');
+      expect(body.getChild(0).getHeading()).toBe('HEADING_2');
+      expect(body.getChild(1).getText()).toBe('Title Only Survivor');
+      expect(body.getChild(1).getHeading()).toBe('HEADING_3');
+      expect(body.getChild(2).getText()).toBe('');
+
+      // 4. Clear BOTH title and content -> removes entire section including H2 and H3
+      env.exports.upsertEntryInDoc(doc, {
+        day: '2026-10-20',
+        title: '',
+        content: ''
+      });
+      const remainingH2 = [];
+      for (let i = 0; i < body.getNumChildren(); i++) {
+        if (body.getChild(i).getHeading() === 'HEADING_2') {
+          remainingH2.push(body.getChild(i).getText());
+        }
+      }
+      expect(remainingH2).toEqual([]);
+    });
+
+    it('exports title-only and formula-prefixed Journal Entries via printDiary and preserves Column 6 sanitization', () => {
+      const jSheet = env.ss.getSheetByName('Journal_Entries');
+      jSheet.getRange(2, 1, 1, 6).setValues([
+        ['2026-10-18', '', '2026-10-18T12:00:00Z', '', '2026-10-18T12:00:00Z', "'- Bullet Title"],
+      ]);
+
+      env.exports.printDiary();
+
+      const doc = Array.from(env.docs.values())[0];
+      const body = doc.getBody();
+      expect(body.getChild(0).getText()).toBe('Sunday, 18 October 2026');
+      expect(body.getChild(0).getHeading()).toBe('HEADING_2');
+      expect(body.getChild(1).getText()).toBe('- Bullet Title');
+      expect(body.getChild(1).getHeading()).toBe('HEADING_3');
+      expect(body.getChild(2).getText()).toBe('');
+
+      // Sheet keeps printedToDiaryAt AND preserves formula sanitization in Column 6
+      const rowsAfter = jSheet.getDataRange().getValues();
+      expect(rowsAfter[1][3]).not.toBe('');
+      expect(rowsAfter[1][5]).toBe("'- Bullet Title");
     });
   });
 

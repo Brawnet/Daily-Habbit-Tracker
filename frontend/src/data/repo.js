@@ -2,6 +2,7 @@ import { getDb } from './db.js';
 import { STORES, ACTIVITY_STATUS, LINKED_ACTIVITIES } from '../shared/contracts.js';
 import { scheduleSync } from './sync.js';
 import { isCheckInEditable, isJournalCreatable, isJournalEditable, today } from '../domain/day.js';
+import { isJournalEntryWritten, normalizeJournalTitle } from '../domain/journal.js';
 import { isBlank } from '../domain/text.js';
 
 const changeListeners = new Set();
@@ -331,9 +332,10 @@ export async function getJournalEntry(day) {
  *
  * @param {string} day
  * @param {string} content
+ * @param {{ title?: string }} [options]
  * @returns {Promise<import('../shared/contracts.js').JournalEntry>}
  */
-export async function saveJournalEntry(day, content) {
+export async function saveJournalEntry(day, content, options) {
   const currentDay = today();
   if (!isJournalEditable(day, currentDay)) {
     throw new Error('Journal entry is read-only');
@@ -345,10 +347,15 @@ export async function saveJournalEntry(day, content) {
     throw new Error('New journal entries can only be created within the last 7 days');
   }
   const now = new Date().toISOString();
+  const resolvedTitle =
+    options && options.title !== undefined
+      ? normalizeJournalTitle(options.title)
+      : normalizeJournalTitle(existing?.title);
 
   /** @type {import('../shared/contracts.js').JournalEntry} */
   const record = {
     day,
+    title: resolvedTitle,
     content: String(content ?? ''),
     updatedAt: now,
     printedToDiaryAt: existing?.printedToDiaryAt || '',
@@ -357,7 +364,7 @@ export async function saveJournalEntry(day, content) {
   await commitSingleMutation(STORES.JOURNAL_ENTRIES, record, 'journalEntries', day);
   if (day === currentDay) {
     try {
-      if (!isBlank(record.content)) {
+      if (isJournalEntryWritten(record)) {
         await triggerActivityCheckIn(LINKED_ACTIVITIES.JOURNAL);
       } else {
         await triggerActivityUncheck(LINKED_ACTIVITIES.JOURNAL);

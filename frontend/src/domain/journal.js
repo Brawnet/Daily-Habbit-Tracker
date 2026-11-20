@@ -1,10 +1,14 @@
 /**
  * journal.js — Pure domain logic for Daily Journal prompt compilation,
- * decompilation, sanitization, and word count calculation.
+ * decompilation, sanitization, title normalization, and word count calculation.
  */
+
+import { isBlank } from './text.js';
+import { formatLong, formatShort } from './day.js';
 
 export const JOURNAL_SUBVIEW = 'journal';
 export const SETTINGS_KEY = 'journalPrompts';
+export const JOURNAL_TITLE_MAX_LENGTH = 120;
 
 export const DEFAULT_JOURNAL_PROMPTS = [
   {
@@ -278,4 +282,43 @@ export function hasNonEmptyJournalAnswers(answers) {
     if (val) return true;
   }
   return false;
+}
+
+/**
+ * Normalizes an optional Journal Entry title: single-line, trimmed, max 120 characters.
+ * @param {string | null | undefined} title
+ * @returns {string}
+ */
+export function normalizeJournalTitle(title) {
+  if (title === null || title === undefined) return '';
+  return String(title)
+    .replace(/[\r\n]+/g, ' ')
+    .trim()
+    .slice(0, JOURNAL_TITLE_MAX_LENGTH)
+    .trim();
+}
+
+/**
+ * Checks whether a Journal Entry counts as written (non-blank title or non-blank content).
+ * @param {{ title?: string, content?: string } | null | undefined} entry
+ * @returns {boolean}
+ */
+export function isJournalEntryWritten(entry) {
+  if (!entry) return false;
+  return normalizeJournalTitle(entry.title) !== '' || !isBlank(entry.content);
+}
+
+/**
+ * Resolves headline and secondary Day subtitle with dynamic Day fallback when title is blank.
+ * @param {{ day: string, title?: string }} entry
+ * @param {'long' | 'short'} [dayStyle='long']
+ * @returns {{ headline: string, daySubtitle: string | null, hasCustomTitle: boolean }}
+ */
+export function resolveJournalDisplayHeader(entry, dayStyle = 'long') {
+  const formattedDay = dayStyle === 'short' ? formatShort(entry.day) : formatLong(entry.day);
+  const customTitle = normalizeJournalTitle(entry?.title);
+  if (customTitle) {
+    return { headline: customTitle, daySubtitle: formattedDay, hasCustomTitle: true };
+  }
+  return { headline: formattedDay, daySubtitle: null, hasCustomTitle: false };
 }

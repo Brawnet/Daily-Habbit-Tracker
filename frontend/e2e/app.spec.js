@@ -594,11 +594,8 @@ test.describe('Habbit App E2E', () => {
     });
   });
 
-  test('renders compact Day metadata across Write, Edit, Reader, and Journal History in Light and Dark mobile viewports', async ({ page }) => {
-    await page.setViewportSize({ width: 393, height: 852 });
-    await page.emulateMedia({ colorScheme: 'light' });
-
-    const dates = await page.evaluate(() => {
+  async function getLocalDayFormats(page) {
+    return page.evaluate(() => {
       const formatIsoDay = (date) => {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -623,6 +620,19 @@ test.describe('Habbit App E2E', () => {
         shortYesterday: formatShortDay(yesterdayDate),
       };
     });
+  }
+
+  async function assertNoHorizontalOverflow(page) {
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)
+    ).toBe(true);
+  }
+
+  test('renders compact Day metadata across Write, Edit, Reader, and Journal History in Light and Dark mobile viewports', async ({ page }) => {
+    await page.setViewportSize({ width: 393, height: 852 });
+    await page.emulateMedia({ colorScheme: 'light' });
+
+    const dates = await getLocalDayFormats(page);
 
     const dayMeta = page.locator('#journal-day-meta');
     const dayPickerTrigger = page.getByLabel('Journal Day');
@@ -636,11 +646,7 @@ test.describe('Habbit App E2E', () => {
       expect(await dayMeta.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
     };
 
-    const expectNoHorizontalOverflow = async () => {
-      expect(
-        await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)
-      ).toBe(true);
-    };
+    const expectNoHorizontalOverflow = () => assertNoHorizontalOverflow(page);
 
     const selectDayFromCalendar = async (targetDayStr) => {
       const triggerBox = await dayPickerTrigger.boundingBox();
@@ -779,5 +785,126 @@ test.describe('Habbit App E2E', () => {
     await expectCompactDayMetaRow();
     await expect(page.locator('#journal-edit-day-value')).toHaveText(dates.longToday);
     await expect(page.locator('#journal-edit-day-value')).toHaveCSS('color', 'rgb(244, 241, 234)');
+  });
+
+  test('supports optional Journal Entry title with dynamic Day fallback, title-only written status, and cross-field search highlights in Light & Dark mobile viewports', async ({ page }) => {
+    await page.setViewportSize({ width: 393, height: 852 });
+    await page.emulateMedia({ colorScheme: 'light' });
+
+    const dates = await getLocalDayFormats(page);
+
+    const titleInput = page.locator('#input-journal-title');
+    const dayMeta = page.locator('#journal-day-meta');
+    const cards = page.locator('.journal-entry-item');
+    const expectNoHorizontalOverflow = () => assertNoHorizontalOverflow(page);
+
+    // 1. Write a Journal: check optional title field metrics, placement, and dynamic placeholder
+    await page.click('button[data-tab="activities"]');
+    await page.click('#choice-journals');
+    await page.click('#btn-choice-write-journal');
+
+    await expect(titleInput).toBeVisible();
+    await expect(titleInput).toHaveAttribute('maxlength', '120');
+    await expect(titleInput).toHaveAttribute('placeholder', `Title (defaults to ${dates.longToday})`);
+    expect(await titleInput.evaluate((el) => getComputedStyle(el).fontSize)).toBe('16px');
+    const titleBox = await titleInput.boundingBox();
+    const dayMetaBox = await dayMeta.boundingBox();
+    expect(titleBox).not.toBeNull();
+    expect(dayMetaBox).not.toBeNull();
+    expect(titleBox.height).toBeGreaterThanOrEqual(44);
+    expect(titleBox.width).toBeGreaterThanOrEqual(44);
+    expect(titleBox.y).toBeLessThan(dayMetaBox.y);
+    await expectNoHorizontalOverflow();
+
+    // Typing title alone does not inflate prompt word count, then typing prompt counts only prompt words
+    await titleInput.fill('Café Deep Focus');
+    await expect(page.locator('#journal-total-words')).toHaveText('0 words');
+    await page.locator('#editor-journal-content').fill('Planned tomorrow milestone carefully');
+    await expect(page.locator('#journal-total-words')).toHaveText('4 words');
+    await expect(page.locator('#journal-status')).toHaveText('Saved', { timeout: 3000 });
+
+    // Switch Day to yesterday -> dynamic placeholder updates; save title-only entry (blank prompt answers)
+    await page.click('#btn-journal-day-picker');
+    const popover = page.locator('#journal-day-calendar-popover');
+    const yesterdayCell = popover.locator(`.journal-calendar-day-btn[data-day="${dates.yesterdayStr}"]`);
+    if ((await yesterdayCell.count()) === 0) {
+      await popover.locator('#btn-calendar-prev-month').click();
+    }
+    await yesterdayCell.click();
+
+    await expect(titleInput).toHaveAttribute('placeholder', `Title (defaults to ${dates.longYesterday})`);
+    await titleInput.fill('Quiet Victory Yesterday');
+    await expect(page.locator('#journal-status')).toHaveText('Saved', { timeout: 3000 });
+
+    // 2. Reload page and verify persistence + written-status badges (including title-only count)
+    await page.reload();
+    await page.click('button[data-tab="activities"]');
+    await expect(page.locator('#choice-journals')).toContainText('Done ✓');
+    await page.click('#choice-journals');
+    await expect(page.locator('#journals-menu-view')).toContainText('Today: Written ✓');
+    await expect(page.locator('#journals-menu-view')).toContainText('2 Journal Entries documented');
+
+    // 3. Journal History cards + cross-field AND search highlighting both card Title and snippet
+    await page.click('#btn-choice-journal-history');
+    await expect(cards).toHaveCount(2);
+    await expect(cards.nth(0).locator('.journal-entry-title')).toHaveText('Café Deep Focus');
+    await expect(cards.nth(0).locator('.journal-entry-day')).toHaveText(dates.shortToday);
+    await expect(cards.nth(1).locator('.journal-entry-title')).toHaveText('Quiet Victory Yesterday');
+    await expect(cards.nth(1).locator('.journal-entry-day')).toHaveText(dates.shortYesterday);
+
+    // Search cross-field AND query ("cafe" in title + "milestone" in content)
+    await page.fill('#journal-history-search', 'cafe milestone');
+    await expect(cards).toHaveCount(1);
+    await expect(cards.nth(0).locator('.journal-entry-title mark')).toHaveText('Café');
+    await expect(cards.nth(0).locator('mark')).toHaveCount(2);
+
+    // Search title-only entry by title token -> matches & highlights title
+    await page.fill('#journal-history-search', 'victory');
+    await expect(cards).toHaveCount(1);
+    await expect(cards.nth(0).locator('.journal-entry-title mark')).toHaveText('Victory');
+
+    // Open title-only Entry Reader -> H1 custom title + long Day subtitle + "No reflection text."
+    await cards.nth(0).click();
+    await expect(page.locator('h1#journal-reader-title')).toHaveText('Quiet Victory Yesterday');
+    await expect(page.locator('#journal-reader-day-subtitle')).toHaveText(dates.longYesterday);
+    await expect(page.locator('#journal-reader-card')).toContainText('No reflection text.');
+
+    // Back -> clear search -> open today's Entry Reader -> Edit Journal -> clear title -> reverts to Day fallback
+    await page.click('#btn-back-from-journal-read');
+    await page.fill('#journal-history-search', '');
+    await expect(cards).toHaveCount(2);
+    await cards.nth(0).click();
+    await expect(page.locator('h1#journal-reader-title')).toHaveText('Café Deep Focus');
+    await expect(page.locator('#journal-reader-day-subtitle')).toHaveText(dates.longToday);
+
+    await page.click('#btn-edit-journal-entry');
+    await expect(titleInput).toHaveValue('Café Deep Focus');
+    expect((await titleInput.boundingBox()).y).toBeLessThan((await dayMeta.boundingBox()).y);
+    await titleInput.fill('');
+    await expect(page.locator('#journal-status')).toHaveText('Saved', { timeout: 3000 });
+    await page.click('#btn-back-from-journal-to-activities');
+
+    // Entry Reader & Journal History dynamically fall back to Day with no duplicate subtitle
+    await expect(page.locator('h1#journal-reader-title')).toHaveText(dates.longToday);
+    await expect(page.locator('#journal-reader-day-subtitle')).toHaveCount(0);
+    await page.click('#btn-back-from-journal-read');
+    await expect(cards.nth(0).locator('.journal-entry-title')).toHaveText(dates.shortToday);
+    await expect(cards.nth(0).locator('.journal-entry-day')).toHaveCount(0);
+
+    // 4. Dark mode check across title input, titled reader, and history card
+    await page.click('button[data-tab="settings"]');
+    await page.click('#theme-option-dark');
+    await expect(page.locator('html')).toHaveClass(/\bdark\b/);
+
+    await page.click('button[data-tab="activities"]');
+    await page.click('#choice-journals');
+    await page.click('#btn-choice-journal-history');
+    await expect(cards.nth(1).locator('.journal-entry-title')).toHaveCSS('color', 'rgb(244, 241, 234)');
+    await cards.nth(1).click();
+    await expect(page.locator('h1#journal-reader-title')).toHaveText('Quiet Victory Yesterday');
+    await page.click('#btn-edit-journal-entry');
+    await expect(titleInput).toHaveCSS('background-color', 'rgb(34, 32, 30)');
+    await expect(titleInput).toHaveCSS('color', 'rgb(244, 241, 234)');
+    await expectNoHorizontalOverflow();
   });
 });

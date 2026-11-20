@@ -60,6 +60,7 @@ export {
 import {
   SETTINGS_KEY,
   DEFAULT_JOURNAL_PROMPTS,
+  JOURNAL_TITLE_MAX_LENGTH,
   computeWordCount,
   decompilePromptJournal,
   sanitizeJournalHtml,
@@ -408,6 +409,7 @@ function createJournalDayMetaBar({
 export function renderPromptCardsJournal({
   prompts,
   answers,
+  title = '',
   status,
   targetDay = '',
   backLabel = 'Back to Journals',
@@ -417,6 +419,7 @@ export function renderPromptCardsJournal({
   onChangeDay,
   showCustomizeButton = true,
   dateSubtitle = '',
+  onUpdateTitle,
   onUpdateAnswers,
   onOpenCustomizeModal,
   onBack,
@@ -478,6 +481,36 @@ export function renderPromptCardsJournal({
   topBar.appendChild(backBtn);
   topBar.appendChild(rightActions);
   container.appendChild(topBar);
+
+  // 1a. Optional Journal Entry Title Input (with dynamic Day fallback placeholder)
+  const titleWrap = document.createElement('div');
+  titleWrap.className = 'flex flex-col';
+
+  const titleLabel = document.createElement('label');
+  titleLabel.setAttribute('for', 'input-journal-title');
+  titleLabel.className = 'sr-only';
+  titleLabel.textContent = 'Journal Entry Title';
+
+  const titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.id = 'input-journal-title';
+  titleInput.maxLength = JOURNAL_TITLE_MAX_LENGTH;
+  titleInput.setAttribute('maxlength', String(JOURNAL_TITLE_MAX_LENGTH));
+  titleInput.setAttribute('aria-label', 'Journal Entry Title');
+  titleInput.value = title || '';
+  const placeholderText = targetDay ? `Title (defaults to ${formatLong(targetDay)})` : 'Title (optional)';
+  titleInput.placeholder = placeholderText;
+  titleInput.setAttribute('placeholder', placeholderText);
+  titleInput.style.fontSize = '16px';
+  titleInput.className =
+    'journal-title-input w-full min-h-[44px] min-w-[44px] px-3.5 py-2.5 text-base font-serif font-semibold rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#FFFFFF] dark:bg-[#22201E] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F]/80 dark:placeholder-[#A39E93]/80 focus:outline-none focus:ring-2 focus:ring-[#B56565] dark:focus:ring-[#C67878] focus:border-[#B56565] dark:focus:border-[#C67878] transition-colors';
+  titleInput.addEventListener('input', () => {
+    onUpdateTitle?.(titleInput.value);
+  });
+
+  titleWrap.appendChild(titleLabel);
+  titleWrap.appendChild(titleInput);
+  container.appendChild(titleWrap);
 
   // 1b. Compact Day Metadata Bar (Write a Journal & Edit Journal)
   if (showDatePicker || dateSubtitle) {

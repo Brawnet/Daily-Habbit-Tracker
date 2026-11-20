@@ -123,12 +123,12 @@ function findHighlights(content, tokens) {
 
 /**
  * Search journal entries offline, case- and diacritic-insensitive.
- * All whitespace-delimited tokens in query must match (AND) against content
+ * All whitespace-delimited tokens in query must match (AND) against title, content,
  * or date representations.
  *
- * @param {Array<{ day: string, content: string }>} entries
+ * @param {Array<{ day: string, title?: string, content: string }>} entries
  * @param {string} query
- * @returns {Array<{ entry: { day: string, content: string }, highlights: Array<[number, number]> }>}
+ * @returns {Array<{ entry: { day: string, title?: string, content: string }, highlights: Array<[number, number]>, titleHighlights: Array<[number, number]> }>}
  */
 export function searchEntries(entries, query) {
   if (!entries || !Array.isArray(entries)) return [];
@@ -137,7 +137,7 @@ export function searchEntries(entries, query) {
   if (!trimmed) {
     return [...entries]
       .sort((a, b) => compareDays(b.day, a.day))
-      .map(entry => ({ entry, highlights: [] }));
+      .map(entry => ({ entry, highlights: [], titleHighlights: [] }));
   }
 
   const rawTokens = trimmed.split(/\s+/).filter(Boolean);
@@ -145,21 +145,24 @@ export function searchEntries(entries, query) {
   if (normTokens.length === 0) {
     return [...entries]
       .sort((a, b) => compareDays(b.day, a.day))
-      .map(entry => ({ entry, highlights: [] }));
+      .map(entry => ({ entry, highlights: [], titleHighlights: [] }));
   }
 
   const results = [];
 
   for (const entry of entries) {
+    const title = entry.title || '';
+    const normTitle = normalize(title);
     const content = entry.content || '';
     const normContent = normalize(content);
 
     let allMatch = true;
     for (const token of normTokens) {
+      const matchInTitle = normTitle.includes(token);
       const matchInContent = normContent.includes(token);
       const matchInDate = matchDateToken(entry.day, token);
 
-      if (!matchInContent && !matchInDate) {
+      if (!matchInTitle && !matchInContent && !matchInDate) {
         allMatch = false;
         break;
       }
@@ -167,7 +170,8 @@ export function searchEntries(entries, query) {
 
     if (allMatch) {
       const highlights = findHighlights(content, normTokens);
-      results.push({ entry, highlights });
+      const titleHighlights = findHighlights(title, normTokens);
+      results.push({ entry, highlights, titleHighlights });
     }
   }
 

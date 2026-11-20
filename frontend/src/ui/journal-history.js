@@ -5,18 +5,17 @@
  * read-only Entry Reader subview for Activities tab.
  */
 
-import { formatLong, formatShort } from '../domain/day.js';
+import { formatShort } from '../domain/day.js';
 import { searchEntries } from '../domain/search.js';
 import {
+  isJournalEntryWritten,
+  normalizeJournalTitle,
   parseStructuredJournalBlocks,
+  resolveJournalDisplayHeader,
   sanitizeJournalHtml,
 } from '../domain/journal.js';
-import { htmlToText } from '../domain/text.js';
+import { htmlToText, isBlank } from '../domain/text.js';
 import { CHEVRON_LEFT_SVG } from './journal-prompts.js';
-
-function isNonEmptyEntry(entry) {
-  return Boolean(entry?.content && htmlToText(entry.content).trim());
-}
 
 function formatEntryCountLabel(count) {
   return `${count} ${count === 1 ? 'Journal Entry' : 'Journal Entries'}`;
@@ -34,14 +33,15 @@ function createBackButton({ id, label, onClick }) {
 }
 
 /**
- * Populates snippet text with highlight marks in a single DOM-node pass.
+ * Populates text with `<mark>` highlight spans in a single DOM-node pass.
  * @param {HTMLElement} containerEl
- * @param {string} plainContent
+ * @param {string} plainText
  * @param {Array<[number, number]>} highlights
  */
-function setSnippetContent(containerEl, plainContent, highlights) {
+function setHighlightedText(containerEl, plainText, highlights) {
+  containerEl.innerHTML = '';
   if (!highlights || highlights.length === 0) {
-    containerEl.textContent = plainContent;
+    containerEl.textContent = plainText;
     return;
   }
 
@@ -49,18 +49,18 @@ function setSnippetContent(containerEl, plainContent, highlights) {
   for (const [start, end] of highlights) {
     if (start > idx) {
       const span = document.createElement('span');
-      span.textContent = plainContent.slice(idx, start);
+      span.textContent = plainText.slice(idx, start);
       containerEl.appendChild(span);
     }
     const mark = document.createElement('mark');
     mark.className = 'bg-amber-200 dark:bg-amber-900/60 text-inherit';
-    mark.textContent = plainContent.slice(start, end);
+    mark.textContent = plainText.slice(start, end);
     containerEl.appendChild(mark);
     idx = end;
   }
-  if (idx < plainContent.length) {
+  if (idx < plainText.length) {
     const span = document.createElement('span');
-    span.textContent = plainContent.slice(idx);
+    span.textContent = plainText.slice(idx);
     containerEl.appendChild(span);
   }
 }
@@ -213,7 +213,7 @@ export function renderJournalHistoryView({
   onSelectEntry,
   onWriteToday,
 }) {
-  const nonEmptyEntries = (entries || []).filter(isNonEmptyEntry);
+  const nonEmptyEntries = (entries || []).filter(isJournalEntryWritten);
   let currentQuery = query || '';
 
   const wrap = document.createElement('div');
@@ -246,8 +246,8 @@ export function renderJournalHistoryView({
   searchInput.type = 'search';
   searchInput.id = 'journal-history-search';
   searchInput.value = currentQuery;
-  searchInput.placeholder = 'Search Journal Entries by keyword or Day...';
-  searchInput.setAttribute('aria-label', 'Search Journal Entries by keyword or Day...');
+  searchInput.placeholder = 'Search Journal Entries by title, keyword, or Day...';
+  searchInput.setAttribute('aria-label', 'Search Journal Entries by title, keyword, or Day...');
   searchInput.style.fontSize = '16px';
   searchInput.className =
     'journal-search-input w-full min-h-[44px] px-4 py-2.5 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#FFFFFF] dark:bg-[#22201E] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F] focus:outline-none focus:ring-2 focus:ring-[#9E4B4B]';
@@ -290,6 +290,7 @@ export function renderJournalHistoryView({
       originalByDay.set(entry.day, entry);
       return {
         ...entry,
+        title: normalizeJournalTitle(entry.title),
         content: htmlToText(entry.content),
       };
     });
@@ -304,14 +305,21 @@ export function renderJournalHistoryView({
     }
 
     for (const item of results) {
-      const { entry, highlights } = item;
+      const { entry, highlights, titleHighlights } = item;
       const originalEntry = originalByDay.get(entry.day) || entry;
+      const { headline, daySubtitle, hasCustomTitle } = resolveJournalDisplayHeader(originalEntry, 'short');
+
       const entryBtn = document.createElement('button');
       entryBtn.type = 'button';
       entryBtn.className =
         'journal-entry-item editorial-card group text-left w-full min-h-[44px] p-4 hover:border-[#9E4B4B] dark:hover:border-[#D99191] transition flex flex-col gap-1.5 cursor-pointer tactile-spring bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
       entryBtn.dataset.day = originalEntry.day;
-      entryBtn.setAttribute('aria-label', `Read Journal Entry for ${formatShort(originalEntry.day)}`);
+      entryBtn.setAttribute(
+        'aria-label',
+        hasCustomTitle
+          ? `Read Journal Entry: ${headline} (${formatShort(originalEntry.day)})`
+          : `Read Journal Entry for ${headline}`
+      );
 
       const cardHeader = document.createElement('div');
       cardHeader.className = 'journal-entry-header flex items-start justify-between gap-2 w-full';
@@ -322,8 +330,17 @@ export function renderJournalHistoryView({
       const titleText = document.createElement('span');
       titleText.className =
         'journal-entry-title text-base font-serif font-semibold leading-snug text-[#1C1B18] dark:text-[#F4F1EA] group-hover:text-[#9E4B4B] dark:group-hover:text-[#D99191] transition-colors break-words';
-      titleText.textContent = formatShort(originalEntry.day);
+      setHighlightedText(titleText, headline, hasCustomTitle ? titleHighlights : []);
       headlineWrap.appendChild(titleText);
+
+      if (daySubtitle) {
+        const daySubEl = document.createElement('time');
+        daySubEl.setAttribute('datetime', originalEntry.day);
+        daySubEl.className = 'journal-entry-day text-xs font-mono text-[#68655F] dark:text-[#A39E93]';
+        daySubEl.textContent = daySubtitle;
+        headlineWrap.appendChild(daySubEl);
+      }
+
       cardHeader.appendChild(headlineWrap);
 
       if (originalEntry.day === todayDay) {
@@ -336,11 +353,13 @@ export function renderJournalHistoryView({
 
       entryBtn.appendChild(cardHeader);
 
-      const snippetEl = document.createElement('div');
-      snippetEl.className =
-        'line-clamp-2 text-sm text-[#68655F] dark:text-[#A39E93] break-words whitespace-pre-wrap';
-      setSnippetContent(snippetEl, entry.content, highlights);
-      entryBtn.appendChild(snippetEl);
+      if (entry.content) {
+        const snippetEl = document.createElement('div');
+        snippetEl.className =
+          'line-clamp-2 text-sm text-[#68655F] dark:text-[#A39E93] break-words whitespace-pre-wrap';
+        setHighlightedText(snippetEl, entry.content, highlights);
+        entryBtn.appendChild(snippetEl);
+      }
 
       entryBtn.addEventListener('click', () => {
         onSelectEntry(originalEntry);
@@ -403,11 +422,13 @@ export function renderJournalReaderView({ entry, isToday, onBack, onEdit }) {
   const titleRow = document.createElement('div');
   titleRow.className = 'flex items-center justify-between gap-2 flex-wrap';
 
+  const { headline, daySubtitle } = resolveJournalDisplayHeader(entry, 'long');
+
   const titleEl = document.createElement('h1');
   titleEl.id = 'journal-reader-title';
   titleEl.className =
     'text-2xl font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA] tracking-tight break-words';
-  titleEl.textContent = formatLong(entry.day);
+  titleEl.textContent = headline;
   titleRow.appendChild(titleEl);
 
   if (isToday) {
@@ -418,13 +439,21 @@ export function renderJournalReaderView({ entry, isToday, onBack, onEdit }) {
   }
 
   header.appendChild(titleRow);
+  if (daySubtitle) {
+    const daySubEl = document.createElement('time');
+    daySubEl.id = 'journal-reader-day-subtitle';
+    daySubEl.setAttribute('datetime', entry.day);
+    daySubEl.className = 'text-xs font-mono font-medium text-[#68655F] dark:text-[#A39E93]';
+    daySubEl.textContent = daySubtitle;
+    header.appendChild(daySubEl);
+  }
   readerCard.appendChild(header);
 
   const contentEl = document.createElement('div');
   contentEl.className =
     'journal-reader-text flex flex-col gap-4 text-sm sm:text-base text-[#1C1B18] dark:text-[#F4F1EA] break-words leading-relaxed select-text';
 
-  if (!isNonEmptyEntry(entry)) {
+  if (isBlank(entry.content)) {
     const emptyMsg = document.createElement('p');
     emptyMsg.className = 'text-sm text-[#68655F] dark:text-[#A39E93] italic';
     emptyMsg.textContent = 'No reflection text.';

@@ -163,7 +163,7 @@ button, a, input, select, textarea, [role="button"], [role="tab"] {
   padding: 6px 8px;
   border-radius: var(--radius-pill);
   background-color: #FFFFFF;
-  border: 1px solid #E6E4DF;
+  border: 1px solid var(--border-hairline);
   box-shadow:
     0 8px 24px rgba(28, 27, 24, 0.08),
     0 2px 6px rgba(28, 27, 24, 0.04);
@@ -178,16 +178,16 @@ button, a, input, select, textarea, [role="button"], [role="tab"] {
 }
 
 .floating-bottom-nav-tab {
-  color: #68655F;
+  color: var(--text-secondary);
   transition: color 180ms ease, transform 150ms ease;
 }
 
 .floating-bottom-nav-tab:not([aria-selected="true"]):hover:not(:disabled) {
-  color: #1C1B18;
+  color: var(--text-primary);
 }
 
 .floating-bottom-nav-tab[aria-selected="true"] {
-  color: #C86D51;
+  color: var(--accent-terracotta);
   font-weight: 600;
 }
 
@@ -201,22 +201,9 @@ button, a, input, select, textarea, [role="button"], [role="tab"] {
 
 .dark .floating-bottom-nav {
   background-color: #000000;
-  border: 1px solid #33302C;
   box-shadow:
     0 10px 28px rgba(0, 0, 0, 0.55),
     0 2px 8px rgba(0, 0, 0, 0.35);
-}
-
-.dark .floating-bottom-nav-tab {
-  color: #A39E93;
-}
-
-.dark .floating-bottom-nav-tab:not([aria-selected="true"]):hover:not(:disabled) {
-  color: #F4F1EA;
-}
-
-.dark .floating-bottom-nav-tab[aria-selected="true"] {
-  color: #D97E63;
 }
 
 /* 12px Rounded Paper Cards with 1px Hairline Border */

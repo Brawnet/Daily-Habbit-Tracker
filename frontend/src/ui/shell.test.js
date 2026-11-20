@@ -304,6 +304,7 @@ describe('ui/shell.js', () => {
 
     for (const item of expected) {
       const btn = mockDoc.getElementById(`tab-btn-${item.id}`);
+      expect(btn.getAttribute('role')).toBe('tab');
       expect(btn.getAttribute('aria-label')).toBe(item.title);
       expect(btn.title).toBe(item.title);
       expect(btn.classList.contains('floating-bottom-nav-tab')).toBe(true);

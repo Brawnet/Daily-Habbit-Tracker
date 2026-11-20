@@ -283,6 +283,7 @@ test.describe('Habbit App E2E', () => {
 
     for (const tab of tabs) {
       const btn = page.locator(`button[data-tab="${tab.id}"]`);
+      await expect(btn).toHaveAttribute('role', 'tab');
       await expect(btn).toHaveAttribute('aria-label', tab.title);
       const btnBox = await btn.boundingBox();
       expect(btnBox).not.toBeNull();
@@ -307,6 +308,8 @@ test.describe('Habbit App E2E', () => {
           const inactiveBtn = document.getElementById(`tab-btn-${inactiveId}`);
           return {
             backgroundColor: navStyle.backgroundColor,
+            borderTopWidth: navStyle.borderTopWidth,
+            borderTopColor: navStyle.borderTopColor,
             backdropFilter: navStyle.backdropFilter,
             backgroundImage: navStyle.backgroundImage,
             boxShadow: navStyle.boxShadow,
@@ -318,15 +321,22 @@ test.describe('Habbit App E2E', () => {
         { activeId: activeTabId, inactiveId: inactiveTabId }
       );
 
-    // Light mode: solid Crisp White (#FFFFFF), zero glass/gradient, Terracotta active (#C86D51)
-    const lightStyles = await readNavStyles('today', 'activities');
-    expect(lightStyles.backgroundColor).toBe('rgb(255, 255, 255)');
-    expect(lightStyles.backdropFilter).toBe('none');
-    expect(lightStyles.backgroundImage).toBe('none');
-    expect(lightStyles.boxShadow).not.toContain('inset');
-    expect(lightStyles.beforeContent).toBe('none');
-    expect(lightStyles.activeColor).toBe('rgb(200, 109, 81)');
-    expect(lightStyles.inactiveColor).toBe('rgb(104, 101, 95)');
+    const flatZeroGlassShape = {
+      borderTopWidth: '1px',
+      backdropFilter: 'none',
+      backgroundImage: 'none',
+      boxShadow: expect.not.stringMatching(/inset|^none$/),
+      beforeContent: 'none',
+    };
+
+    // Light mode: solid Crisp White (#FFFFFF), #E6E4DF hairline border, zero glass/gradient, Terracotta active (#C86D51)
+    expect(await readNavStyles('today', 'activities')).toEqual({
+      ...flatZeroGlassShape,
+      backgroundColor: 'rgb(255, 255, 255)',
+      borderTopColor: 'rgb(230, 228, 223)',
+      activeColor: 'rgb(200, 109, 81)',
+      inactiveColor: 'rgb(104, 101, 95)',
+    });
 
     const todayBtn = page.locator('button[data-tab="today"]');
     const activitiesBtn = page.locator('button[data-tab="activities"]');
@@ -351,25 +361,20 @@ test.describe('Habbit App E2E', () => {
         inactiveColor: 'rgb(104, 101, 95)',
       });
 
-    // Dark mode: pure solid black (#000000), zero blur/gradient, Terracotta active (#D97E63)
+    // Dark mode: pure solid black (#000000), #33302C hairline border, zero blur/gradient, Terracotta active (#D97E63)
     await page.click('button[data-tab="settings"]');
     await page.click('#theme-option-dark');
     await expect(page.locator('#theme-option-dark')).toHaveAttribute('aria-checked', 'true');
 
     await expect
       .poll(() => readNavStyles('settings', 'today'))
-      .toEqual(
-        expect.objectContaining({
-          backgroundColor: 'rgb(0, 0, 0)',
-          backdropFilter: 'none',
-          backgroundImage: 'none',
-          beforeContent: 'none',
-          activeColor: 'rgb(217, 126, 99)',
-          inactiveColor: 'rgb(163, 158, 147)',
-        })
-      );
-    const darkStyles = await readNavStyles('settings', 'today');
-    expect(darkStyles.boxShadow).not.toContain('inset');
+      .toEqual({
+        ...flatZeroGlassShape,
+        backgroundColor: 'rgb(0, 0, 0)',
+        borderTopColor: 'rgb(51, 48, 44)',
+        activeColor: 'rgb(217, 126, 99)',
+        inactiveColor: 'rgb(163, 158, 147)',
+      });
   });
 
   test('centers compact floating pill on wider viewports', async ({ page }) => {
@@ -470,8 +475,7 @@ test.describe('Habbit App E2E', () => {
     // Activities inline SVG fill adapts to manual Dark mode even on light OS
     await page.click('button[data-tab="activities"]');
     await expect(page.locator('#activities-choice-hub')).toBeVisible();
-    const svgFill = await page.locator('.act-logo-fill').first().evaluate((el) => getComputedStyle(el).fill);
-    expect(svgFill).toBe('rgb(34, 32, 30)');
+    await expect(page.locator('.act-logo-fill').first()).toHaveCSS('fill', 'rgb(34, 32, 30)');
 
     // Reload -> persists Dark before paint and keeps Dark radio selected in Settings
     await page.reload();

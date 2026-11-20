@@ -178,7 +178,7 @@ function renderBottomNavButtons() {
 
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.role = 'tab';
+    btn.setAttribute('role', 'tab');
     btn.id = `tab-btn-${name}`;
     btn.dataset.tab = name;
     btn.setAttribute('aria-label', label);

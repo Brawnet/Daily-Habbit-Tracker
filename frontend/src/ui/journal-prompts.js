@@ -23,6 +23,15 @@ export const LIST_NUMBER_SVG = `
 </svg>
 `.trim();
 
+const CALENDAR_SVG = `
+<svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+  <line x1="16" y1="2" x2="16" y2="6" />
+  <line x1="8" y1="2" x2="8" y2="6" />
+  <line x1="3" y1="10" x2="21" y2="10" />
+</svg>
+`.trim();
+
 export {
   JOURNAL_SUBVIEW,
   SETTINGS_KEY,
@@ -83,6 +92,80 @@ export async function saveJournalPrompts(setSettingFn, prompts) {
   } catch (err) {
     console.error('Failed to save journal prompts:', err);
   }
+}
+
+/**
+ * Builds the compact secondary Day metadata strip for Write a Journal and Edit Journal.
+ */
+function createJournalDayMetaBar({
+  showDatePicker = false,
+  targetDay = '',
+  minDay = '',
+  maxDay = '',
+  dateSubtitle = '',
+  onChangeDay,
+}) {
+  const bar = document.createElement('div');
+  bar.id = 'journal-day-meta';
+  bar.className =
+    'journal-day-meta flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-1 py-1 text-xs text-[#68655F] dark:text-[#A39E93]';
+
+  const labelGroup = document.createElement('div');
+  labelGroup.className = 'inline-flex items-center gap-1.5 shrink-0';
+
+  const iconWrap = document.createElement('span');
+  iconWrap.className = 'inline-flex items-center text-[#9E4B4B] dark:text-[#D99191]';
+  iconWrap.innerHTML = CALENDAR_SVG;
+  labelGroup.appendChild(iconWrap);
+
+  if (showDatePicker) {
+    const dateLabel = document.createElement('label');
+    dateLabel.setAttribute('for', 'input-journal-date');
+    dateLabel.className = 'text-xs font-mono font-medium text-[#68655F] dark:text-[#A39E93]';
+    dateLabel.textContent = 'Journal Day';
+    labelGroup.appendChild(dateLabel);
+
+    const dateInput = document.createElement('input');
+    dateInput.type = 'date';
+    dateInput.id = 'input-journal-date';
+    dateInput.setAttribute('aria-label', 'Journal Day');
+    if (minDay) dateInput.setAttribute('min', minDay);
+    if (maxDay) dateInput.setAttribute('max', maxDay);
+    dateInput.value = targetDay;
+    dateInput.style.fontSize = '16px';
+    dateInput.className =
+      'min-h-[44px] min-w-[44px] px-2.5 py-1.5 text-base font-mono rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-transparent hover:bg-[#EFECE6]/60 dark:hover:bg-[#2C2926]/60 text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#B56565] transition-colors cursor-pointer';
+
+    dateInput.addEventListener('change', () => {
+      const nextDay = dateInput.value;
+      if (!nextDay || (minDay && nextDay < minDay) || (maxDay && nextDay > maxDay)) {
+        dateInput.value = targetDay;
+        return;
+      }
+      if (nextDay !== targetDay && typeof onChangeDay === 'function') {
+        onChangeDay(nextDay);
+      }
+    });
+
+    bar.appendChild(labelGroup);
+    bar.appendChild(dateInput);
+    return bar;
+  }
+
+  const labelText = document.createElement('span');
+  labelText.className = 'text-xs font-mono font-medium text-[#68655F] dark:text-[#A39E93]';
+  labelText.textContent = 'Journal Day';
+  labelGroup.appendChild(labelText);
+
+  const dayValue = document.createElement('time');
+  dayValue.id = 'journal-edit-day-value';
+  if (targetDay) dayValue.setAttribute('datetime', targetDay);
+  dayValue.className = 'text-xs font-mono font-medium text-[#1C1B18] dark:text-[#F4F1EA]';
+  dayValue.textContent = dateSubtitle;
+
+  bar.appendChild(labelGroup);
+  bar.appendChild(dayValue);
+  return bar;
 }
 
 /**
@@ -162,66 +245,18 @@ export function renderPromptCardsJournal({
   topBar.appendChild(rightActions);
   container.appendChild(topBar);
 
-  // 1b. Date Picker (Write a Journal) or Entry Date Banner (Edit Journal)
-  if (showDatePicker) {
-    const dateCard = document.createElement('div');
-    dateCard.className =
-      'editorial-card flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C] shadow-none';
-
-    const dateLabelWrap = document.createElement('div');
-    dateLabelWrap.className = 'flex flex-col';
-
-    const dateLabel = document.createElement('label');
-    dateLabel.setAttribute('for', 'input-journal-date');
-    dateLabel.className = 'text-xs font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]';
-    dateLabel.textContent = 'Journal Day';
-
-    const dateHint = document.createElement('span');
-    dateHint.className = 'text-[11px] font-mono text-[#68655F] dark:text-[#A39E93]';
-    dateHint.textContent = 'Today or up to 7 days back';
-
-    dateLabelWrap.appendChild(dateLabel);
-    dateLabelWrap.appendChild(dateHint);
-
-    const dateInput = document.createElement('input');
-    dateInput.type = 'date';
-    dateInput.id = 'input-journal-date';
-    dateInput.setAttribute('aria-label', 'Journal Day');
-    if (minDay) dateInput.setAttribute('min', minDay);
-    if (maxDay) dateInput.setAttribute('max', maxDay);
-    dateInput.value = targetDay;
-    dateInput.style.fontSize = '16px';
-    dateInput.className =
-      'min-h-[44px] px-3 py-2 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] font-mono focus:outline-none focus:ring-2 focus:ring-[#B56565]';
-
-    dateInput.addEventListener('change', () => {
-      const nextDay = dateInput.value;
-      if (!nextDay || (minDay && nextDay < minDay) || (maxDay && nextDay > maxDay)) {
-        dateInput.value = targetDay;
-        return;
-      }
-      if (nextDay !== targetDay && typeof onChangeDay === 'function') {
-        onChangeDay(nextDay);
-      }
-    });
-
-    dateCard.appendChild(dateLabelWrap);
-    dateCard.appendChild(dateInput);
-    container.appendChild(dateCard);
-  } else if (dateSubtitle) {
-    const dateBanner = document.createElement('div');
-    dateBanner.id = 'journal-edit-date-banner';
-    dateBanner.className =
-      'editorial-card flex items-center justify-between px-4 py-3 bg-[#FBF2F2] dark:bg-[rgba(181,101,101,0.16)] border-[#E6E4DF] dark:border-[#33302C] shadow-none';
-    const bannerLabel = document.createElement('span');
-    bannerLabel.className = 'text-xs font-mono font-semibold uppercase tracking-wide text-[#9E4B4B] dark:text-[#D99191]';
-    bannerLabel.textContent = 'Editing Journal Entry';
-    const bannerDate = document.createElement('span');
-    bannerDate.className = 'text-sm font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]';
-    bannerDate.textContent = dateSubtitle;
-    dateBanner.appendChild(bannerLabel);
-    dateBanner.appendChild(bannerDate);
-    container.appendChild(dateBanner);
+  // 1b. Compact Day Metadata Bar (Write a Journal & Edit Journal)
+  if (showDatePicker || dateSubtitle) {
+    container.appendChild(
+      createJournalDayMetaBar({
+        showDatePicker,
+        targetDay,
+        minDay,
+        maxDay,
+        dateSubtitle,
+        onChangeDay,
+      })
+    );
   }
 
   // 2. Question Prompt Cards (active prompts + any archived prompts that already have saved answers)

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MockElement, MockDocument } from './test-helpers.js';
-import { today, addDays } from '../domain/day.js';
+import { today, addDays, formatLong, formatShort } from '../domain/day.js';
 
 describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
   let mockDoc;
@@ -427,9 +427,10 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     deepCleanup();
   });
 
-  it('supports bounded 7-day backfill date picker in Write a Journal and saves to selected past Day', async () => {
+  it('supports bounded 7-day backfill inline Day picker in Write a Journal, flushes pending saves on switch, and saves to selected past Day', async () => {
     const todayDay = today();
     const pastDay = addDays(todayDay, -3);
+    const blankPastDay = addDays(todayDay, -2);
     const minDay = addDays(todayDay, -7);
 
     repoModule._seedJournalEntry({
@@ -450,19 +451,42 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     root.querySelector('#btn-choice-write-journal').click();
     await new Promise((r) => setTimeout(r, 15));
 
-    const dateInput = root.querySelector('#input-journal-date');
+    const metaBar = root.querySelector('#journal-day-meta');
+    expect(metaBar).not.toBeNull();
+    expect(metaBar.classList.contains('journal-day-meta')).toBe(true);
+    expect(metaBar.classList.contains('editorial-card')).toBe(false);
+
+    const dateLabel = metaBar.querySelector('label');
+    expect(dateLabel).not.toBeNull();
+    expect(dateLabel.getAttribute('for')).toBe('input-journal-date');
+    expect(dateLabel.textContent).toBe('Journal Day');
+
+    let dateInput = root.querySelector('#input-journal-date');
     expect(dateInput).not.toBeNull();
+    expect(dateInput.type).toBe('date');
+    expect(dateInput.getAttribute('aria-label')).toBe('Journal Day');
     expect(dateInput.value).toBe(todayDay);
     expect(dateInput.getAttribute('min')).toBe(minDay);
     expect(dateInput.getAttribute('max')).toBe(todayDay);
     expect(dateInput.style.fontSize).toBe('16px');
+    expect(dateInput.classList.contains('min-h-[44px]')).toBe(true);
+    expect(dateInput.classList.contains('min-w-[44px]')).toBe(true);
+    expect(dateInput.parentElement.classList.contains('editorial-card')).toBe(false);
     expect(root.querySelector('#btn-customize-prompts')).not.toBeNull();
 
-    // Switch to 3 days ago -> loads existing entry and hides Customize Prompts
+    // Type without waiting for 800ms debounce, then switch Day -> flushes pending save before loading pastDay
+    const todayEditor = root.querySelector('#editor-journal-content');
+    todayEditor.innerHTML = '<p>Draft before switching day</p>';
+    todayEditor.dispatchEvent({ type: 'input' });
+
     dateInput.value = pastDay;
     dateInput.dispatchEvent({ type: 'change' });
     await new Promise((r) => setTimeout(r, 15));
 
+    expect(repoModule.saveJournalEntry).toHaveBeenCalledWith(
+      todayDay,
+      expect.stringContaining('Draft before switching day')
+    );
     expect(root.querySelector('#btn-customize-prompts')).toBeNull();
     const editor0 = root.querySelector('#editor-journal-content');
     expect(editor0.innerHTML).toBe('Three days ago text');
@@ -475,6 +499,23 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     const lastCall = repoModule.saveJournalEntry.mock.calls.at(-1);
     expect(lastCall[0]).toBe(pastDay);
     expect(lastCall[1]).toContain('Backfilled update for three days ago');
+
+    // Switch to a blank past Day -> renders empty prompt cards and keeps Customize Prompts hidden
+    dateInput = root.querySelector('#input-journal-date');
+    dateInput.value = blankPastDay;
+    dateInput.dispatchEvent({ type: 'change' });
+    await new Promise((r) => setTimeout(r, 15));
+
+    expect(root.querySelector('#btn-customize-prompts')).toBeNull();
+    expect(root.querySelector('#editor-journal-content').innerHTML).toBe('');
+
+    // Switch back to todayDay -> shows Customize Prompts again
+    dateInput = root.querySelector('#input-journal-date');
+    dateInput.value = todayDay;
+    dateInput.dispatchEvent({ type: 'change' });
+    await new Promise((r) => setTimeout(r, 15));
+
+    expect(root.querySelector('#btn-customize-prompts')).not.toBeNull();
 
     cleanup();
   });
@@ -524,6 +565,49 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     expect(items[0].dataset.day).toBe(todayDay);
     expect(items[1].dataset.day).toBe(olderDay);
 
+    for (const [card, dayStr, expectTodayBadge] of [
+      [items[0], todayDay, true],
+      [items[1], olderDay, false],
+    ]) {
+      const cardHeader = card.querySelector('.journal-entry-header');
+      expect(cardHeader).not.toBeNull();
+      const headline = cardHeader.querySelector('.journal-entry-headline');
+      expect(headline).not.toBeNull();
+      const titleEl = headline.querySelector('.journal-entry-title');
+      expect(titleEl).not.toBeNull();
+      expect(titleEl.textContent).toBe(formatShort(dayStr));
+      expect(titleEl.classList.contains('text-base')).toBe(true);
+      expect(titleEl.classList.contains('font-serif')).toBe(true);
+      expect(titleEl.classList.contains('font-semibold')).toBe(true);
+
+      const badgeEl = cardHeader.querySelector('.badge-sage');
+      if (expectTodayBadge) {
+        expect(badgeEl).not.toBeNull();
+        expect(badgeEl.textContent).toBe('Today');
+      } else {
+        expect(badgeEl).toBeNull();
+      }
+    }
+
+    // Open today's Entry Reader first to verify Today badge and clean single header
+    items[0].click();
+    await new Promise((r) => setTimeout(r, 15));
+
+    const todayReaderCard = root.querySelector('#journal-reader-card');
+    expect(todayReaderCard).not.toBeNull();
+    const todayReaderHeader = todayReaderCard.querySelector('#journal-reader-header');
+    expect(todayReaderHeader).not.toBeNull();
+    const todayReaderTitle = todayReaderHeader.querySelector('#journal-reader-title');
+    expect(todayReaderTitle).not.toBeNull();
+    expect(todayReaderTitle.tagName).toBe('H1');
+    expect(todayReaderTitle.textContent).toBe(formatLong(todayDay));
+    expect(todayReaderHeader.querySelectorAll('p').length).toBe(0);
+    expect(todayReaderHeader.textContent).not.toContain(formatShort(todayDay));
+    expect(todayReaderHeader.textContent).toContain('Today');
+
+    root.querySelector('#btn-back-from-journal-read').click();
+    await new Promise((r) => setTimeout(r, 15));
+
     const searchInput = root.querySelector('#journal-history-search');
     expect(searchInput).not.toBeNull();
     expect(searchInput.style.fontSize).toBe('16px');
@@ -539,14 +623,24 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     expect(markEl).not.toBeNull();
     expect(markEl.textContent.toLowerCase()).toBe('stoic');
 
-    // Open separate in-page Entry Reader
+    // Open separate in-page Entry Reader for olderDay
     items[0].click();
     await new Promise((r) => setTimeout(r, 15));
 
     const readerView = root.querySelector('#journal-read-view');
     expect(readerView).not.toBeNull();
     expect(root.querySelector('#journal-history-view')).toBeNull();
-    expect(root.querySelector('#journal-reader-card').textContent).toContain('Read stoic philosophy');
+    const readerCard = root.querySelector('#journal-reader-card');
+    const readerHeader = readerCard.querySelector('#journal-reader-header');
+    expect(readerHeader).not.toBeNull();
+    const readerTitle = readerHeader.querySelector('#journal-reader-title');
+    expect(readerTitle).not.toBeNull();
+    expect(readerTitle.tagName).toBe('H1');
+    expect(readerTitle.textContent).toBe(formatLong(olderDay));
+    expect(readerHeader.querySelectorAll('p').length).toBe(0);
+    expect(readerHeader.textContent).not.toContain(formatShort(olderDay));
+    expect(readerHeader.textContent).not.toContain('Today');
+    expect(readerCard.textContent).toContain('Read stoic philosophy');
     expect(root.querySelector('#btn-back-from-journal-read')).not.toBeNull();
     expect(root.querySelector('#btn-edit-journal-entry')).not.toBeNull();
 
@@ -595,6 +689,21 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
 
     expect(root.querySelector('#journal-view')).not.toBeNull();
     expect(root.querySelector('#input-journal-date')).toBeNull();
+    expect(root.querySelector('#journal-edit-date-banner')).toBeNull();
+    expect(root.querySelector('#journal-view').textContent).not.toContain('Editing Journal Entry');
+
+    const editMetaBar = root.querySelector('#journal-day-meta');
+    expect(editMetaBar).not.toBeNull();
+    expect(editMetaBar.classList.contains('journal-day-meta')).toBe(true);
+    expect(editMetaBar.classList.contains('editorial-card')).toBe(false);
+    expect(editMetaBar.classList.contains('bg-[#FBF2F2]')).toBe(false);
+
+    const editDayValue = root.querySelector('#journal-edit-day-value');
+    expect(editDayValue).not.toBeNull();
+    expect(editDayValue.tagName).toBe('TIME');
+    expect(editDayValue.getAttribute('datetime')).toBe(oldDay);
+    expect(editDayValue.textContent).toBe(formatLong(oldDay));
+
     expect(root.querySelector('#btn-customize-prompts')).toBeNull();
 
     // Archived prompt with saved answer MUST be rendered and editable

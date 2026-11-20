@@ -584,4 +584,133 @@ test.describe('Habbit App E2E', () => {
       metaThemeColor: '#F6F5F2',
     });
   });
+
+  test('renders compact Day metadata across Write, Edit, Reader, and Journal History in Light and Dark mobile viewports', async ({ page }) => {
+    await page.setViewportSize({ width: 393, height: 852 });
+    await page.emulateMedia({ colorScheme: 'light' });
+
+    const dates = await page.evaluate(() => {
+      const fmtDay = (d) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+      const fmtLong = (d) =>
+        `${d.toLocaleDateString('en-US', { weekday: 'long' })}, ${d.getDate()} ${d.toLocaleDateString('en-US', { month: 'long' })} ${d.getFullYear()}`;
+      const fmtShort = (d) =>
+        `${d.toLocaleDateString('en-US', { weekday: 'short' })}, ${d.getDate()} ${d.toLocaleDateString('en-US', { month: 'short' })} ${d.getFullYear()}`;
+
+      const t = new Date();
+      const y = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 1, 12, 0, 0);
+      const min = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 7, 12, 0, 0);
+      return {
+        todayStr: fmtDay(t),
+        yesterdayStr: fmtDay(y),
+        minDayStr: fmtDay(min),
+        longToday: fmtLong(t),
+        shortToday: fmtShort(t),
+        longYesterday: fmtLong(y),
+        shortYesterday: fmtShort(y),
+      };
+    });
+
+    // 1. Write a Journal (Light)
+    await page.click('button[data-tab="activities"]');
+    await page.click('#choice-journals');
+    await page.click('#btn-choice-write-journal');
+
+    const dayMeta = page.locator('#journal-day-meta');
+    await expect(dayMeta).toBeVisible();
+    await expect(dayMeta).not.toHaveClass(/editorial-card/);
+    expect(await dayMeta.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+
+    const dateInput = page.getByLabel('Journal Day');
+    await expect(dateInput).toHaveAttribute('id', 'input-journal-date');
+    await expect(dateInput).toHaveAttribute('min', dates.minDayStr);
+    await expect(dateInput).toHaveAttribute('max', dates.todayStr);
+    expect(await dateInput.evaluate((el) => getComputedStyle(el).fontSize)).toBe('16px');
+    const dateBox = await dateInput.boundingBox();
+    expect(dateBox).not.toBeNull();
+    expect(dateBox.width).toBeGreaterThanOrEqual(44);
+    expect(dateBox.height).toBeGreaterThanOrEqual(44);
+
+    // Type and immediately switch Day without waiting 800ms -> flushes today's draft
+    await page.locator('#editor-journal-content').fill('Unsaved draft flushed on Day switch');
+    await page.fill('#input-journal-date', dates.yesterdayStr);
+    await expect(page.locator('#btn-customize-prompts')).toHaveCount(0);
+    await expect(page.locator('#editor-journal-content')).toHaveText('');
+
+    await page.locator('#editor-journal-content').fill('Yesterday reflection entry');
+    await expect(page.locator('#journal-status')).toHaveText('Saved', { timeout: 3000 });
+
+    // 2. Journal History cards (Light)
+    await page.click('#btn-back-from-journal-to-activities');
+    await page.click('#btn-choice-journal-history');
+    const cards = page.locator('.journal-entry-item');
+    await expect(cards).toHaveCount(2);
+
+    const todayCard = cards.nth(0);
+    await expect(todayCard.locator('.journal-entry-header .journal-entry-title')).toHaveText(dates.shortToday);
+    await expect(todayCard.locator('.journal-entry-header .badge-sage')).toHaveText('Today');
+    await expect(todayCard).toContainText('Unsaved draft flushed on Day switch');
+
+    const yesterdayCard = cards.nth(1);
+    await expect(yesterdayCard.locator('.journal-entry-header .journal-entry-title')).toHaveText(dates.shortYesterday);
+    await expect(yesterdayCard.locator('.journal-entry-header .badge-sage')).toHaveCount(0);
+
+    // 3. Entry Reader (Light)
+    await yesterdayCard.click();
+    const readerHeader = page.locator('#journal-reader-header');
+    await expect(readerHeader).toBeVisible();
+    await expect(readerHeader.locator('h1#journal-reader-title')).toHaveText(dates.longYesterday);
+    await expect(readerHeader.locator('p')).toHaveCount(0);
+    await expect(readerHeader).not.toContainText(dates.shortYesterday);
+
+    // 4. Edit Journal (Light)
+    await page.click('#btn-edit-journal-entry');
+    await expect(page.locator('#journal-edit-date-banner')).toHaveCount(0);
+    await expect(dayMeta).toBeVisible();
+    await expect(dayMeta).not.toHaveClass(/editorial-card/);
+    expect(await dayMeta.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+    await expect(page.locator('#journal-edit-day-value')).toHaveText(dates.longYesterday);
+
+    // 5. Dark mode verification across all 4 surfaces
+    await page.click('button[data-tab="settings"]');
+    await page.click('#theme-option-dark');
+    await expect(page.locator('#theme-option-dark')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('html')).toHaveClass(/\bdark\b/);
+
+    // Write a Journal (Dark)
+    await page.click('button[data-tab="activities"]');
+    await page.click('#choice-journals');
+    await page.click('#btn-choice-write-journal');
+    await expect(dayMeta).toBeVisible();
+    expect(await dayMeta.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+    await expect(dateInput).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+
+    // Journal History (Dark)
+    await page.click('#btn-back-from-journal-to-activities');
+    await page.click('#btn-choice-journal-history');
+    await expect(cards.nth(0).locator('.journal-entry-header .journal-entry-title')).toHaveCSS('color', 'rgb(244, 241, 234)');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+
+    // Entry Reader (Dark)
+    await cards.nth(0).click();
+    await expect(readerHeader).toBeVisible();
+    await expect(readerHeader.locator('h1#journal-reader-title')).toHaveText(dates.longToday);
+    await expect(readerHeader.locator('h1#journal-reader-title')).toHaveCSS('color', 'rgb(244, 241, 234)');
+    await expect(readerHeader.locator('p')).toHaveCount(0);
+    await expect(readerHeader.locator('.badge-sage')).toHaveText('Today');
+
+    // Edit Journal (Dark)
+    await page.click('#btn-edit-journal-entry');
+    await expect(page.locator('#journal-edit-date-banner')).toHaveCount(0);
+    await expect(dayMeta).toBeVisible();
+    expect(await dayMeta.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+    await expect(page.locator('#journal-edit-day-value')).toHaveText(dates.longToday);
+    await expect(page.locator('#journal-edit-day-value')).toHaveCSS('color', 'rgb(244, 241, 234)');
+  });
 });

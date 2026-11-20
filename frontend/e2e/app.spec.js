@@ -155,7 +155,7 @@ test.describe('Habbit App E2E', () => {
     await journalEditor.fill(testReflection);
     await expect(page.locator('#journal-status')).toHaveText('Saved', { timeout: 3000 });
 
-    // Backfill yesterday via 7-day date picker
+    // Backfill yesterday via themed 7-day calendar picker
     const yesterday = await page.evaluate(() => {
       const d = new Date();
       d.setDate(d.getDate() - 1);
@@ -164,7 +164,15 @@ test.describe('Habbit App E2E', () => {
       const day = String(d.getDate()).padStart(2, '0');
       return `${y}-${m}-${day}`;
     });
-    await page.fill('#input-journal-date', yesterday);
+    await page.click('#btn-journal-day-picker');
+    const calendarPopover = page.locator('#journal-day-calendar-popover');
+    await expect(calendarPopover).toBeVisible();
+    const yesterdayCell = calendarPopover.locator(`.journal-calendar-day-btn[data-day="${yesterday}"]`);
+    if ((await yesterdayCell.count()) === 0) {
+      await calendarPopover.locator('#btn-calendar-prev-month').click();
+    }
+    await yesterdayCell.click();
+    await expect(calendarPopover).toHaveCount(0);
     await expect(page.locator('#btn-customize-prompts')).toHaveCount(0);
 
     const pastReflection = 'Refleksi kemarin: tetap konsisten menjaga fokus.';
@@ -191,6 +199,7 @@ test.describe('Habbit App E2E', () => {
 
     // Edit past entry and return to refreshed Entry Reader
     await page.click('#btn-edit-journal-entry');
+    await expect(page.locator('#btn-journal-day-picker')).toHaveCount(0);
     await expect(page.locator('#input-journal-date')).toHaveCount(0);
     await expect(page.locator('#btn-customize-prompts')).toHaveCount(0);
     const updatedPastReflection = 'Refleksi kemarin (revisi): selesai lebih cepat.';
@@ -583,5 +592,192 @@ test.describe('Habbit App E2E', () => {
       hasDarkClass: false,
       metaThemeColor: '#F6F5F2',
     });
+  });
+
+  test('renders compact Day metadata across Write, Edit, Reader, and Journal History in Light and Dark mobile viewports', async ({ page }) => {
+    await page.setViewportSize({ width: 393, height: 852 });
+    await page.emulateMedia({ colorScheme: 'light' });
+
+    const dates = await page.evaluate(() => {
+      const formatIsoDay = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const dayOfMonth = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${dayOfMonth}`;
+      };
+      const formatLongDay = (date) =>
+        `${date.toLocaleDateString('en-US', { weekday: 'long' })}, ${date.getDate()} ${date.toLocaleDateString('en-US', { month: 'long' })} ${date.getFullYear()}`;
+      const formatShortDay = (date) =>
+        `${date.toLocaleDateString('en-US', { weekday: 'short' })}, ${date.getDate()} ${date.toLocaleDateString('en-US', { month: 'short' })} ${date.getFullYear()}`;
+
+      const todayDate = new Date();
+      const yesterdayDate = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate() - 1, 12, 0, 0);
+      const minBackfillDate = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate() - 7, 12, 0, 0);
+      return {
+        todayStr: formatIsoDay(todayDate),
+        yesterdayStr: formatIsoDay(yesterdayDate),
+        minDayStr: formatIsoDay(minBackfillDate),
+        longToday: formatLongDay(todayDate),
+        shortToday: formatShortDay(todayDate),
+        longYesterday: formatLongDay(yesterdayDate),
+        shortYesterday: formatShortDay(yesterdayDate),
+      };
+    });
+
+    const dayMeta = page.locator('#journal-day-meta');
+    const dayPickerTrigger = page.getByLabel('Journal Day');
+    const calendarPopover = page.locator('#journal-day-calendar-popover');
+    const cards = page.locator('.journal-entry-item');
+    const readerHeader = page.locator('#journal-reader-header');
+
+    const expectCompactDayMetaRow = async () => {
+      await expect(dayMeta).toBeVisible();
+      await expect(dayMeta).not.toHaveClass(/editorial-card/);
+      expect(await dayMeta.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+    };
+
+    const expectNoHorizontalOverflow = async () => {
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)
+      ).toBe(true);
+    };
+
+    const selectDayFromCalendar = async (targetDayStr) => {
+      const triggerBox = await dayPickerTrigger.boundingBox();
+      expect(triggerBox).not.toBeNull();
+      // Click the left text area of the field (not just any right-side icon) to verify full-field clickability
+      await page.mouse.click(triggerBox.x + 12, triggerBox.y + triggerBox.height / 2);
+      await expect(calendarPopover).toBeVisible();
+      const dayCell = calendarPopover.locator(`.journal-calendar-day-btn[data-day="${targetDayStr}"]`);
+      if ((await dayCell.count()) === 0) {
+        await calendarPopover.locator('#btn-calendar-prev-month').click();
+      }
+      await dayCell.click();
+      await expect(calendarPopover).toHaveCount(0);
+    };
+
+    const expectReaderHeaderClean = async (expectedLongDay, expectedShortDay, expectTodayPill) => {
+      await expect(readerHeader).toBeVisible();
+      await expect(readerHeader.locator('h1#journal-reader-title')).toHaveText(expectedLongDay);
+      await expect(readerHeader.locator('p')).toHaveCount(0);
+      await expect(readerHeader).not.toContainText(expectedShortDay);
+      if (expectTodayPill) {
+        await expect(readerHeader.locator('.badge-sage')).toHaveText('Today');
+      } else {
+        await expect(readerHeader.locator('.badge-sage')).toHaveCount(0);
+      }
+    };
+
+    // 1. Write a Journal (Light)
+    await page.click('button[data-tab="activities"]');
+    await page.click('#choice-journals');
+    await page.click('#btn-choice-write-journal');
+
+    await expectCompactDayMetaRow();
+    await expectNoHorizontalOverflow();
+
+    await expect(dayPickerTrigger).toHaveAttribute('id', 'btn-journal-day-picker');
+    await expect(dayPickerTrigger).toContainText(dates.shortToday);
+    await expect(dayPickerTrigger).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+    const triggerBox = await dayPickerTrigger.boundingBox();
+    expect(triggerBox).not.toBeNull();
+    expect(triggerBox.width).toBeGreaterThanOrEqual(44);
+    expect(triggerBox.height).toBeGreaterThanOrEqual(44);
+
+    // Open calendar by clicking the text side of the field and inspect Light theme + bounds
+    await page.mouse.click(triggerBox.x + 12, triggerBox.y + triggerBox.height / 2);
+    await expect(calendarPopover).toBeVisible();
+    await expect(calendarPopover).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+    await expect(calendarPopover).toHaveCSS('border-top-color', 'rgb(230, 228, 223)');
+    await expect(calendarPopover.locator('.journal-calendar-day-btn[aria-pressed="true"]')).toHaveCSS(
+      'background-color',
+      'rgb(158, 75, 75)'
+    );
+    const todayCellBox = await calendarPopover.locator(`.journal-calendar-day-btn[data-day="${dates.todayStr}"]`).boundingBox();
+    expect(todayCellBox.width).toBeGreaterThanOrEqual(44);
+    expect(todayCellBox.height).toBeGreaterThanOrEqual(44);
+    await expectNoHorizontalOverflow();
+    await page.keyboard.press('Escape');
+    await expect(calendarPopover).toHaveCount(0);
+
+    // Type and immediately switch Day via calendar without waiting 800ms -> flushes today's draft
+    await page.locator('#editor-journal-content').fill('Unsaved draft flushed on Day switch');
+    await selectDayFromCalendar(dates.yesterdayStr);
+    await expect(dayPickerTrigger).toContainText(dates.shortYesterday);
+    await expect(page.locator('#btn-customize-prompts')).toHaveCount(0);
+    await expect(page.locator('#editor-journal-content')).toHaveText('');
+
+    await page.locator('#editor-journal-content').fill('Yesterday reflection entry');
+    await expect(page.locator('#journal-status')).toHaveText('Saved', { timeout: 3000 });
+
+    // 2. Journal History cards (Light)
+    await page.click('#btn-back-from-journal-to-activities');
+    await page.click('#btn-choice-journal-history');
+    await expect(cards).toHaveCount(2);
+
+    const todayCard = cards.nth(0);
+    await expect(todayCard.locator('.journal-entry-header .journal-entry-title')).toHaveText(dates.shortToday);
+    await expect(todayCard.locator('.journal-entry-header .badge-sage')).toHaveText('Today');
+    await expect(todayCard).toContainText('Unsaved draft flushed on Day switch');
+
+    const yesterdayCard = cards.nth(1);
+    await expect(yesterdayCard.locator('.journal-entry-header .journal-entry-title')).toHaveText(dates.shortYesterday);
+    await expect(yesterdayCard.locator('.journal-entry-header .badge-sage')).toHaveCount(0);
+
+    // 3. Entry Reader (Light)
+    await yesterdayCard.click();
+    await expectReaderHeaderClean(dates.longYesterday, dates.shortYesterday, false);
+
+    // 4. Edit Journal (Light)
+    await page.click('#btn-edit-journal-entry');
+    await expect(page.locator('#journal-edit-date-banner')).toHaveCount(0);
+    await expectCompactDayMetaRow();
+    await expect(page.locator('#journal-edit-day-value')).toHaveText(dates.longYesterday);
+
+    // 5. Dark mode verification across all 4 surfaces
+    await page.click('button[data-tab="settings"]');
+    await page.click('#theme-option-dark');
+    await expect(page.locator('#theme-option-dark')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('html')).toHaveClass(/\bdark\b/);
+
+    // Write a Journal (Dark) + themed calendar popover in Dark mode
+    await page.click('button[data-tab="activities"]');
+    await page.click('#choice-journals');
+    await page.click('#btn-choice-write-journal');
+    await expectCompactDayMetaRow();
+    await expect(dayPickerTrigger).toBeVisible();
+    await expect(dayPickerTrigger).toHaveCSS('background-color', 'rgb(34, 32, 30)');
+    await expect(dayPickerTrigger).toHaveCSS('border-top-color', 'rgb(51, 48, 44)');
+    await expect(dayPickerTrigger).toHaveCSS('color', 'rgb(244, 241, 234)');
+
+    await dayPickerTrigger.click();
+    await expect(calendarPopover).toBeVisible();
+    await expect(calendarPopover).toHaveCSS('background-color', 'rgb(34, 32, 30)');
+    await expect(calendarPopover).toHaveCSS('border-top-color', 'rgb(51, 48, 44)');
+    await expect(calendarPopover.locator('.journal-calendar-day-btn[aria-pressed="true"]')).toHaveCSS(
+      'background-color',
+      'rgb(198, 120, 120)'
+    );
+    await expectNoHorizontalOverflow();
+    await page.keyboard.press('Escape');
+    await expect(calendarPopover).toHaveCount(0);
+
+    // Journal History (Dark)
+    await page.click('#btn-back-from-journal-to-activities');
+    await page.click('#btn-choice-journal-history');
+    await expect(todayCard.locator('.journal-entry-header .journal-entry-title')).toHaveCSS('color', 'rgb(244, 241, 234)');
+    await expectNoHorizontalOverflow();
+
+    // Entry Reader (Dark)
+    await todayCard.click();
+    await expectReaderHeaderClean(dates.longToday, dates.shortToday, true);
+    await expect(readerHeader.locator('h1#journal-reader-title')).toHaveCSS('color', 'rgb(244, 241, 234)');
+
+    // Edit Journal (Dark)
+    await page.click('#btn-edit-journal-entry');
+    await expect(page.locator('#journal-edit-date-banner')).toHaveCount(0);
+    await expectCompactDayMetaRow();
+    await expect(page.locator('#journal-edit-day-value')).toHaveText(dates.longToday);
+    await expect(page.locator('#journal-edit-day-value')).toHaveCSS('color', 'rgb(244, 241, 234)');
   });
 });

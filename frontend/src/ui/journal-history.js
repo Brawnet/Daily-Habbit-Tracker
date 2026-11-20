@@ -313,23 +313,28 @@ export function renderJournalHistoryView({
       entryBtn.dataset.day = originalEntry.day;
       entryBtn.setAttribute('aria-label', `Read Journal Entry for ${formatShort(originalEntry.day)}`);
 
-      const dateHeader = document.createElement('div');
-      dateHeader.className = 'flex items-center justify-between gap-2 w-full';
+      const cardHeader = document.createElement('div');
+      cardHeader.className = 'journal-entry-header flex items-start justify-between gap-2 w-full';
 
-      const dateText = document.createElement('span');
-      dateText.className =
-        'text-xs font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA] group-hover:text-[#9E4B4B] dark:group-hover:text-[#D99191] transition-colors';
-      dateText.textContent = formatShort(originalEntry.day);
-      dateHeader.appendChild(dateText);
+      const headlineWrap = document.createElement('div');
+      headlineWrap.className = 'journal-entry-headline flex flex-col gap-0.5 min-w-0';
+
+      const titleText = document.createElement('span');
+      titleText.className =
+        'journal-entry-title text-base font-serif font-semibold leading-snug text-[#1C1B18] dark:text-[#F4F1EA] group-hover:text-[#9E4B4B] dark:group-hover:text-[#D99191] transition-colors break-words';
+      titleText.textContent = formatShort(originalEntry.day);
+      headlineWrap.appendChild(titleText);
+      cardHeader.appendChild(headlineWrap);
 
       if (originalEntry.day === todayDay) {
         const todayBadge = document.createElement('span');
-        todayBadge.className = 'badge-sage px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold';
+        todayBadge.className =
+          'badge-sage mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold shrink-0';
         todayBadge.textContent = 'Today';
-        dateHeader.appendChild(todayBadge);
+        cardHeader.appendChild(todayBadge);
       }
 
-      entryBtn.appendChild(dateHeader);
+      entryBtn.appendChild(cardHeader);
 
       const snippetEl = document.createElement('div');
       snippetEl.className =
@@ -391,31 +396,28 @@ export function renderJournalReaderView({ entry, isToday, onBack, onEdit }) {
   readerCard.className =
     'editorial-card p-6 sm:p-8 flex flex-col gap-6 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
 
-  const header = document.createElement('div');
-  header.className = 'border-b border-[#E6E4DF] dark:border-[#33302C] pb-4 flex flex-col gap-1';
+  const header = document.createElement('header');
+  header.id = 'journal-reader-header';
+  header.className = 'border-b border-[#E6E4DF] dark:border-[#33302C] pb-4 flex flex-col gap-1.5';
 
   const titleRow = document.createElement('div');
   titleRow.className = 'flex items-center justify-between gap-2 flex-wrap';
 
   const titleEl = document.createElement('h1');
+  titleEl.id = 'journal-reader-title';
   titleEl.className =
-    'text-2xl font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA] tracking-tight';
+    'text-2xl font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA] tracking-tight break-words';
   titleEl.textContent = formatLong(entry.day);
   titleRow.appendChild(titleEl);
 
   if (isToday) {
     const todayPill = document.createElement('span');
-    todayPill.className = 'badge-sage px-2.5 py-0.5 rounded-full text-xs font-mono font-semibold';
+    todayPill.className = 'badge-sage px-2.5 py-0.5 rounded-full text-xs font-mono font-semibold shrink-0';
     todayPill.textContent = 'Today';
     titleRow.appendChild(todayPill);
   }
 
-  const shortSub = document.createElement('p');
-  shortSub.className = 'text-xs font-mono text-[#68655F] dark:text-[#A39E93]';
-  shortSub.textContent = formatShort(entry.day);
-
   header.appendChild(titleRow);
-  header.appendChild(shortSub);
   readerCard.appendChild(header);
 
   const contentEl = document.createElement('div');

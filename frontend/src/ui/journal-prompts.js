@@ -23,6 +23,27 @@ export const LIST_NUMBER_SVG = `
 </svg>
 `.trim();
 
+const CALENDAR_SVG = `
+<svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+  <line x1="16" y1="2" x2="16" y2="6" />
+  <line x1="8" y1="2" x2="8" y2="6" />
+  <line x1="3" y1="10" x2="21" y2="10" />
+</svg>
+`.trim();
+
+const CHEVRON_RIGHT_SVG = `
+<svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M9 5l7 7-7 7" />
+</svg>
+`.trim();
+
+const CHEVRON_DOWN_SVG = `
+<svg class="w-3.5 h-3.5 shrink-0 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M6 9l6 6 6-6" />
+</svg>
+`.trim();
+
 export {
   JOURNAL_SUBVIEW,
   SETTINGS_KEY,
@@ -44,6 +65,7 @@ import {
   sanitizeJournalHtml,
 } from '../domain/journal.js';
 import { isBlank } from '../domain/text.js';
+import { formatLong, formatShort } from '../domain/day.js';
 /**
  * Loads current prompts from Settings, or seeds and returns defaults.
  * @param {Function} getSettingFn
@@ -83,6 +105,301 @@ export async function saveJournalPrompts(setSettingFn, prompts) {
   } catch (err) {
     console.error('Failed to save journal prompts:', err);
   }
+}
+
+function parseYearMonth(dayStr) {
+  const [y, m] = String(dayStr || '').split('-').map(Number);
+  if (y && m >= 1 && m <= 12) {
+    return { year: y, month: m - 1 };
+  }
+  const now = new Date();
+  return { year: now.getFullYear(), month: now.getMonth() };
+}
+
+function toYearMonthKey(year, month) {
+  return `${year}-${String(month + 1).padStart(2, '0')}`;
+}
+
+function buildJournalDayTrigger({ bar, targetDay, minDay, maxDay, onChangeDay }) {
+  const triggerBtn = document.createElement('button');
+  triggerBtn.type = 'button';
+  triggerBtn.id = 'btn-journal-day-picker';
+  triggerBtn.setAttribute('aria-haspopup', 'dialog');
+  triggerBtn.setAttribute('aria-expanded', 'false');
+  triggerBtn.setAttribute('aria-label', 'Journal Day');
+  if (targetDay) triggerBtn.setAttribute('data-day', targetDay);
+  triggerBtn.className =
+    'min-h-[44px] min-w-[44px] inline-flex items-center gap-2 px-3 py-2 text-xs font-mono font-medium rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#FFFFFF] dark:bg-[#22201E] hover:border-[#B56565] dark:hover:border-[#C67878] hover:bg-[#FBF2F2]/60 dark:hover:bg-[rgba(181,101,101,0.14)] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#B56565] transition-colors cursor-pointer tactile-spring';
+
+  const textSpan = document.createElement('span');
+  textSpan.textContent = targetDay ? formatShort(targetDay) : 'Select Day';
+
+  const chevronWrap = document.createElement('span');
+  chevronWrap.className = 'inline-flex items-center text-[#68655F] dark:text-[#A39E93]';
+  chevronWrap.innerHTML = CHEVRON_DOWN_SVG;
+
+  triggerBtn.appendChild(textSpan);
+  triggerBtn.appendChild(chevronWrap);
+
+  let popoverEl = null;
+  let { year: viewYear, month: viewMonth } = parseYearMonth(targetDay || maxDay);
+  const minYm = minDay ? minDay.slice(0, 7) : '';
+  const maxYm = maxDay ? maxDay.slice(0, 7) : '';
+
+  const selectDay = (chosenDay) => {
+    closePopover();
+    if (!chosenDay || (minDay && chosenDay < minDay) || (maxDay && chosenDay > maxDay)) return;
+    if (chosenDay !== targetDay && typeof onChangeDay === 'function') {
+      onChangeDay(chosenDay);
+    }
+  };
+
+  function handleOutsideClick(e) {
+    if (!popoverEl) return;
+    const isInsideBar =
+      typeof bar.contains === 'function' && e?.target ? bar.contains(e.target) : false;
+    if (!isInsideBar) {
+      closePopover();
+    }
+  }
+
+  function handleDocKeydown(e) {
+    if (e?.key === 'Escape') {
+      closePopover();
+      triggerBtn.focus?.();
+    }
+  }
+
+  function closePopover() {
+    if (popoverEl) {
+      popoverEl.remove();
+      popoverEl = null;
+    }
+    triggerBtn.setAttribute('aria-expanded', 'false');
+    if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+      document.removeEventListener('click', handleOutsideClick);
+      document.removeEventListener('keydown', handleDocKeydown);
+    }
+  }
+
+  function renderPopoverContent() {
+    if (!popoverEl) return;
+    popoverEl.innerHTML = '';
+
+    const navHeader = document.createElement('div');
+    navHeader.className = 'flex items-center justify-between gap-1 mb-2';
+
+    const curYm = toYearMonthKey(viewYear, viewMonth);
+
+    const prevBtn = document.createElement('button');
+    prevBtn.type = 'button';
+    prevBtn.id = 'btn-calendar-prev-month';
+    prevBtn.setAttribute('aria-label', 'Previous month');
+    prevBtn.disabled = Boolean(minYm && curYm <= minYm);
+    prevBtn.className =
+      'min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg text-[#68655F] dark:text-[#A39E93] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors';
+    prevBtn.innerHTML = CHEVRON_LEFT_SVG;
+    prevBtn.addEventListener('click', () => {
+      if (prevBtn.disabled) return;
+      if (viewMonth === 0) {
+        viewYear -= 1;
+        viewMonth = 11;
+      } else {
+        viewMonth -= 1;
+      }
+      renderPopoverContent();
+    });
+
+    const monthLabel = document.createElement('span');
+    monthLabel.id = 'journal-calendar-month-label';
+    monthLabel.className = 'text-sm font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]';
+    monthLabel.textContent = new Date(viewYear, viewMonth, 1, 12, 0, 0).toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric',
+    });
+
+    const nextBtn = document.createElement('button');
+    nextBtn.type = 'button';
+    nextBtn.id = 'btn-calendar-next-month';
+    nextBtn.setAttribute('aria-label', 'Next month');
+    nextBtn.disabled = Boolean(maxYm && curYm >= maxYm);
+    nextBtn.className =
+      'min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg text-[#68655F] dark:text-[#A39E93] hover:text-[#1C1B18] dark:hover:text-[#F4F1EA] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors';
+    nextBtn.innerHTML = CHEVRON_RIGHT_SVG;
+    nextBtn.addEventListener('click', () => {
+      if (nextBtn.disabled) return;
+      if (viewMonth === 11) {
+        viewYear += 1;
+        viewMonth = 0;
+      } else {
+        viewMonth += 1;
+      }
+      renderPopoverContent();
+    });
+
+    navHeader.appendChild(prevBtn);
+    navHeader.appendChild(monthLabel);
+    navHeader.appendChild(nextBtn);
+    popoverEl.appendChild(navHeader);
+
+    const weekdaysRow = document.createElement('div');
+    weekdaysRow.className = 'grid grid-cols-7 gap-0.5 text-center mb-1';
+    for (const wd of ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']) {
+      const wdEl = document.createElement('span');
+      wdEl.className = 'text-[11px] font-mono font-medium text-[#68655F] dark:text-[#A39E93] py-1';
+      wdEl.textContent = wd;
+      weekdaysRow.appendChild(wdEl);
+    }
+    popoverEl.appendChild(weekdaysRow);
+
+    const grid = document.createElement('div');
+    grid.className = 'grid grid-cols-7 gap-0.5';
+
+    const firstWeekdayJs = new Date(viewYear, viewMonth, 1, 12, 0, 0).getDay();
+    const leadingOffset = (firstWeekdayJs + 6) % 7;
+    for (let i = 0; i < leadingOffset; i += 1) {
+      const spacer = document.createElement('div');
+      spacer.setAttribute('aria-hidden', 'true');
+      grid.appendChild(spacer);
+    }
+
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0, 12, 0, 0).getDate();
+    for (let d = 1; d <= daysInMonth; d += 1) {
+      const dayStr = `${toYearMonthKey(viewYear, viewMonth)}-${String(d).padStart(2, '0')}`;
+      const inRange = (!minDay || dayStr >= minDay) && (!maxDay || dayStr <= maxDay);
+      const isSelected = dayStr === targetDay;
+      const isTodayCell = dayStr === maxDay;
+
+      const dayBtn = document.createElement('button');
+      dayBtn.type = 'button';
+      dayBtn.setAttribute('data-day', dayStr);
+      dayBtn.setAttribute('aria-label', formatLong(dayStr));
+      dayBtn.textContent = String(d);
+
+      const baseClass =
+        'journal-calendar-day-btn min-h-[44px] min-w-[44px] rounded-lg text-xs font-mono inline-flex items-center justify-center transition-colors';
+
+      if (!inRange) {
+        dayBtn.disabled = true;
+        dayBtn.setAttribute('aria-disabled', 'true');
+        dayBtn.className = `${baseClass} text-[#68655F]/35 dark:text-[#A39E93]/30 opacity-45 cursor-not-allowed`;
+      } else if (isSelected) {
+        dayBtn.setAttribute('aria-pressed', 'true');
+        dayBtn.className = `${baseClass} bg-[#9E4B4B] dark:bg-[#C67878] text-[#FAF8F5] font-semibold cursor-pointer`;
+      } else if (isTodayCell) {
+        dayBtn.className = `${baseClass} border border-[#B56565] dark:border-[#C67878] text-[#9E4B4B] dark:text-[#D99191] font-semibold hover:bg-[#FBF2F2] dark:hover:bg-[rgba(181,101,101,0.2)] cursor-pointer`;
+      } else {
+        dayBtn.className = `${baseClass} text-[#1C1B18] dark:text-[#F4F1EA] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] cursor-pointer`;
+      }
+
+      if (inRange) {
+        dayBtn.addEventListener('click', () => selectDay(dayStr));
+      }
+      grid.appendChild(dayBtn);
+    }
+    popoverEl.appendChild(grid);
+
+    const footer = document.createElement('div');
+    footer.className =
+      'flex items-center justify-between gap-2 pt-2 mt-2 border-t border-[#E6E4DF] dark:border-[#33302C]';
+
+    const windowHint = document.createElement('span');
+    windowHint.className = 'text-[11px] font-mono text-[#68655F] dark:text-[#A39E93]';
+    windowHint.textContent = 'Today & past 7 days';
+
+    const todayBtn = document.createElement('button');
+    todayBtn.type = 'button';
+    todayBtn.id = 'btn-calendar-jump-today';
+    todayBtn.disabled = !maxDay || targetDay === maxDay;
+    todayBtn.className =
+      'min-h-[44px] min-w-[44px] px-3 rounded-lg text-xs font-mono font-semibold text-[#9E4B4B] dark:text-[#D99191] hover:bg-[#FBF2F2] dark:hover:bg-[rgba(181,101,101,0.16)] disabled:opacity-40 disabled:cursor-default cursor-pointer transition-colors';
+    todayBtn.textContent = 'Today';
+    todayBtn.addEventListener('click', () => selectDay(maxDay));
+
+    footer.appendChild(windowHint);
+    footer.appendChild(todayBtn);
+    popoverEl.appendChild(footer);
+  }
+
+  function openPopover() {
+    ({ year: viewYear, month: viewMonth } = parseYearMonth(targetDay || maxDay));
+    popoverEl = document.createElement('div');
+    popoverEl.id = 'journal-day-calendar-popover';
+    popoverEl.setAttribute('role', 'dialog');
+    popoverEl.setAttribute('aria-modal', 'false');
+    popoverEl.setAttribute('aria-label', 'Choose Journal Day');
+    popoverEl.className =
+      'absolute right-0 top-full mt-1.5 z-40 w-full sm:w-[344px] max-w-full rounded-xl bg-[#FFFFFF] dark:bg-[#22201E] border border-[#E6E4DF] dark:border-[#33302C] p-2.5 shadow-lg';
+    popoverEl.addEventListener('click', (e) => e?.stopPropagation?.());
+
+    renderPopoverContent();
+    bar.appendChild(popoverEl);
+    triggerBtn.setAttribute('aria-expanded', 'true');
+
+    if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+      document.addEventListener('click', handleOutsideClick);
+      document.addEventListener('keydown', handleDocKeydown);
+    }
+  }
+
+  triggerBtn.addEventListener('click', (e) => {
+    e?.stopPropagation?.();
+    if (popoverEl) {
+      closePopover();
+    } else {
+      openPopover();
+    }
+  });
+
+  return triggerBtn;
+}
+
+/**
+ * Builds the compact secondary Day metadata strip for Write a Journal and Edit Journal.
+ */
+function createJournalDayMetaBar({
+  showDatePicker = false,
+  targetDay = '',
+  minDay = '',
+  maxDay = '',
+  formattedDay = '',
+  onChangeDay,
+}) {
+  const bar = document.createElement('div');
+  bar.id = 'journal-day-meta';
+  bar.className =
+    'journal-day-meta relative flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-1 py-1 text-xs text-[#68655F] dark:text-[#A39E93]';
+
+  const labelGroup = document.createElement('div');
+  labelGroup.className = 'inline-flex items-center gap-1.5 shrink-0';
+
+  const iconWrap = document.createElement('span');
+  iconWrap.className = 'inline-flex items-center text-[#9E4B4B] dark:text-[#D99191]';
+  iconWrap.innerHTML = CALENDAR_SVG;
+  labelGroup.appendChild(iconWrap);
+
+  const dayLabel = document.createElement(showDatePicker ? 'label' : 'span');
+  dayLabel.className = 'text-xs font-mono font-medium text-[#68655F] dark:text-[#A39E93]';
+  dayLabel.textContent = 'Journal Day';
+  if (showDatePicker) {
+    dayLabel.setAttribute('for', 'btn-journal-day-picker');
+  }
+  labelGroup.appendChild(dayLabel);
+
+  let rightEl;
+  if (showDatePicker) {
+    rightEl = buildJournalDayTrigger({ bar, targetDay, minDay, maxDay, onChangeDay });
+  } else {
+    rightEl = document.createElement('time');
+    rightEl.id = 'journal-edit-day-value';
+    if (targetDay) rightEl.setAttribute('datetime', targetDay);
+    rightEl.className = 'text-xs font-mono font-medium text-[#1C1B18] dark:text-[#F4F1EA]';
+    rightEl.textContent = formattedDay;
+  }
+
+  bar.appendChild(labelGroup);
+  bar.appendChild(rightEl);
+  return bar;
 }
 
 /**
@@ -162,66 +479,18 @@ export function renderPromptCardsJournal({
   topBar.appendChild(rightActions);
   container.appendChild(topBar);
 
-  // 1b. Date Picker (Write a Journal) or Entry Date Banner (Edit Journal)
-  if (showDatePicker) {
-    const dateCard = document.createElement('div');
-    dateCard.className =
-      'editorial-card flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C] shadow-none';
-
-    const dateLabelWrap = document.createElement('div');
-    dateLabelWrap.className = 'flex flex-col';
-
-    const dateLabel = document.createElement('label');
-    dateLabel.setAttribute('for', 'input-journal-date');
-    dateLabel.className = 'text-xs font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]';
-    dateLabel.textContent = 'Journal Day';
-
-    const dateHint = document.createElement('span');
-    dateHint.className = 'text-[11px] font-mono text-[#68655F] dark:text-[#A39E93]';
-    dateHint.textContent = 'Today or up to 7 days back';
-
-    dateLabelWrap.appendChild(dateLabel);
-    dateLabelWrap.appendChild(dateHint);
-
-    const dateInput = document.createElement('input');
-    dateInput.type = 'date';
-    dateInput.id = 'input-journal-date';
-    dateInput.setAttribute('aria-label', 'Journal Day');
-    if (minDay) dateInput.setAttribute('min', minDay);
-    if (maxDay) dateInput.setAttribute('max', maxDay);
-    dateInput.value = targetDay;
-    dateInput.style.fontSize = '16px';
-    dateInput.className =
-      'min-h-[44px] px-3 py-2 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] font-mono focus:outline-none focus:ring-2 focus:ring-[#B56565]';
-
-    dateInput.addEventListener('change', () => {
-      const nextDay = dateInput.value;
-      if (!nextDay || (minDay && nextDay < minDay) || (maxDay && nextDay > maxDay)) {
-        dateInput.value = targetDay;
-        return;
-      }
-      if (nextDay !== targetDay && typeof onChangeDay === 'function') {
-        onChangeDay(nextDay);
-      }
-    });
-
-    dateCard.appendChild(dateLabelWrap);
-    dateCard.appendChild(dateInput);
-    container.appendChild(dateCard);
-  } else if (dateSubtitle) {
-    const dateBanner = document.createElement('div');
-    dateBanner.id = 'journal-edit-date-banner';
-    dateBanner.className =
-      'editorial-card flex items-center justify-between px-4 py-3 bg-[#FBF2F2] dark:bg-[rgba(181,101,101,0.16)] border-[#E6E4DF] dark:border-[#33302C] shadow-none';
-    const bannerLabel = document.createElement('span');
-    bannerLabel.className = 'text-xs font-mono font-semibold uppercase tracking-wide text-[#9E4B4B] dark:text-[#D99191]';
-    bannerLabel.textContent = 'Editing Journal Entry';
-    const bannerDate = document.createElement('span');
-    bannerDate.className = 'text-sm font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]';
-    bannerDate.textContent = dateSubtitle;
-    dateBanner.appendChild(bannerLabel);
-    dateBanner.appendChild(bannerDate);
-    container.appendChild(dateBanner);
+  // 1b. Compact Day Metadata Bar (Write a Journal & Edit Journal)
+  if (showDatePicker || dateSubtitle) {
+    container.appendChild(
+      createJournalDayMetaBar({
+        showDatePicker,
+        targetDay,
+        minDay,
+        maxDay,
+        formattedDay: dateSubtitle,
+        onChangeDay,
+      })
+    );
   }
 
   // 2. Question Prompt Cards (active prompts + any archived prompts that already have saved answers)

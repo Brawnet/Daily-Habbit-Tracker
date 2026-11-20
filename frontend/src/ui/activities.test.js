@@ -589,21 +589,27 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
       }
     }
 
+    const assertReaderHeader = (readerCard, dayStr, expectTodayBadge) => {
+      expect(readerCard).not.toBeNull();
+      const readerHeader = readerCard.querySelector('#journal-reader-header');
+      expect(readerHeader).not.toBeNull();
+      const readerTitle = readerHeader.querySelector('#journal-reader-title');
+      expect(readerTitle).not.toBeNull();
+      expect(readerTitle.tagName).toBe('H1');
+      expect(readerTitle.textContent).toBe(formatLong(dayStr));
+      expect(readerHeader.querySelectorAll('p').length).toBe(0);
+      expect(readerHeader.textContent).not.toContain(formatShort(dayStr));
+      if (expectTodayBadge) {
+        expect(readerHeader.textContent).toContain('Today');
+      } else {
+        expect(readerHeader.textContent).not.toContain('Today');
+      }
+    };
+
     // Open today's Entry Reader first to verify Today badge and clean single header
     items[0].click();
     await new Promise((r) => setTimeout(r, 15));
-
-    const todayReaderCard = root.querySelector('#journal-reader-card');
-    expect(todayReaderCard).not.toBeNull();
-    const todayReaderHeader = todayReaderCard.querySelector('#journal-reader-header');
-    expect(todayReaderHeader).not.toBeNull();
-    const todayReaderTitle = todayReaderHeader.querySelector('#journal-reader-title');
-    expect(todayReaderTitle).not.toBeNull();
-    expect(todayReaderTitle.tagName).toBe('H1');
-    expect(todayReaderTitle.textContent).toBe(formatLong(todayDay));
-    expect(todayReaderHeader.querySelectorAll('p').length).toBe(0);
-    expect(todayReaderHeader.textContent).not.toContain(formatShort(todayDay));
-    expect(todayReaderHeader.textContent).toContain('Today');
+    assertReaderHeader(root.querySelector('#journal-reader-card'), todayDay, true);
 
     root.querySelector('#btn-back-from-journal-read').click();
     await new Promise((r) => setTimeout(r, 15));
@@ -631,15 +637,7 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     expect(readerView).not.toBeNull();
     expect(root.querySelector('#journal-history-view')).toBeNull();
     const readerCard = root.querySelector('#journal-reader-card');
-    const readerHeader = readerCard.querySelector('#journal-reader-header');
-    expect(readerHeader).not.toBeNull();
-    const readerTitle = readerHeader.querySelector('#journal-reader-title');
-    expect(readerTitle).not.toBeNull();
-    expect(readerTitle.tagName).toBe('H1');
-    expect(readerTitle.textContent).toBe(formatLong(olderDay));
-    expect(readerHeader.querySelectorAll('p').length).toBe(0);
-    expect(readerHeader.textContent).not.toContain(formatShort(olderDay));
-    expect(readerHeader.textContent).not.toContain('Today');
+    assertReaderHeader(readerCard, olderDay, false);
     expect(readerCard.textContent).toContain('Read stoic philosophy');
     expect(root.querySelector('#btn-back-from-journal-read')).not.toBeNull();
     expect(root.querySelector('#btn-edit-journal-entry')).not.toBeNull();

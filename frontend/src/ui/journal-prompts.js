@@ -102,7 +102,7 @@ function createJournalDayMetaBar({
   targetDay = '',
   minDay = '',
   maxDay = '',
-  dateSubtitle = '',
+  formattedDay = '',
   onChangeDay,
 }) {
   const bar = document.createElement('div');
@@ -118,53 +118,47 @@ function createJournalDayMetaBar({
   iconWrap.innerHTML = CALENDAR_SVG;
   labelGroup.appendChild(iconWrap);
 
+  const dayLabel = document.createElement(showDatePicker ? 'label' : 'span');
+  dayLabel.className = 'text-xs font-mono font-medium text-[#68655F] dark:text-[#A39E93]';
+  dayLabel.textContent = 'Journal Day';
   if (showDatePicker) {
-    const dateLabel = document.createElement('label');
-    dateLabel.setAttribute('for', 'input-journal-date');
-    dateLabel.className = 'text-xs font-mono font-medium text-[#68655F] dark:text-[#A39E93]';
-    dateLabel.textContent = 'Journal Day';
-    labelGroup.appendChild(dateLabel);
+    dayLabel.setAttribute('for', 'input-journal-date');
+  }
+  labelGroup.appendChild(dayLabel);
 
-    const dateInput = document.createElement('input');
-    dateInput.type = 'date';
-    dateInput.id = 'input-journal-date';
-    dateInput.setAttribute('aria-label', 'Journal Day');
-    if (minDay) dateInput.setAttribute('min', minDay);
-    if (maxDay) dateInput.setAttribute('max', maxDay);
-    dateInput.value = targetDay;
-    dateInput.style.fontSize = '16px';
-    dateInput.className =
+  let rightEl;
+  if (showDatePicker) {
+    rightEl = document.createElement('input');
+    rightEl.type = 'date';
+    rightEl.id = 'input-journal-date';
+    rightEl.setAttribute('aria-label', 'Journal Day');
+    if (minDay) rightEl.setAttribute('min', minDay);
+    if (maxDay) rightEl.setAttribute('max', maxDay);
+    rightEl.value = targetDay;
+    rightEl.style.fontSize = '16px';
+    rightEl.className =
       'min-h-[44px] min-w-[44px] px-2.5 py-1.5 text-base font-mono rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-transparent hover:bg-[#EFECE6]/60 dark:hover:bg-[#2C2926]/60 text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#B56565] transition-colors cursor-pointer';
 
-    dateInput.addEventListener('change', () => {
-      const nextDay = dateInput.value;
+    rightEl.addEventListener('change', () => {
+      const nextDay = rightEl.value;
       if (!nextDay || (minDay && nextDay < minDay) || (maxDay && nextDay > maxDay)) {
-        dateInput.value = targetDay;
+        rightEl.value = targetDay;
         return;
       }
       if (nextDay !== targetDay && typeof onChangeDay === 'function') {
         onChangeDay(nextDay);
       }
     });
-
-    bar.appendChild(labelGroup);
-    bar.appendChild(dateInput);
-    return bar;
+  } else {
+    rightEl = document.createElement('time');
+    rightEl.id = 'journal-edit-day-value';
+    if (targetDay) rightEl.setAttribute('datetime', targetDay);
+    rightEl.className = 'text-xs font-mono font-medium text-[#1C1B18] dark:text-[#F4F1EA]';
+    rightEl.textContent = formattedDay;
   }
 
-  const labelText = document.createElement('span');
-  labelText.className = 'text-xs font-mono font-medium text-[#68655F] dark:text-[#A39E93]';
-  labelText.textContent = 'Journal Day';
-  labelGroup.appendChild(labelText);
-
-  const dayValue = document.createElement('time');
-  dayValue.id = 'journal-edit-day-value';
-  if (targetDay) dayValue.setAttribute('datetime', targetDay);
-  dayValue.className = 'text-xs font-mono font-medium text-[#1C1B18] dark:text-[#F4F1EA]';
-  dayValue.textContent = dateSubtitle;
-
   bar.appendChild(labelGroup);
-  bar.appendChild(dayValue);
+  bar.appendChild(rightEl);
   return bar;
 }
 
@@ -253,7 +247,7 @@ export function renderPromptCardsJournal({
         targetDay,
         minDay,
         maxDay,
-        dateSubtitle,
+        formattedDay: dateSubtitle,
         onChangeDay,
       })
     );

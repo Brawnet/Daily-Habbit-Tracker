@@ -5,7 +5,7 @@ Aplikasi PWA pribadi Habit Tracker & Daily Journal untuk satu pengguna di banyak
 Sumber kebenaran lain (baca dulu, jangan diduplikasi di sini):
 
 - `GLOSSARY.md` — istilah domain. Pakai istilah ini **persis** di kode, UI, nama sheet, dan komentar (Habit, Archived Habit, Check-in, Streak, Day, Journal Entry, Diary, Device, Reminder).
-- `docs/adr/0001` offline-first · `0002` Sheets sumber kebenaran, Diary satu arah · `0003` arsitektur Reminder.
+- `docs/adr/0001` offline-first · `0002` Sheets sumber kebenaran, Diary satu arah · `0003` arsitektur Reminder · `0004` layout `--app-height` & floating bottom nav · `0005` Journal History & pengeditan entry lampau.
 
 Nama aplikasi: **Habbit** (dengan dua "b", disengaja). UI berbahasa **Inggris**. Pengaturan tema per Device tersedia dalam 3 pilihan: `Light`, `Dark`, dan `System` (default mengikuti tema Device).
 
@@ -20,7 +20,7 @@ Nama aplikasi: **Habbit** (dengan dua "b", disengaja). UI berbahasa **Inggris**.
 | Jendela Check-in | Hanya **hari ini dan kemarin** yang bisa ditambah/dibatalkan. Masa depan & lebih lama dari kemarin: read-only. |
 | Habit | Hanya harian. Bisa tambah, ganti nama, urut naik/turun, arsip/aktifkan lagi. **Tidak ada hapus.** Ganti nama tidak mengubah riwayat. |
 | Streak | Lihat GLOSSARY. Hari ini belum Check-in → hitung dari kemarin. Contoh: Check-in 17,18,19; tanggal 20 pagi = 3; tanggal 21 tanpa Check-in 20 = 0. |
-| Journal Entry | Maks satu per Day, key = `day`. Tanpa judul, tanpa Mood. Bisa diedit **hanya pada Day-nya**; setelah lewat → read-only. Entry dianggap "ada" bila `content.trim() !== ''`. |
+| Journal Entry | Maks satu per Day, key = `day`. Tanpa judul, tanpa Mood. Entry yang sudah ada dapat diedit kembali untuk semua Day hingga hari ini (`day <= today`), sedangkan pembuatan entry baru dibatasi di Device maksimal 7 hari ke belakang (`[today - 7, today]`). Masa depan dilarang. Entry dianggap "ada" bila `content.trim() !== ''`. |
 | Diary | Google Docs, satu file per tahun, urut kronologis. Ditulis Apps Script, tidak pernah dibaca aplikasi. Lihat §6.3. |
 | Reminder | Satu jam global untuk semua Device (default `20:00`, diatur di Settings, tersinkron). Dikirim maks sekali per hari, hanya bila ada Habit aktif tanpa Check-in hari ini **atau** belum ada Journal Entry hari ini. Ke semua Device yang mengaktifkan notifikasi. Tap → buka tab Today. Zona waktu server: `Asia/Jakarta`. |
 | Search | Di Device (offline). Case- & diacritic-insensitive. Query dipecah per spasi, semua token harus cocok (AND) terhadap `content` + representasi tanggal (`2026-10-20`, `20 oct 2026`, `20 october 2026`, `tuesday`, `oct 2026`). Token yang cocok di `content` di-highlight. |
@@ -117,7 +117,7 @@ Aturan `sync` di server (di dalam `LockService.getScriptLock().waitLock(20000)`)
 1. `now` = waktu server, dipaksa monoton (> nilai terakhir di Script Properties).
 2. Per record masuk: cari by key. Tulis bila belum ada **atau** `incoming.updatedAt > existing.updatedAt` (dengan `incoming.updatedAt` dibatasi atas / clamped ke waktu server `now` untuk mencegah pemalsuan timestamp masa depan); set `serverUpdatedAt = now`. `printedToDiaryAt` dari klien diabaikan. Aturan lock sinkronisasi:
    - Check-in: hanya hari ini dan kemarin (`day === todayJakarta || day === yesterdayJakarta`) yang dapat diubah; tanggal di luar jendela ini ditolak dengan reason `LOCKED`.
-   - Journal Entry: hanya hari ini yang bebas diedit; catatan masa lalu (`day < todayJakarta`) yang `printedToDiaryAt` sudah terisi ditolak server dengan reason `LOCKED`. Entri masa depan (`day > todayJakarta`) atau dengan format tanggal tidak valid ditolak.
+   - Journal Entry: semua catatan hingga hari ini (`day <= todayJakarta`) disinkronkan via LWW dan dapat diperbarui tanpa lock `printedToDiaryAt` agar edit masa lalu dan sinkronisasi offline tetap diterima (ADR-0005). Hanya entri masa depan (`day > todayJakarta`) atau format tanggal tidak valid yang ditolak dengan `LOCKED`.
 3. Balas semua record dengan `serverUpdatedAt > since` (`since` null = semua). `cursor = now`.
 
 Auth: bandingkan `pin` dengan Script Property `PIN` menggunakan perbandingan timing-safe (`timingSafeEqualPin`). PIN minimal 4 karakter. Kegagalan >10x berturut-turut dalam 10 menit (CacheService terproteksi LockService) → `RATE_LIMITED` selama 10 menit bagi percobaan tidak terautentikasi (pemanggil dengan PIN valid tidak terpengaruh DoS lockout).
@@ -149,7 +149,7 @@ Ambil Journal Entry yang belum dicetak (`!printedToDiaryAt`) atau telah diedit s
   - satu paragraf Normal per baris `content`
   - satu paragraf kosong sebagai pemisah
 - Set `printedToDiaryAt = serverNow`. Entry yang gagal dicoba lagi di run berikutnya.
-- Aturan `LOCKED`: hanya mengunci entri hari lampau (`day < todayJakarta && printedToDiaryAt !== ''`). Entri hari ini tetap bebas diedit dan di-sync sepanjang hari.
+- Aturan `LOCKED`: hanya entri masa depan (`day > todayJakarta`) yang ditolak sinkronisasinya; seluruh `Journal Entry` dengan `day <= todayJakarta` yang baru ditulis atau diperbarui akan disisipkan secara kronologis atau diperbarui in-place di Google Docs `Diary` oleh `syncDiaryEntries()`.
 
 ### 6.4 `checkReminder()` (trigger 10 menit)
 
@@ -186,13 +186,13 @@ Keluar bila: `nowHHMM < reminderTime`, atau `LAST_REMINDER_DAY === todayJakarta`
 ## 10. UI (4 tab, floating icon-only Liquid Glass bottom nav dengan `aria-label` & `sr-only`: Today · Activities · History · Settings; route `?tab=`)
 
 - **Today**: tanggal panjang; progres `3/5 done`; daftar Habit aktif (urut `sortOrder`) dengan tombol Check-in + Streak (`🔥 5`); textarea Journal Entry autosave (debounce 800 ms) dengan status "Saved"; empty state → link ke Manage Habits.
-- **History**: kartu per Habit aktif: heatmap 12 minggu (kolom = minggu, baris Senin–Minggu), Streak saat ini, Streak terpanjang, completion 30 hari (penyebut = Day dalam 30 hari terakhir sejak `createdAt` Habit). Sel hari ini & kemarin bisa di-tap untuk toggle Check-in; lainnya read-only. Bagian "Archived" ter-collapse. Di bawah: kotak search + daftar Journal Entry terbaru dulu (tanggal pendek + cuplikan 2 baris, highlight hasil search); tap → tampilan baca penuh (read-only; bila hari ini → tombol "Edit in Today").
+- **History**: khusus riwayat Habit (kartu per Habit aktif: heatmap 12 minggu dengan kolom = minggu dan baris Senin–Minggu, Streak saat ini, Streak terpanjang, completion 30 hari dengan penyebut = Day dalam 30 hari terakhir sejak `createdAt` Habit; sel hari ini & kemarin bisa di-tap untuk toggle Check-in, lainnya read-only; bagian "Archived Habits" ter-collapse).
 - **Settings**: *Appearance* (pilihan tema per Device: `Light` | `Dark` | `System`, berlaku seketika tanpa tombol simpan) · *Sync* (URL Web App, PIN `type=password`, Test connection → `ping`, Sync now, last synced, status) · *Manage Habits* (tambah, rename inline, ▲▼, archive/unarchive) · *Reminder* (input jam, Enable notifications, Send test notification, status) · *Install App* (§8) · versi aplikasi.
-- **Activities**: empty state dengan tombol buat baru; daftar Activity dengan filter status (*All*, *Backlog*, *In Progress*, *Completed*, *Archived*); kartu Activity menampilkan judul, author, badge tipe & status, jumlah halaman, dan ringkasan eksekutif; aksi Edit dan Archive; modal form dengan input terstandar (16px, target sentuh ≥44px).
+- **Activities**: Choice Hub untuk **Books Summary** (pustaka buku, tambah buku, *Continue Summary* per Book Chapter, dan *Read the Summary* terkompilasi) serta **Journals** (menu 2 pilihan *Write a Journal* dan *Journal History*, sementara deep link `?tab=activities&subview=journal` langsung ke *Write a Journal*). *Write a Journal* menyediakan pemilih tanggal `[today - 7, today]` dan Prompt Cards Stack autosave (tombol *Customize Prompts* hanya pada hari ini). *Journal History* menyediakan search offline (highlight hasil), empty state dengan CTA *Write Today's Journal*, tampilan baca penuh terpisah in-page (*Entry Reader* read-only), serta tombol *Edit Journal* untuk mengedit entry `day <= today` (termasuk prompt arsip yang sudah berjawaban).
 
 ## 11. Tes (Vitest) — wajib hijau
 
-- `domain/day`: toDay lokal (bukan UTC) dekat tengah malam, addDays lintas bulan/tahun, jendela Check-in, journal editable.
+- `domain/day`: toDay lokal (bukan UTC) dekat tengah malam, addDays lintas bulan/tahun, jendela Check-in, `isJournalEditable` (`day <= today`), `isJournalCreatable` (batas 7 hari inklusif).
 - `domain/streak`: contoh §1, hari ini sudah/belum Check-in, gap, Check-in `deleted` diabaikan, longest streak.
 - `domain/stats`: completion rate dengan Habit baru < 30 hari; bentuk heatmap & awal minggu Senin.
 - `domain/search`: AND token, diakritik, cocok tanggal, rentang highlight.

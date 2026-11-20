@@ -55,13 +55,45 @@ export function isCheckInEditable(day, todayDay) {
 }
 
 /**
- * Journal is only editable on today (SPEC §1)
+ * Validates strict YYYY-MM-DD local calendar string bounds.
+ * @param {string} day
+ * @returns {boolean}
+ */
+export function isValidDayString(day) {
+  if (typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    return false;
+  }
+  const [y, m, d] = day.split('-').map(Number);
+  const date = new Date(y, m - 1, d, 12, 0, 0);
+  return (
+    date.getFullYear() === y &&
+    date.getMonth() === m - 1 &&
+    date.getDate() === d
+  );
+}
+
+/**
+ * Existing journal entries are editable on any Day up to today (day <= today).
  * @param {string} day - 'YYYY-MM-DD'
  * @param {string} todayDay - 'YYYY-MM-DD'
  * @returns {boolean}
  */
 export function isJournalEditable(day, todayDay) {
-  return day === todayDay;
+  return isValidDayString(day) && isValidDayString(todayDay) && day <= todayDay;
+}
+
+/**
+ * Brand-new journal entry creation is allowed within [today - maxBackfillDays, today] inclusive.
+ * @param {string} day - 'YYYY-MM-DD'
+ * @param {string} todayDay - 'YYYY-MM-DD'
+ * @param {number} [maxBackfillDays=7]
+ * @returns {boolean}
+ */
+export function isJournalCreatable(day, todayDay, maxBackfillDays = 7) {
+  if (!isValidDayString(day) || !isValidDayString(todayDay)) {
+    return false;
+  }
+  return day <= todayDay && day >= addDays(todayDay, -maxBackfillDays);
 }
 
 /**

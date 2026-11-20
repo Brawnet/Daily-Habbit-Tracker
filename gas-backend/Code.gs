@@ -200,7 +200,7 @@ function isJournalRecord(rec) {
 
 /**
  * Compares records by key. If incoming.updatedAt > existing.updatedAt (or new), write with serverUpdatedAt = nowMonotonic.
- * If existing JournalEntry has printedToDiaryAt !== '', reject with reason: 'LOCKED'.
+ * Rejects future-dated JournalEntry records (day > todayJakarta) with reason: 'LOCKED'; past and today entries sync via LWW.
  * @param {Array|object} existingRecords
  * @param {Array|object} incomingRecords
  * @param {string} nowMonotonic
@@ -262,15 +262,13 @@ function mergeRecordsLWW(existingRecords, incomingRecords, nowMonotonic, todayJa
       }
     }
 
-    if (isJournal && existing && existing.printedToDiaryAt && String(existing.printedToDiaryAt).trim() !== '') {
-      if (!today || key < today) {
-        rejected.push({
-          type: 'journalEntries',
-          key: key,
-          reason: 'LOCKED'
-        });
-        continue;
-      }
+    if (isJournal && today && key > today) {
+      rejected.push({
+        type: 'journalEntries',
+        key: key,
+        reason: 'LOCKED'
+      });
+      continue;
     }
 
     if (!existing || !existing.updatedAt || (incoming.updatedAt && incoming.updatedAt > existing.updatedAt)) {
@@ -665,15 +663,6 @@ function syncJournalEntries(sheet, incomingJournalEntries, nowMonotonic) {
     const clientUpdatedAt = clampClientTimestamp(entry.updatedAt, nowMonotonic);
     const rowIndex = rowMap.get(day);
     if (rowIndex !== undefined) {
-      const printedToDiaryAt = String(data[rowIndex][3] || '');
-      if (day < todayJakarta && printedToDiaryAt.trim() !== '') {
-        rejected.push({
-          type: 'journalEntries',
-          key: day,
-          reason: 'LOCKED'
-        });
-        continue;
-      }
       const existingUpdatedAt = String(data[rowIndex][2] || '');
       if (!existingUpdatedAt || clientUpdatedAt > existingUpdatedAt) {
         data[rowIndex][1] = sanitizeFormulaInjection(entry.content || '');

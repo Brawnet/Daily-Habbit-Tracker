@@ -91,6 +91,14 @@ export function renderPromptCardsJournal({
   prompts,
   answers,
   status,
+  targetDay = '',
+  backLabel = 'Back to Journals',
+  showDatePicker = false,
+  minDay = '',
+  maxDay = '',
+  onChangeDay,
+  showCustomizeButton = true,
+  dateSubtitle = '',
   onUpdateAnswers,
   onOpenCustomizeModal,
   onBack,
@@ -101,14 +109,19 @@ export function renderPromptCardsJournal({
   // 1. Top Navigation & Stats Bar
   const topBar = document.createElement('div');
   topBar.className =
-    'flex items-center justify-between pb-3 border-b border-[#E6E4DF] dark:border-[#33302C] gap-2';
+    'flex flex-wrap items-center justify-between pb-3 border-b border-[#E6E4DF] dark:border-[#33302C] gap-2';
 
   const backBtn = document.createElement('button');
   backBtn.type = 'button';
   backBtn.id = 'btn-back-from-journal-to-activities';
   backBtn.className =
     'min-h-[44px] min-w-[44px] inline-flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-lg text-xs font-semibold text-[#68655F] dark:text-[#A39E93] hover:text-[#C86D51] dark:hover:text-[#D97E63] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] active:scale-95 transition-all cursor-pointer tactile-spring';
-  backBtn.innerHTML = `${CHEVRON_LEFT_SVG} <span>Back to Activities</span>`;
+  const backIconWrap = document.createElement('span');
+  backIconWrap.innerHTML = CHEVRON_LEFT_SVG;
+  const backTextSpan = document.createElement('span');
+  backTextSpan.textContent = backLabel;
+  backBtn.appendChild(backIconWrap);
+  backBtn.appendChild(backTextSpan);
   backBtn.addEventListener('click', onBack);
 
   const rightActions = document.createElement('div');
@@ -125,33 +138,101 @@ export function renderPromptCardsJournal({
     'badge-rose inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-medium';
   statusBadge.textContent = status || 'Saved';
 
-  const customizeBtn = document.createElement('button');
-  customizeBtn.type = 'button';
-  customizeBtn.id = 'btn-customize-prompts';
-  customizeBtn.className =
-    'btn-secondary-surface min-h-[44px] min-w-[44px] inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-mono font-semibold border border-[#E6E4DF] dark:border-[#33302C] text-[#68655F] dark:text-[#A39E93] hover:text-[#C86D51] hover:border-[#C86D51] active:scale-95 transition cursor-pointer tactile-spring';
-  customizeBtn.innerHTML = `
-    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-    </svg>
-    <span>Customize Prompts</span>
-  `;
-  customizeBtn.addEventListener('click', onOpenCustomizeModal);
-
   rightActions.appendChild(wordBadge);
   rightActions.appendChild(statusBadge);
-  rightActions.appendChild(customizeBtn);
+
+  if (showCustomizeButton) {
+    const customizeBtn = document.createElement('button');
+    customizeBtn.type = 'button';
+    customizeBtn.id = 'btn-customize-prompts';
+    customizeBtn.className =
+      'btn-secondary-surface min-h-[44px] min-w-[44px] inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-mono font-semibold border border-[#E6E4DF] dark:border-[#33302C] text-[#68655F] dark:text-[#A39E93] hover:text-[#C86D51] hover:border-[#C86D51] active:scale-95 transition cursor-pointer tactile-spring';
+    customizeBtn.innerHTML = `
+      <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+      </svg>
+      <span>Customize Prompts</span>
+    `;
+    customizeBtn.addEventListener('click', onOpenCustomizeModal);
+    rightActions.appendChild(customizeBtn);
+  }
 
   topBar.appendChild(backBtn);
   topBar.appendChild(rightActions);
   container.appendChild(topBar);
 
-  // 2. Question Prompt Cards
-  const activePrompts = [...prompts]
-    .filter((p) => !p.archived)
+  // 1b. Date Picker (Write a Journal) or Entry Date Banner (Edit Journal)
+  if (showDatePicker) {
+    const dateCard = document.createElement('div');
+    dateCard.className =
+      'editorial-card flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C] shadow-none';
+
+    const dateLabelWrap = document.createElement('div');
+    dateLabelWrap.className = 'flex flex-col';
+
+    const dateLabel = document.createElement('label');
+    dateLabel.setAttribute('for', 'input-journal-date');
+    dateLabel.className = 'text-xs font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]';
+    dateLabel.textContent = 'Journal Date';
+
+    const dateHint = document.createElement('span');
+    dateHint.className = 'text-[11px] font-mono text-[#68655F] dark:text-[#A39E93]';
+    dateHint.textContent = 'Today or up to 7 days back';
+
+    dateLabelWrap.appendChild(dateLabel);
+    dateLabelWrap.appendChild(dateHint);
+
+    const dateInput = document.createElement('input');
+    dateInput.type = 'date';
+    dateInput.id = 'input-journal-date';
+    dateInput.setAttribute('aria-label', 'Journal Date');
+    if (minDay) dateInput.setAttribute('min', minDay);
+    if (maxDay) dateInput.setAttribute('max', maxDay);
+    dateInput.value = targetDay;
+    dateInput.style.fontSize = '16px';
+    dateInput.className =
+      'min-h-[44px] px-3 py-2 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] font-mono focus:outline-none focus:ring-2 focus:ring-[#B56565]';
+
+    dateInput.addEventListener('change', () => {
+      const nextDay = dateInput.value;
+      if (!nextDay || (minDay && nextDay < minDay) || (maxDay && nextDay > maxDay)) {
+        dateInput.value = targetDay;
+        return;
+      }
+      if (nextDay !== targetDay && typeof onChangeDay === 'function') {
+        onChangeDay(nextDay);
+      }
+    });
+
+    dateCard.appendChild(dateLabelWrap);
+    dateCard.appendChild(dateInput);
+    container.appendChild(dateCard);
+  } else if (dateSubtitle) {
+    const dateBanner = document.createElement('div');
+    dateBanner.id = 'journal-edit-date-banner';
+    dateBanner.className =
+      'editorial-card flex items-center justify-between px-4 py-3 bg-[#FBF2F2] dark:bg-[rgba(181,101,101,0.16)] border-[#E6E4DF] dark:border-[#33302C] shadow-none';
+    const bannerLabel = document.createElement('span');
+    bannerLabel.className = 'text-xs font-mono font-semibold uppercase tracking-wide text-[#B56565] dark:text-[#C67878]';
+    bannerLabel.textContent = 'Editing Entry';
+    const bannerDate = document.createElement('span');
+    bannerDate.className = 'text-sm font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]';
+    bannerDate.textContent = dateSubtitle;
+    dateBanner.appendChild(bannerLabel);
+    dateBanner.appendChild(bannerDate);
+    container.appendChild(dateBanner);
+  }
+
+  // 2. Question Prompt Cards (active prompts + any archived prompts that already have saved answers)
+  const visiblePrompts = [...prompts]
+    .filter((p) => {
+      if (!p.archived) return true;
+      const ans = String(answers?.[p.id] || '').replace(/<[^>]*>/g, '').trim();
+      return Boolean(ans);
+    })
     .sort((a, b) => a.order - b.order);
 
-  activePrompts.forEach((p, idx) => {
+  visiblePrompts.forEach((p, idx) => {
     const card = document.createElement('div');
     card.className =
       'editorial-card flex flex-col gap-3 p-4 sm:p-5 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C] shadow-none hover:border-[#68655F] dark:hover:border-[#A39E93] transition';
@@ -161,7 +242,7 @@ export function renderPromptCardsJournal({
     cardHeader.className = 'flex items-center justify-between gap-2';
 
     const promptTitleWrap = document.createElement('div');
-    promptTitleWrap.className = 'flex items-center gap-2.5';
+    promptTitleWrap.className = 'flex items-center gap-2.5 flex-wrap';
 
     const numBadge = document.createElement('span');
     numBadge.className =
@@ -175,6 +256,14 @@ export function renderPromptCardsJournal({
 
     promptTitleWrap.appendChild(numBadge);
     promptTitleWrap.appendChild(questionTitle);
+
+    if (p.archived) {
+      const archivedBadge = document.createElement('span');
+      archivedBadge.className =
+        'px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-[#EFECE6] dark:bg-[#2C2926] text-[#68655F] dark:text-[#A39E93]';
+      archivedBadge.textContent = 'Archived prompt';
+      promptTitleWrap.appendChild(archivedBadge);
+    }
 
     // Card Toolbar (bullets / numbers) meeting touch target min-h-[44px]
     const toolbar = document.createElement('div');

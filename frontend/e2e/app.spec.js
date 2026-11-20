@@ -136,34 +136,83 @@ test.describe('Habbit App E2E', () => {
     await expect(page.locator('li', { hasText: 'Membaca Buku' })).toBeVisible();
   });
 
-  test('writes daily journal reflection in activities, autosaves, and displays in History tab', async ({ page }) => {
-    // Navigate to Activities tab
+  test('writes today and backfills past journal entries, searches Journal History, reads and edits in-page, and moves Journal History out of History tab', async ({ page }) => {
+    // Navigate to Activities tab -> Journals Choice Hub -> Write a Journal
     await page.click('button[data-tab="activities"]');
     await expect(page.locator('#activities-choice-hub')).toBeVisible();
 
-    // Open Journals choice
     await page.click('#choice-journals');
+    await expect(page.locator('#journals-menu-view')).toBeVisible();
+    await page.click('#btn-choice-write-journal');
+
     const journalEditor = page.locator('#editor-journal-content');
     await expect(journalEditor).toBeVisible();
     await expect(page.locator('#journal-notes-card')).toHaveCount(0);
     await expect(page.locator('#editor-journal-notes')).toHaveCount(0);
 
-    // Type reflection text
+    // Type today's reflection
     const testReflection = 'Refleksi hari ini: berhasil menyelesaikan target dengan fokus.';
     await journalEditor.fill(testReflection);
-
-    // Debounce save (800ms) and expect status indicator to be 'Saved'
     await expect(page.locator('#journal-status')).toHaveText('Saved', { timeout: 3000 });
 
-    // Reload page to ensure content was saved in IndexedDB
+    // Backfill yesterday via 7-day date picker
+    const yesterday = await page.evaluate(() => {
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    });
+    await page.fill('#input-journal-date', yesterday);
+    await expect(page.locator('#btn-customize-prompts')).toHaveCount(0);
+
+    const pastReflection = 'Refleksi kemarin: tetap konsisten menjaga fokus.';
+    await page.locator('#editor-journal-content').fill(pastReflection);
+    await expect(page.locator('#journal-status')).toHaveText('Saved', { timeout: 3000 });
+
+    // Return to Journals Menu and open Journal History
+    await page.click('#btn-back-from-journal-to-activities');
+    await expect(page.locator('#journals-menu-view')).toBeVisible();
+    await page.click('#btn-choice-journal-history');
+    await expect(page.locator('#journal-history-view')).toBeVisible();
+    await expect(page.locator('.journal-entry-item')).toHaveCount(2);
+
+    // Search and open Entry Reader
+    await page.fill('#journal-history-search', 'kemarin');
+    await expect(page.locator('.journal-entry-item')).toHaveCount(1);
+    await expect(page.locator('.journal-entry-item mark')).toContainText('kemarin');
+    await page.click('.journal-entry-item');
+
+    // Separate in-page Entry Reader (read-only first with Edit Journal button)
+    await expect(page.locator('#journal-read-view')).toBeVisible();
+    await expect(page.locator('#journal-reader-card')).toContainText(pastReflection);
+    await expect(page.locator('#btn-edit-journal-entry')).toBeVisible();
+
+    // Edit past entry and return to refreshed Entry Reader
+    await page.click('#btn-edit-journal-entry');
+    await expect(page.locator('#input-journal-date')).toHaveCount(0);
+    await expect(page.locator('#btn-customize-prompts')).toHaveCount(0);
+    const updatedPastReflection = 'Refleksi kemarin (revisi): selesai lebih cepat.';
+    await page.locator('#editor-journal-content').fill(updatedPastReflection);
+    await expect(page.locator('#journal-status')).toHaveText('Saved', { timeout: 3000 });
+    await page.click('#btn-back-from-journal-to-activities');
+
+    await expect(page.locator('#journal-read-view')).toBeVisible();
+    await expect(page.locator('#journal-reader-card')).toContainText('selesai lebih cepat.');
+
+    // Reload page and confirm persistence inside Journal History
     await page.reload();
     await page.click('button[data-tab="activities"]');
     await page.click('#choice-journals');
-    await expect(page.locator('#editor-journal-content')).toContainText(testReflection);
-
-    // Switch to History tab and verify journal entry is listed
-    await page.click('button[data-tab="history"]');
+    await page.click('#btn-choice-journal-history');
     await expect(page.locator('text=Refleksi hari ini')).toBeVisible({ timeout: 3000 });
+    await expect(page.locator('text=selesai lebih cepat.')).toBeVisible({ timeout: 3000 });
+
+    // Switch to History tab and verify Journal History has moved out
+    await page.click('button[data-tab="history"]');
+    await expect(page.locator('.journal-history-section')).toHaveCount(0);
+    await expect(page.locator('.journal-search-input')).toHaveCount(0);
   });
 
   test('saves sync credentials in Settings tab and shows confirmation toast', async ({ page }) => {
@@ -341,6 +390,7 @@ test.describe('Habbit App E2E', () => {
     // Full-screen modal stacking above floating pill
     await page.click('button[data-tab="activities"]');
     await page.click('#choice-journals');
+    await page.click('#btn-choice-write-journal');
     await page.click('#btn-customize-prompts');
 
     const modal = page.locator('#modal-customize-prompts');

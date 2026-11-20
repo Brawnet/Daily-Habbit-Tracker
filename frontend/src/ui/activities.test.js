@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MockElement, MockDocument } from './test-helpers.js';
 import { today, addDays, formatLong, formatShort } from '../domain/day.js';
+import { normalizeJournalTitle } from '../domain/journal.js';
 
 describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
   let mockDoc;
@@ -76,9 +77,14 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
       listJournalEntries: vi.fn(async () =>
         Object.values(journalEntries).sort((a, b) => b.day.localeCompare(a.day))
       ),
-      saveJournalEntry: vi.fn(async (day, content) => {
+      saveJournalEntry: vi.fn(async (day, content, options = {}) => {
+        const resolvedTitle =
+          options && options.title !== undefined
+            ? normalizeJournalTitle(options.title)
+            : normalizeJournalTitle(journalEntries[day]?.title);
         const entry = {
           day,
+          title: resolvedTitle,
           content: String(content ?? ''),
           updatedAt: new Date().toISOString(),
           printedToDiaryAt: journalEntries[day]?.printedToDiaryAt || '',
@@ -526,7 +532,8 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
 
     expect(repoModule.saveJournalEntry).toHaveBeenCalledWith(
       todayDay,
-      expect.stringContaining('Draft before switching day')
+      expect.stringContaining('Draft before switching day'),
+      { title: '' }
     );
     expect(root.querySelector('#btn-journal-day-picker').textContent).toContain(formatShort(pastDay));
     expect(root.querySelector('#btn-customize-prompts')).toBeNull();
@@ -760,7 +767,8 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
 
     expect(repoModule.saveJournalEntry).toHaveBeenCalledWith(
       oldDay,
-      expect.stringContaining('Revised archived reflection')
+      expect.stringContaining('Revised archived reflection'),
+      { title: '' }
     );
 
     const refreshedReader = root.querySelector('#journal-read-view');
@@ -934,6 +942,209 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     expect(readerCard.textContent).toContain('Deep Work');
     expect(readerCard.textContent).toContain('Chapter 1: Deep Work is Valuable');
     expect(readerCard.textContent).toContain('Focus without distraction is a superpower.');
+
+    cleanup();
+  });
+
+  it('renders optional title input above compact Day metadata in Write and Edit modes, autosaves/flushes with dynamic Day placeholder, and leaves word count prompt-only', async () => {
+    const todayDay = today();
+    const pastDay = addDays(todayDay, -2);
+    repoModule._seedJournalEntry({
+      day: pastDay,
+      title: 'Existing Past Headline',
+      content: '<div class="journal-prompt-block" data-prompt-id="jp_day"><h3>How was your day?</h3><div class="journal-prompt-answer">Steady climb</div></div>',
+    });
+
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 15));
+
+    root.querySelector('#choice-journals').click();
+    await new Promise((r) => setTimeout(r, 15));
+    root.querySelector('#btn-choice-write-journal').click();
+    await new Promise((r) => setTimeout(r, 15));
+
+    const titleInput = root.querySelector('#input-journal-title');
+    const dayMeta = root.querySelector('#journal-day-meta');
+    expect(titleInput).not.toBeNull();
+    expect(titleInput.tagName).toBe('INPUT');
+    expect(titleInput.type).toBe('text');
+    expect(titleInput.style.fontSize).toBe('16px');
+    expect(titleInput.classList.contains('min-h-[44px]')).toBe(true);
+    expect(titleInput.classList.contains('min-w-[44px]')).toBe(true);
+    expect(titleInput.getAttribute('maxlength')).toBe('120');
+    expect(titleInput.getAttribute('placeholder')).toBe(`Title (defaults to ${formatLong(todayDay)})`);
+
+    const titleLabel = root.querySelector('label');
+    expect(titleLabel).not.toBeNull();
+
+    // Title input sits above #journal-day-meta inside the workspace children
+    const workspace = dayMeta.parentElement;
+    const titleWrapIndex = workspace.children.indexOf(titleInput.parentElement);
+    const dayMetaIndex = workspace.children.indexOf(dayMeta);
+    expect(titleWrapIndex).toBeGreaterThan(-1);
+    expect(dayMetaIndex).toBeGreaterThan(titleWrapIndex);
+
+    // Typing title schedules autosave WITHOUT changing prompt word count
+    titleInput.value = '  Breakthrough Focus  ';
+    titleInput.dispatchEvent({ type: 'input' });
+    expect(root.querySelector('#journal-total-words').textContent).toBe('0 words');
+
+    // Switch Day immediately before 800ms debounce -> flushes title to todayDay and updates placeholder & value
+    root.querySelector('#btn-journal-day-picker').click();
+    const pastBtn = root
+      .querySelector('#journal-day-calendar-popover')
+      .querySelectorAll('.journal-calendar-day-btn')
+      .find((b) => b.dataset.day === pastDay);
+    pastBtn.click();
+    await new Promise((r) => setTimeout(r, 15));
+
+    expect(repoModule.saveJournalEntry).toHaveBeenCalledWith(todayDay, '', {
+      title: 'Breakthrough Focus',
+    });
+
+    const pastTitleInput = root.querySelector('#input-journal-title');
+    expect(pastTitleInput.value).toBe('Existing Past Headline');
+    expect(pastTitleInput.getAttribute('placeholder')).toBe(`Title (defaults to ${formatLong(pastDay)})`);
+
+    // Clear title on pastDay -> debounced autosave persists title: ''
+    pastTitleInput.value = '   ';
+    pastTitleInput.dispatchEvent({ type: 'input' });
+    await new Promise((r) => setTimeout(r, 850));
+
+    expect(repoModule.saveJournalEntry.mock.calls.at(-1)).toEqual([
+      pastDay,
+      expect.stringContaining('Steady climb'),
+      { title: '' },
+    ]);
+
+    // Back to Journals Menu -> Journal History -> Entry Reader -> Edit Journal
+    root.querySelector('#btn-back-from-journal-to-activities').click();
+    await new Promise((r) => setTimeout(r, 15));
+    root.querySelector('#btn-choice-journal-history').click();
+    await new Promise((r) => setTimeout(r, 15));
+
+    const pastCard = root.querySelectorAll('.journal-entry-item').find((c) => c.dataset.day === pastDay);
+    expect(pastCard).not.toBeNull();
+    // Cleared title falls back dynamically to formatShort(pastDay) without duplicate subtitle
+    expect(pastCard.querySelector('.journal-entry-title').textContent).toBe(formatShort(pastDay));
+    expect(pastCard.querySelector('.journal-entry-day')).toBeNull();
+
+    pastCard.click();
+    await new Promise((r) => setTimeout(r, 15));
+    expect(root.querySelector('#journal-reader-title').textContent).toBe(formatLong(pastDay));
+    expect(root.querySelector('#journal-reader-day-subtitle')).toBeNull();
+
+    // Edit Journal also places #input-journal-title above #journal-day-meta with dynamic Day placeholder
+    root.querySelector('#btn-edit-journal-entry').click();
+    await new Promise((r) => setTimeout(r, 15));
+    const editTitleInput = root.querySelector('#input-journal-title');
+    const editDayMeta = root.querySelector('#journal-day-meta');
+    expect(editTitleInput).not.toBeNull();
+    expect(editTitleInput.getAttribute('placeholder')).toBe(`Title (defaults to ${formatLong(pastDay)})`);
+    expect(editDayMeta.parentElement.children.indexOf(editTitleInput.parentElement)).toBeLessThan(
+      editDayMeta.parentElement.children.indexOf(editDayMeta)
+    );
+
+    // Add title back in Edit Journal and tap Done/Back immediately -> flushes and updates Entry Reader
+    editTitleInput.value = 'Restored Reflection Title';
+    editTitleInput.dispatchEvent({ type: 'input' });
+    root.querySelector('#btn-back-from-journal-to-activities').click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(root.querySelector('#journal-reader-title').textContent).toBe('Restored Reflection Title');
+    const subtitleEl = root.querySelector('#journal-reader-day-subtitle');
+    expect(subtitleEl).not.toBeNull();
+    expect(subtitleEl.tagName).toBe('TIME');
+    expect(subtitleEl.textContent).toBe(formatLong(pastDay));
+
+    cleanup();
+  });
+
+  it('treats title-only today Journal Entry as written across Choice Hub, Journals Menu, History, and Entry Reader', async () => {
+    const todayDay = today();
+    repoModule._seedJournalEntry({
+      day: todayDay,
+      title: 'Title Only Today',
+      content: '',
+    });
+
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 15));
+
+    // Choice Hub Done ✓ badge
+    expect(root.querySelector('#choice-journals').textContent).toContain('Done ✓');
+
+    // Journals Menu status & count
+    root.querySelector('#choice-journals').click();
+    await new Promise((r) => setTimeout(r, 15));
+    const menu = root.querySelector('#journals-menu-view');
+    expect(menu.textContent).toContain('Today: Written ✓');
+    expect(menu.textContent).toContain('1 Journal Entry documented');
+
+    // Journal History card
+    root.querySelector('#btn-choice-journal-history').click();
+    await new Promise((r) => setTimeout(r, 15));
+    const items = root.querySelectorAll('.journal-entry-item');
+    expect(items).toHaveLength(1);
+    expect(items[0].querySelector('.journal-entry-title').textContent).toBe('Title Only Today');
+    expect(items[0].querySelector('.journal-entry-day').textContent).toBe(formatShort(todayDay));
+
+    // Entry Reader shows custom H1, long Day subtitle, and No reflection text.
+    items[0].click();
+    await new Promise((r) => setTimeout(r, 15));
+    expect(root.querySelector('#journal-reader-title').textContent).toBe('Title Only Today');
+    expect(root.querySelector('#journal-reader-day-subtitle').textContent).toBe(formatLong(todayDay));
+    expect(root.querySelector('#journal-reader-card').textContent).toContain('No reflection text.');
+
+    cleanup();
+  });
+
+  it('highlights search matches with <mark> in both Journal History card title and preview snippet', async () => {
+    const todayDay = today();
+    const olderDay = addDays(todayDay, -10);
+
+    repoModule._seedJournalEntry({
+      day: todayDay,
+      title: 'Café Morning Strategy',
+      content: '<div class="journal-prompt-block" data-prompt-id="jp_day"><h3>How was your day?</h3><div class="journal-prompt-answer">Planned next milestone clearly.</div></div>',
+    });
+    repoModule._seedJournalEntry({
+      day: olderDay,
+      title: '',
+      content: '<div class="journal-prompt-block" data-prompt-id="jp_day"><h3>How was your day?</h3><div class="journal-prompt-answer">Routine Tuesday notes.</div></div>',
+    });
+
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 15));
+
+    root.querySelector('#choice-journals').click();
+    await new Promise((r) => setTimeout(r, 15));
+    root.querySelector('#btn-choice-journal-history').click();
+    await new Promise((r) => setTimeout(r, 15));
+
+    // Untouched initial list checks titled vs untitled card structures
+    let cards = root.querySelectorAll('.journal-entry-item');
+    expect(cards).toHaveLength(2);
+    expect(cards[0].querySelector('.journal-entry-title').textContent).toBe('Café Morning Strategy');
+    expect(cards[0].querySelector('.journal-entry-day').textContent).toBe(formatShort(todayDay));
+    expect(cards[1].querySelector('.journal-entry-title').textContent).toBe(formatShort(olderDay));
+    expect(cards[1].querySelector('.journal-entry-day')).toBeNull();
+
+    // Cross-field AND query: "cafe" (in title) + "milestone" (in content)
+    const searchInput = root.querySelector('#journal-history-search');
+    searchInput.value = 'cafe milestone';
+    searchInput.dispatchEvent({ type: 'input' });
+    await new Promise((r) => setTimeout(r, 10));
+
+    cards = root.querySelectorAll('.journal-entry-item');
+    expect(cards).toHaveLength(1);
+    const titleMarks = cards[0].querySelector('.journal-entry-title').querySelectorAll('mark');
+    expect(titleMarks.map((m) => m.textContent)).toEqual(['Café']);
+    const allMarks = cards[0].querySelectorAll('mark');
+    expect(allMarks.map((m) => m.textContent)).toEqual(['Café', 'milestone']);
 
     cleanup();
   });

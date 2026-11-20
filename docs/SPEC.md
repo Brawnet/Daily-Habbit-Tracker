@@ -5,7 +5,7 @@ Aplikasi PWA pribadi Habit Tracker & Daily Journal untuk satu pengguna di banyak
 Sumber kebenaran lain (baca dulu, jangan diduplikasi di sini):
 
 - `GLOSSARY.md` — istilah domain. Pakai istilah ini **persis** di kode, UI, nama sheet, dan komentar (Habit, Archived Habit, Check-in, Streak, Day, Journal Entry, Diary, Device, Reminder).
-- `docs/adr/0001` offline-first · `0002` Sheets sumber kebenaran, Diary satu arah · `0003` arsitektur Reminder · `0004` layout `--app-height` & floating bottom nav · `0005` Journal History & pengeditan entry lampau.
+- `docs/adr/0001` offline-first · `0002` Sheets sumber kebenaran, Diary satu arah · `0003` arsitektur Reminder · `0004` layout `--app-height` & floating bottom nav · `0005` Journal History & pengeditan entry lampau · `0006` judul opsional Journal Entry & Heading 3 Diary.
 
 Nama aplikasi: **Habbit** (dengan dua "b", disengaja). UI berbahasa **Inggris**. Pengaturan tema per Device tersedia dalam 3 pilihan: `Light`, `Dark`, dan `System` (default mengikuti tema Device).
 
@@ -20,10 +20,10 @@ Nama aplikasi: **Habbit** (dengan dua "b", disengaja). UI berbahasa **Inggris**.
 | Jendela Check-in | Hanya **hari ini dan kemarin** yang bisa ditambah/dibatalkan. Masa depan & lebih lama dari kemarin: read-only. |
 | Habit | Hanya harian. Bisa tambah, ganti nama, urut naik/turun, arsip/aktifkan lagi. **Tidak ada hapus.** Ganti nama tidak mengubah riwayat. |
 | Streak | Lihat GLOSSARY. Hari ini belum Check-in → hitung dari kemarin. Contoh: Check-in 17,18,19; tanggal 20 pagi = 3; tanggal 21 tanpa Check-in 20 = 0. |
-| Journal Entry | Maks satu per Day, key = `day`. Tanpa judul, tanpa Mood. Entry yang sudah ada dapat diedit kembali untuk semua Day hingga hari ini (`day <= today`), sedangkan pembuatan entry baru dibatasi di Device maksimal 7 hari ke belakang (`[today - 7, today]`). Masa depan dilarang. Entry dianggap "ada" bila `content.trim() !== ''`. |
+| Journal Entry | Maks satu per Day, key = `day`. Judul opsional (`title`: single-line trim, maks. 120 karakter, fallback dinamis ke `Day` milik entri saat kosong), tanpa Mood. Entry yang sudah ada dapat diedit kembali untuk semua Day hingga hari ini (`day <= today`), sedangkan pembuatan entry baru dibatasi di Device maksimal 7 hari ke belakang (`[today - 7, today]`). Masa depan dilarang. Entry dianggap "ada/tertulis" bila `!isBlank(title) || !isBlank(content)`. |
 | Diary | Google Docs, satu file per tahun, urut kronologis. Ditulis Apps Script, tidak pernah dibaca aplikasi. Lihat §6.3. |
 | Reminder | Satu jam global untuk semua Device (default `20:00`, diatur di Settings, tersinkron). Dikirim maks sekali per hari, hanya bila ada Habit aktif tanpa Check-in hari ini **atau** belum ada Journal Entry hari ini. Ke semua Device yang mengaktifkan notifikasi. Tap → buka tab Today. Zona waktu server: `Asia/Jakarta`. |
-| Search | Di Device (offline). Case- & diacritic-insensitive. Query dipecah per spasi, semua token harus cocok (AND) terhadap `content` + representasi tanggal (`2026-10-20`, `20 oct 2026`, `20 october 2026`, `tuesday`, `oct 2026`). Token yang cocok di `content` di-highlight. |
+| Search | Di Device (offline). Case- & diacritic-insensitive. Query dipecah per spasi, semua token harus cocok (AND) terhadap `title`, `content`, atau representasi tanggal (`2026-10-20`, `20 oct 2026`, `20 october 2026`, `tuesday`, `oct 2026`). Token yang cocok di `title` dan `content` di-highlight dengan `<mark>`. |
 
 ## 2. Struktur repo
 
@@ -63,7 +63,7 @@ Semua timestamp ISO-8601 UTC string. `updatedAt` diisi Device saat mutasi; `serv
 ```js
 /** @typedef {{ id: string /*uuid*/, name: string /*1–60*/, sortOrder: number, archived: boolean, linkedActivity?: 'journal' | 'book_summary' | null, createdAt: string, updatedAt: string }} Habit */
 /** @typedef {{ id: string /*uuid*/, habitId: string, day: string /*YYYY-MM-DD*/, deleted: boolean, updatedAt: string }} CheckIn */
-/** @typedef {{ day: string /*YYYY-MM-DD*/, content: string, updatedAt: string, printedToDiaryAt: string }} JournalEntry */
+/** @typedef {{ day: string /*YYYY-MM-DD*/, title?: string /*<=120*/, content: string, updatedAt: string, printedToDiaryAt: string }} JournalEntry */
 /** @typedef {{ key: 'reminderTime', value: string, updatedAt: string }} Setting */
 /** @typedef {{ id: string, title: string, author: string, createdAt: string, updatedAt: string }} Book */
 /** @typedef {{ id: string, bookId: string, title: string, content: string, sortOrder: number, createdAt: string, updatedAt: string }} BookChapter */
@@ -75,7 +75,7 @@ Google Sheets (dibuat `setup()`; seluruh sheet diformat teks `@` agar tanggal ti
 |---|---|
 | `Habits` | id, name, sortOrder, archived, createdAt, updatedAt, serverUpdatedAt |
 | `Check_Ins` | id, habitId, day, deleted, updatedAt, serverUpdatedAt |
-| `Journal_Entries` | day, content, updatedAt, printedToDiaryAt, serverUpdatedAt |
+| `Journal_Entries` | day, content, updatedAt, printedToDiaryAt, serverUpdatedAt, title |
 | `Settings` | key, value, updatedAt, serverUpdatedAt |
 | `Push_Subscriptions` | deviceId, endpoint, p256dh, auth, createdAt |
 | `Activities` | id, title, author, type, status, totalPages, summary, archived, createdAt, updatedAt, serverUpdatedAt |
@@ -134,19 +134,20 @@ Satu file, tetapi logika murni (format/parse heading Diary, posisi sisip, keputu
 
 ### 6.2 `setup()` — idempoten, dijalankan manual sekali
 
-Buat sheet + header + format teks bila belum ada; buat folder Drive `Habbit Diary`; generate `PUSH_SHARED_SECRET` bila kosong; hapus lalu pasang ulang trigger `printDiary` (harian ~02:00) dan `checkReminder` (tiap 10 menit); log ringkasan + langkah berikutnya.
+Buat sheet + header (termasuk perluasan otomatis header `Journal_Entries` dari 5 ke 6 kolom pada spreadsheet eksisting) + format teks bila belum ada; buat folder Drive `Habbit Diary`; generate `PUSH_SHARED_SECRET` bila kosong; hapus lalu pasang ulang trigger `printDiary` (harian ~02:00) dan `checkReminder` (tiap 10 menit); log ringkasan + langkah berikutnya.
 
 ### 6.3 `syncDiaryEntries()` & `printDiary()` (auto-sync 10 menit & trigger harian)
 
 Auto-sync jurnal ke Google Drive Doc dijalankan setiap 10 menit di dalam siklus background `checkReminder()` serta di-catch up harian pada `printDiary()` (~02:00 Jakarta).
 
-Ambil Journal Entry yang belum dicetak (`!printedToDiaryAt`) atau telah diedit setelah pencetakan (`serverUpdatedAt > printedToDiaryAt`). Entri dikelompokkan per tahun (`YYYY`) untuk membuka dan menyimpan setiap Google Doc sekali per siklus di folder `DIARY_FOLDER_ID`:
+Ambil Journal Entry yang belum dicetak (`!printedToDiaryAt`, selama `title` atau `content` tidak kosong) atau telah diedit setelah pencetakan (`serverUpdatedAt > printedToDiaryAt`). Entri dikelompokkan per tahun (`YYYY`) untuk membuka dan menyimpan setiap Google Doc sekali per siklus di folder `DIARY_FOLDER_ID`:
 - Bila heading tanggal sudah ada di Doc:
-  - Jika content diisi: update isi paragraf secara in-place di bawah heading tanggal tersebut tanpa membuat heading duplikat.
-  - Jika content kosong/dihapus: hapus heading tanggal dan paragraf pemisahnya dari Doc.
-- Bila heading tanggal belum ada dan content tidak kosong: sisipkan blok di **posisi kronologis**:
+  - Jika `title` atau `content` diisi: update Heading 3 opsional (`title` bila ada) dan isi paragraf secara in-place di bawah Heading 2 tanggal tersebut tanpa membuat heading tanggal duplikat.
+  - Jika `title` dan `content` keduanya kosong/dihapus: hapus heading tanggal dan seluruh paragraf entri tersebut dari Doc.
+- Bila heading tanggal belum ada dan `title` atau `content` tidak kosong: sisipkan blok di **posisi kronologis**:
   - Heading 2: `EEEE, d MMMM yyyy` (contoh `Tuesday, 20 October 2026`)
-  - satu paragraf Normal per baris `content`
+  - Heading 3 opsional: `title` (hanya disisipkan bila tidak kosong)
+  - satu paragraf Normal per baris `content` (bila ada)
   - satu paragraf kosong sebagai pemisah
 - Set `printedToDiaryAt = serverNow`. Entry yang gagal dicoba lagi di run berikutnya.
 - Aturan `LOCKED`: hanya entri masa depan (`day > todayJakarta`) yang ditolak sinkronisasinya; seluruh `Journal Entry` dengan `day <= todayJakarta` yang baru ditulis atau diperbarui akan disisipkan secara kronologis atau diperbarui in-place di Google Docs `Diary` oleh `syncDiaryEntries()`.
@@ -156,7 +157,7 @@ Ambil Journal Entry yang belum dicetak (`!printedToDiaryAt`) atau telah diedit s
 Menjalankan `syncDiaryEntries(ss, props, { includeToday: true })` dalam blok `try/catch` agar entri jurnal hari ini otomatis tersimpan ke Google Doc setiap 10 menit tanpa menunggu pergantian hari.
 
 Kemudian mengevaluasi pengiriman push notification:
-Keluar bila: `nowHHMM < reminderTime`, atau `LAST_REMINDER_DAY === todayJakarta`, atau tidak ada subscription, atau `PUSH_ENDPOINT_URL` kosong. Hitung Habit aktif tanpa Check-in (non-deleted) hari ini dan apakah Journal Entry hari ini ada. Tidak ada yang tertunda → set `LAST_REMINDER_DAY`, keluar. Selain itu `UrlFetchApp` POST ke `PUSH_ENDPOINT_URL` dengan header `x-push-secret` dan body `{ subscriptions, notification: { title: 'Habbit', body, url: '/?tab=today' } }`. Teks body: `2 habits left · Journal not written yet` / `1 habit left` / `Journal not written yet`. Hapus subscription yang hasilnya 404/410. Set `LAST_REMINDER_DAY`.
+Keluar bila: `nowHHMM < reminderTime`, atau `LAST_REMINDER_DAY === todayJakarta`, atau tidak ada subscription, atau `PUSH_ENDPOINT_URL` kosong. Hitung Habit aktif tanpa Check-in (non-deleted) hari ini dan apakah Journal Entry hari ini ada (`!isBlank(title) || !isBlank(content)`). Tidak ada yang tertunda → set `LAST_REMINDER_DAY`, keluar. Selain itu `UrlFetchApp` POST ke `PUSH_ENDPOINT_URL` dengan header `x-push-secret` dan body `{ subscriptions, notification: { title: 'Habbit', body, url: '/?tab=today' } }`. Teks body: `2 habits left · Journal not written yet` / `1 habit left` / `Journal not written yet`. Hapus subscription yang hasilnya 404/410. Set `LAST_REMINDER_DAY`.
 ## 7. Web Push
 
 - VAPID dibuat user: `npx web-push generate-vapid-keys`.
@@ -188,14 +189,15 @@ Keluar bila: `nowHHMM < reminderTime`, atau `LAST_REMINDER_DAY === todayJakarta`
 - **Today**: tanggal panjang; progres `3/5 done`; daftar Habit aktif (urut `sortOrder`) dengan tombol Check-in + Streak (`🔥 5`); textarea Journal Entry autosave (debounce 800 ms) dengan status "Saved"; empty state → link ke Manage Habits.
 - **History**: khusus riwayat Habit (kartu per Habit aktif: heatmap 12 minggu dengan kolom = minggu dan baris Senin–Minggu, Streak saat ini, Streak terpanjang, completion 30 hari dengan penyebut = Day dalam 30 hari terakhir sejak `createdAt` Habit; sel hari ini & kemarin bisa di-tap untuk toggle Check-in, lainnya read-only; bagian "Archived Habits" ter-collapse).
 - **Settings**: *Appearance* (pilihan tema per Device: `Light` | `Dark` | `System`, berlaku seketika tanpa tombol simpan) · *Sync* (URL Web App, PIN `type=password`, Test connection → `ping`, Sync now, last synced, status) · *Manage Habits* (tambah, rename inline, ▲▼, archive/unarchive) · *Reminder* (input jam, Enable notifications, Send test notification, status) · *Install App* (§8) · versi aplikasi.
-- **Activities**: Choice Hub untuk **Books Summary** (pustaka buku, tambah buku, *Continue Summary* per Book Chapter, dan *Read the Summary* terkompilasi) serta **Journals** (menu 2 pilihan *Write a Journal* dan *Journal History*, sementara deep link `?tab=activities&subview=journal` langsung ke *Write a Journal*). *Write a Journal* menyediakan pemilih tanggal `[today - 7, today]` dan Prompt Cards Stack autosave (tombol *Customize Prompts* hanya pada hari ini). *Journal History* menyediakan search offline (highlight hasil), empty state dengan CTA *Write Today's Journal*, tampilan baca penuh terpisah in-page (*Entry Reader* read-only), serta tombol *Edit Journal* untuk mengedit entry `day <= today` (termasuk prompt arsip yang sudah berjawaban).
+- **Activities**: Choice Hub untuk **Books Summary** (pustaka buku, tambah buku, *Continue Summary* per Book Chapter, dan *Read the Summary* terkompilasi) serta **Journals** (menu 2 pilihan *Write a Journal* dan *Journal History*, sementara deep link `?tab=activities&subview=journal` langsung ke *Write a Journal*). *Write a Journal* dan *Edit Journal* menyediakan input judul opsional (`maxlength="120"`, `16px`, target sentuh `>= 44×44px`) di atas baris metadata `Day` dengan *placeholder* fallback `Title (defaults to <Day>)` yang ikut autosave (sedangkan hitungan kata tetap khusus jawaban refleksi); *Write a Journal* juga menyediakan kalender `[today - 7, today]` dan Prompt Cards Stack (tombol *Customize Prompts* hanya pada hari ini). *Journal History* menampilkan judul kustom dengan tanggal pendek di baris sekunder (atau langsung tanggal pendek bila tanpa judul), menyediakan search offline dengan `<mark>` di judul dan cuplikan, empty state CTA *Write Today's Journal*, tampilan *Entry Reader* read-only (judul kustom sebagai `<h1>` + tanggal panjang di subjudul, atau tanggal panjang sebagai `<h1>` tanpa duplikasi bila tanpa judul), serta tombol *Edit Journal* untuk mengedit entry `day <= today` (termasuk prompt arsip yang sudah berjawaban).
 
 ## 11. Tes (Vitest) — wajib hijau
 
 - `domain/day`: toDay lokal (bukan UTC) dekat tengah malam, addDays lintas bulan/tahun, jendela Check-in, `isJournalEditable` (`day <= today`), `isJournalCreatable` (batas 7 hari inklusif).
+- `domain/journal`: kompilasi/dekompilasi prompt, sanitasi HTML, normalisasi judul opsional (`<=120`), status tertulis judul-saja, resolusi fallback `Day`, hitungan kata khusus jawaban prompt.
 - `domain/streak`: contoh §1, hari ini sudah/belum Check-in, gap, Check-in `deleted` diabaikan, longest streak.
 - `domain/stats`: completion rate dengan Habit baru < 30 hari; bentuk heatmap & awal minggu Senin.
-- `domain/search`: AND token, diakritik, cocok tanggal, rentang highlight.
+- `domain/search`: AND token lintas judul/`content`/tanggal, diakritik, cocok tanggal, rentang highlight judul & `content`.
 - `data/merge` + `data/sync` (fake-indexeddb, `fetch` di-mock): LWW dua arah, outbox coalesce, outbox tidak terhapus bila record berubah saat sync in-flight, LOCKED.
 - `gas-backend/tests`: auth & rate limit, sync upsert + cursor monoton, LOCKED, format/parse heading Diary, posisi sisip kronologis (awal/tengah/akhir/entri terlambat), keputusan & teks Reminder, idempotensi `setup()` (dengan stub).
 

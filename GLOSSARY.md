@@ -29,7 +29,7 @@ _Avoid_: Date (server), session, Hari
 ### Jurnal
 
 **Journal Entry**:
-Tulisan reflektif pengguna untuk satu Day, diidentifikasi oleh tanggalnya; paling banyak satu Journal Entry per Day dan tidak memiliki judul atau Mood.
+Tulisan reflektif pengguna untuk satu Day, diidentifikasi oleh tanggalnya; dapat memiliki judul opsional (maks. 120 karakter, fallback dinamis ke Day bila kosong), paling banyak satu Journal Entry per Day dan tidak memiliki Mood.
 _Avoid_: Note, post, diary entry, Entri Jurnal
 
 **Diary**:

@@ -45,7 +45,11 @@ import {
 import { addDays, formatLong, today } from '../domain/day.js';
 import { showToast } from './shell.js';
 import { isBlank, htmlToText, htmlToMarkdownText } from '../domain/text.js';
-import { sanitizeJournalHtml } from '../domain/journal.js';
+import {
+  isJournalEntryWritten,
+  normalizeJournalTitle,
+  sanitizeJournalHtml,
+} from '../domain/journal.js';
 export const JOURNALING_LOGO_SVG = `
 <svg class="w-full h-full" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
   <g transform="rotate(-7.5 46 51)" stroke-width="3.2">
@@ -175,7 +179,7 @@ export function mount(rootEl) {
   // Transient drafts
   let newChapterTitle = '';
   let newChapterContent = '';
-  let journalDraft = '';
+  let isTodayJournalWritten = false;
   let journalStatus = 'Saved';
   let chapterStatus = 'Saved';
   let cachedPrompts = JSON.parse(JSON.stringify(DEFAULT_JOURNAL_PROMPTS));
@@ -192,21 +196,16 @@ export function mount(rootEl) {
   container.className = 'activities-view flex flex-col gap-6 max-w-lg mx-auto w-full pb-20 pt-2 px-4';
   rootEl.appendChild(container);
 
-  function hasJournalText(html) {
-    return Boolean(html && htmlToText(html).trim());
-  }
-
   function syncTodayJournalBadge({ renderMenuIfPresent = false } = {}) {
     getJournalEntry(today())
       .then((entry) => {
-        const nextContent = entry?.content || '';
-        const prevDone = hasJournalText(journalDraft);
-        const nextDone = hasJournalText(nextContent);
-        journalDraft = nextContent;
+        const prevDone = isTodayJournalWritten;
+        const nextDone = isJournalEntryWritten(entry);
+        isTodayJournalWritten = nextDone;
         if (
           isMounted &&
           ((currentView === 'home' && nextDone !== prevDone) ||
-            (renderMenuIfPresent && currentView === 'journals-menu' && Boolean(nextContent)))
+            (renderMenuIfPresent && currentView === 'journals-menu' && nextDone))
         ) {
           render();
         }
@@ -382,8 +381,7 @@ export function mount(rootEl) {
     leftJ.appendChild(textJ);
 
     const actionJ = document.createElement('span');
-    const isTodayJournalDone = hasJournalText(journalDraft);
-    if (isTodayJournalDone) {
+    if (isTodayJournalWritten) {
       actionJ.className =
         'badge-sage inline-flex items-center gap-1 px-3.5 py-1.5 rounded-full text-xs font-mono font-semibold transition-colors shrink-0';
       actionJ.textContent = 'Done ✓';
@@ -1239,13 +1237,11 @@ export function mount(rootEl) {
       getJournalEntry(todayDay),
       listJournalEntries(),
     ]);
-    journalDraft = todayEntry?.content || '';
-    const nonEmptyCount = (allEntries || []).filter((e) =>
-      Boolean(e && e.content && htmlToText(e.content).trim())
-    ).length;
+    isTodayJournalWritten = isJournalEntryWritten(todayEntry);
+    const nonEmptyCount = (allEntries || []).filter(isJournalEntryWritten).length;
 
     return renderJournalsChoiceMenu({
-      isTodayDone: Boolean(journalDraft && htmlToText(journalDraft).trim()),
+      isTodayDone: isTodayJournalWritten,
       entryCount: nonEmptyCount,
       logoSvg: JOURNALING_LOGO_SVG,
       pencilSvg: PENCIL_WRITE_SVG,
@@ -1321,8 +1317,9 @@ export function mount(rootEl) {
     const isTodayTarget = day === todayDay;
     const existingEntry = await getJournalEntry(day);
     const rawContent = existingEntry?.content || '';
+    let journalTitle = normalizeJournalTitle(existingEntry?.title);
     if (isTodayTarget) {
-      journalDraft = rawContent;
+      isTodayJournalWritten = isJournalEntryWritten(existingEntry);
     }
 
     const wrap = document.createElement('div');
@@ -1374,17 +1371,18 @@ export function mount(rootEl) {
       const statusBadge = wrap.querySelector('#journal-status');
       try {
         const compiled = compilePromptJournal(prompts, answers);
+        const normalizedTitle = normalizeJournalTitle(journalTitle);
         if (day === today()) {
-          journalDraft = compiled;
+          isTodayJournalWritten = isJournalEntryWritten({ title: normalizedTitle, content: compiled });
         }
-        await saveJournalEntry(day, compiled);
+        await saveJournalEntry(day, compiled, { title: normalizedTitle });
         if (statusBadge) statusBadge.textContent = 'Saved';
       } catch {
         if (statusBadge) statusBadge.textContent = 'Error';
       }
     }
 
-    function handleUpdateAnswers() {
+    function scheduleJournalAutosave() {
       const statusBadge = wrap.querySelector('#journal-status');
       if (statusBadge) statusBadge.textContent = 'Saving...';
 
@@ -1396,16 +1394,26 @@ export function mount(rootEl) {
       }, 800);
     }
 
+    function handleUpdateTitle(nextTitle) {
+      journalTitle = normalizeJournalTitle(nextTitle);
+      scheduleJournalAutosave();
+    }
+
+    function handleUpdateAnswers() {
+      scheduleJournalAutosave();
+    }
+
     function handleSavePrompts(newPrompts) {
       cachedPrompts = newPrompts;
       prompts = [...newPrompts];
       saveJournalPrompts(setSetting, newPrompts);
       if (hasNonEmptyJournalAnswers(answers)) {
         const compiled = compilePromptJournal(newPrompts, answers);
+        const normalizedTitle = normalizeJournalTitle(journalTitle);
         if (day === today()) {
-          journalDraft = compiled;
+          isTodayJournalWritten = isJournalEntryWritten({ title: normalizedTitle, content: compiled });
         }
-        saveJournalEntry(day, compiled).catch(() => {});
+        saveJournalEntry(day, compiled, { title: normalizedTitle }).catch(() => {});
       }
     }
 
@@ -1426,6 +1434,7 @@ export function mount(rootEl) {
     const cardsEl = renderPromptCardsJournal({
       prompts,
       answers,
+      title: journalTitle,
       status: journalStatus,
       targetDay: day,
       backLabel: mode === 'edit' ? 'Done · Back to Entry' : 'Back to Journals',
@@ -1439,6 +1448,7 @@ export function mount(rootEl) {
       },
       showCustomizeButton: mode === 'write' && isTodayTarget,
       dateSubtitle: mode === 'edit' ? formatLong(day) : '',
+      onUpdateTitle: handleUpdateTitle,
       onUpdateAnswers: handleUpdateAnswers,
       onOpenCustomizeModal: handleOpenCustomizeModal,
       onBack: async () => {

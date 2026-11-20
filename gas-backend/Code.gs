@@ -40,6 +40,14 @@ function isJournalEntryWritten(entry) {
   return normalizeJournalTitle(entry.title) !== '' || !isBlankText(entry.content);
 }
 
+function sanitizeJournalTitle(title) {
+  return sanitizeFormulaInjection(normalizeJournalTitle(title));
+}
+
+function desanitizeJournalTitle(rawTitle) {
+  return normalizeJournalTitle(desanitizeFormulaInjection(rawTitle || ''));
+}
+
 /**
  * Formats 'YYYY-MM-DD' into 'Tuesday, 20 October 2026' (Heading 2 format)
  * @param {string} day
@@ -505,7 +513,7 @@ function readAllJournalEntries(sheet) {
       updatedAt: String(row[2] || ''),
       printedToDiaryAt: String(row[3] || ''),
       serverUpdatedAt: String(row[4] || ''),
-      title: normalizeJournalTitle(desanitizeFormulaInjection(row[5] || ''))
+      title: desanitizeJournalTitle(row[5])
     });
   }
   return list;
@@ -707,7 +715,7 @@ function syncJournalEntries(sheet, incomingJournalEntries, nowMonotonic) {
         data[rowIndex][2] = clientUpdatedAt;
         data[rowIndex][4] = nowMonotonic;
         if (entry.title !== undefined) {
-          data[rowIndex][5] = sanitizeFormulaInjection(normalizeJournalTitle(entry.title));
+          data[rowIndex][5] = sanitizeJournalTitle(entry.title);
         }
       }
     } else {
@@ -717,7 +725,7 @@ function syncJournalEntries(sheet, incomingJournalEntries, nowMonotonic) {
         clientUpdatedAt,
         '',
         nowMonotonic,
-        sanitizeFormulaInjection(normalizeJournalTitle(entry.title))
+        sanitizeJournalTitle(entry.title)
       ];
       data.push(newRow);
       rowMap.set(day, data.length - 1);
@@ -982,6 +990,13 @@ function getOrCreateDiaryDoc(folder, year, props) {
   return doc;
 }
 
+function appendOrInsertParagraph(body, startIndex, text, heading) {
+  const pos = startIndex === undefined ? -1 : startIndex;
+  const paragraph = pos === -1 ? body.appendParagraph(text) : body.insertParagraph(pos, text);
+  paragraph.setHeading(heading);
+  return { paragraph, nextPos: pos === -1 ? -1 : pos + 1 };
+}
+
 function writeEntryParagraphs(body, startIndex, lines) {
   let pos = startIndex;
   for (const rawLine of lines) {
@@ -992,10 +1007,10 @@ function writeEntryParagraphs(body, startIndex, lines) {
     const h3Match = trimmed.match(/<h3[^>]*>([\s\S]*?)<\/h3>/i) || trimmed.match(/^###\s*(.*)$/);
     if (h3Match) {
       const headingText = h3Match[1].replace(/<[^>]*>/g, '').trim();
-      const p = pos === -1 ? body.appendParagraph(headingText) : body.insertParagraph(pos++, headingText);
-      p.setHeading(DocumentApp.ParagraphHeading.NORMAL);
-      if (typeof p.setBold === 'function') {
-        p.setBold(true);
+      const { paragraph, nextPos } = appendOrInsertParagraph(body, pos, headingText, DocumentApp.ParagraphHeading.NORMAL);
+      pos = nextPos;
+      if (typeof paragraph.setBold === 'function') {
+        paragraph.setBold(true);
       }
       continue;
     }
@@ -1010,34 +1025,28 @@ function writeEntryParagraphs(body, startIndex, lines) {
       ? line.replace(/<[^>]*>/g, '').trim()
       : line;
 
-    const p = pos === -1 ? body.appendParagraph(cleanText) : body.insertParagraph(pos++, cleanText);
-    p.setHeading(DocumentApp.ParagraphHeading.NORMAL);
-    if (typeof p.setBold === 'function') {
-      p.setBold(false);
+    const { paragraph, nextPos } = appendOrInsertParagraph(body, pos, cleanText, DocumentApp.ParagraphHeading.NORMAL);
+    pos = nextPos;
+    if (typeof paragraph.setBold === 'function') {
+      paragraph.setBold(false);
     }
   }
-  const blank = pos === -1 ? body.appendParagraph('') : body.insertParagraph(pos++, '');
-  blank.setHeading(DocumentApp.ParagraphHeading.NORMAL);
-  return pos;
+  return appendOrInsertParagraph(body, pos, '', DocumentApp.ParagraphHeading.NORMAL).nextPos;
 }
 
 function writeEntryBody(body, startIndex, entry) {
   let pos = startIndex;
-  const titleText = normalizeJournalTitle(desanitizeFormulaInjection(entry && entry.title ? entry.title : ''));
+  const titleText = desanitizeJournalTitle(entry && entry.title);
   if (titleText) {
-    const h3 = pos === -1 ? body.appendParagraph(titleText) : body.insertParagraph(pos++, titleText);
-    h3.setHeading(DocumentApp.ParagraphHeading.HEADING_3);
+    pos = appendOrInsertParagraph(body, pos, titleText, DocumentApp.ParagraphHeading.HEADING_3).nextPos;
   }
   if (!isBlankText(entry && entry.content)) {
-    const lines = String(entry.content).split('\n');
-    return writeEntryParagraphs(body, pos, lines);
+    return writeEntryParagraphs(body, pos, String(entry.content).split('\n'));
   }
-  const blank = pos === -1 ? body.appendParagraph('') : body.insertParagraph(pos++, '');
-  blank.setHeading(DocumentApp.ParagraphHeading.NORMAL);
-  return pos;
+  return appendOrInsertParagraph(body, pos, '', DocumentApp.ParagraphHeading.NORMAL).nextPos;
 }
 
-function insertEntryIntoDoc(doc, entry) {
+function upsertEntryInDoc(doc, entry) {
   const body = doc.getBody();
   const existingHeadings = [];
   for (let i = 0; i < body.getNumChildren(); i++) {
@@ -1067,8 +1076,7 @@ function insertEntryIntoDoc(doc, entry) {
         if (body.getNumChildren() > 1) {
           body.removeChild(body.getChild(i));
         } else {
-          const blank = body.appendParagraph('');
-          blank.setHeading(DocumentApp.ParagraphHeading.NORMAL);
+          appendOrInsertParagraph(body, -1, '', DocumentApp.ParagraphHeading.NORMAL);
           body.removeChild(body.getChild(i));
         }
       }
@@ -1091,20 +1099,11 @@ function insertEntryIntoDoc(doc, entry) {
 
   const insertIndex = findChronologicalInsertIndex(existingHeadings, entry.day);
   const headingText = formatDiaryHeading(entry.day);
-
-  if (insertIndex === -1) {
-    const h2 = body.appendParagraph(headingText);
-    h2.setHeading(DocumentApp.ParagraphHeading.HEADING_2);
-    writeEntryBody(body, -1, entry);
-  } else {
-    let pos = insertIndex;
-    const h2 = body.insertParagraph(pos++, headingText);
-    h2.setHeading(DocumentApp.ParagraphHeading.HEADING_2);
-    writeEntryBody(body, pos, entry);
-  }
+  const { nextPos } = appendOrInsertParagraph(body, insertIndex, headingText, DocumentApp.ParagraphHeading.HEADING_2);
+  writeEntryBody(body, nextPos, entry);
 }
 
-const upsertEntryInDoc = insertEntryIntoDoc;
+const insertEntryIntoDoc = upsertEntryInDoc;
 
 function updateJournalEntryInSheet(sheet, entry) {
   ensureSheetHeaders(sheet, SCHEMA.Journal_Entries, false);
@@ -1113,8 +1112,8 @@ function updateJournalEntryInSheet(sheet, entry) {
     if (String(data[i][0]) === entry.day) {
       const sanitizedContent = sanitizeFormulaInjection(entry.content || '');
       const sanitizedTitle = entry.title !== undefined
-        ? sanitizeFormulaInjection(normalizeJournalTitle(entry.title))
-        : sanitizeFormulaInjection(normalizeJournalTitle(desanitizeFormulaInjection(data[i][5] || '')));
+        ? sanitizeJournalTitle(entry.title)
+        : sanitizeJournalTitle(desanitizeJournalTitle(data[i][5]));
       sheet.getRange(i + 1, 1, 1, SCHEMA.Journal_Entries.length).setNumberFormat('@');
       sheet.getRange(i + 1, 1, 1, SCHEMA.Journal_Entries.length).setValues([[
         entry.day,
@@ -1451,7 +1450,7 @@ function syncDiaryEntries(ss, props, options) {
       try {
         const doc = getOrCreateDiaryDoc(folder, year, props);
         for (const entry of entriesForYear) {
-          insertEntryIntoDoc(doc, entry);
+          upsertEntryInDoc(doc, entry);
         }
         doc.saveAndClose();
 
@@ -1598,6 +1597,8 @@ if (typeof module !== 'undefined' && module.exports) {
     normalizeJournalTitle,
     isBlankText,
     isJournalEntryWritten,
+    sanitizeJournalTitle,
+    desanitizeJournalTitle,
     formatDiaryHeading,
     parseDiaryHeading,
     findChronologicalInsertIndex,

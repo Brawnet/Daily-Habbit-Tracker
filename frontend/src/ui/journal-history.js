@@ -5,7 +5,7 @@
  * read-only Entry Reader subview for Activities tab.
  */
 
-import { formatLong, formatShort } from '../domain/day.js';
+import { formatShort } from '../domain/day.js';
 import { searchEntries } from '../domain/search.js';
 import {
   isJournalEntryWritten,

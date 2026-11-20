@@ -594,11 +594,8 @@ test.describe('Habbit App E2E', () => {
     });
   });
 
-  test('renders compact Day metadata across Write, Edit, Reader, and Journal History in Light and Dark mobile viewports', async ({ page }) => {
-    await page.setViewportSize({ width: 393, height: 852 });
-    await page.emulateMedia({ colorScheme: 'light' });
-
-    const dates = await page.evaluate(() => {
+  async function getLocalDayFormats(page) {
+    return page.evaluate(() => {
       const formatIsoDay = (date) => {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -623,6 +620,19 @@ test.describe('Habbit App E2E', () => {
         shortYesterday: formatShortDay(yesterdayDate),
       };
     });
+  }
+
+  async function assertNoHorizontalOverflow(page) {
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)
+    ).toBe(true);
+  }
+
+  test('renders compact Day metadata across Write, Edit, Reader, and Journal History in Light and Dark mobile viewports', async ({ page }) => {
+    await page.setViewportSize({ width: 393, height: 852 });
+    await page.emulateMedia({ colorScheme: 'light' });
+
+    const dates = await getLocalDayFormats(page);
 
     const dayMeta = page.locator('#journal-day-meta');
     const dayPickerTrigger = page.getByLabel('Journal Day');
@@ -636,11 +646,7 @@ test.describe('Habbit App E2E', () => {
       expect(await dayMeta.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
     };
 
-    const expectNoHorizontalOverflow = async () => {
-      expect(
-        await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)
-      ).toBe(true);
-    };
+    const expectNoHorizontalOverflow = () => assertNoHorizontalOverflow(page);
 
     const selectDayFromCalendar = async (targetDayStr) => {
       const triggerBox = await dayPickerTrigger.boundingBox();
@@ -785,38 +791,12 @@ test.describe('Habbit App E2E', () => {
     await page.setViewportSize({ width: 393, height: 852 });
     await page.emulateMedia({ colorScheme: 'light' });
 
-    const dates = await page.evaluate(() => {
-      const formatIsoDay = (date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const dayOfMonth = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${dayOfMonth}`;
-      };
-      const formatLongDay = (date) =>
-        `${date.toLocaleDateString('en-US', { weekday: 'long' })}, ${date.getDate()} ${date.toLocaleDateString('en-US', { month: 'long' })} ${date.getFullYear()}`;
-      const formatShortDay = (date) =>
-        `${date.toLocaleDateString('en-US', { weekday: 'short' })}, ${date.getDate()} ${date.toLocaleDateString('en-US', { month: 'short' })} ${date.getFullYear()}`;
-
-      const todayDate = new Date();
-      const yesterdayDate = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate() - 1, 12, 0, 0);
-      return {
-        yesterdayStr: formatIsoDay(yesterdayDate),
-        longToday: formatLongDay(todayDate),
-        shortToday: formatShortDay(todayDate),
-        longYesterday: formatLongDay(yesterdayDate),
-        shortYesterday: formatShortDay(yesterdayDate),
-      };
-    });
+    const dates = await getLocalDayFormats(page);
 
     const titleInput = page.locator('#input-journal-title');
     const dayMeta = page.locator('#journal-day-meta');
     const cards = page.locator('.journal-entry-item');
-
-    const expectNoHorizontalOverflow = async () => {
-      expect(
-        await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)
-      ).toBe(true);
-    };
+    const expectNoHorizontalOverflow = () => assertNoHorizontalOverflow(page);
 
     // 1. Write a Journal: check optional title field metrics, placement, and dynamic placeholder
     await page.click('button[data-tab="activities"]');

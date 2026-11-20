@@ -814,7 +814,9 @@ describe('Pure Functions', () => {
         'timingSafeEqualPin',
         'normalizeJournalTitle',
         'isBlankText',
-        'isJournalEntryWritten'
+        'isJournalEntryWritten',
+        'sanitizeJournalTitle',
+        'desanitizeJournalTitle'
       ];
 
       const bannedAmbientSymbols = [
@@ -1212,13 +1214,18 @@ describe('GAS Backend Actions', () => {
       expect(res1.changes.journalEntries[0].title).toBe('=Dangerous Title');
       expect(jSheet.getDataRange().getValues()[1][5]).toBe("'=Dangerous Title");
 
+      const createLegacyFiveColEnv = () => {
+        const legEnv = createGasEnv({ PIN });
+        const legSheet = legEnv.ss.insertSheet('Journal_Entries');
+        legSheet.getRange(1, 1, 2, 5).setValues([
+          ['day', 'content', 'updatedAt', 'printedToDiaryAt', 'serverUpdatedAt'],
+          ['2026-10-18', 'Legacy body', '2026-10-18T10:00:00Z', '', '2026-10-18T10:00:00Z'],
+        ]);
+        return { legEnv, legSheet };
+      };
+
       // Simulate legacy 5-column Journal_Entries sheet from before Issue #56
-      const legacyEnv = createGasEnv({ PIN });
-      const legacySheet = legacyEnv.ss.insertSheet('Journal_Entries');
-      legacySheet.getRange(1, 1, 2, 5).setValues([
-        ['day', 'content', 'updatedAt', 'printedToDiaryAt', 'serverUpdatedAt'],
-        ['2026-10-18', 'Legacy body', '2026-10-18T10:00:00Z', '', '2026-10-18T10:00:00Z'],
-      ]);
+      const { legEnv: legacyEnv, legSheet: legacySheet } = createLegacyFiveColEnv();
 
       // Reading legacy 5-col rows yields title: ''
       const readLegacy = legacyEnv.exports.readAllJournalEntries(legacySheet);
@@ -1237,12 +1244,7 @@ describe('GAS Backend Actions', () => {
       expect(legacySheet.getDataRange().getValues()[1][1]).toBe('Legacy body');
 
       // Also test direct sync on un-upgraded 5-col sheet automatically expands Row 1 to 6 columns and writes Column 6
-      const legacyEnv2 = createGasEnv({ PIN });
-      const legacySheet2 = legacyEnv2.ss.insertSheet('Journal_Entries');
-      legacySheet2.getRange(1, 1, 2, 5).setValues([
-        ['day', 'content', 'updatedAt', 'printedToDiaryAt', 'serverUpdatedAt'],
-        ['2026-10-18', 'Legacy body', '2026-10-18T10:00:00Z', '', '2026-10-18T10:00:00Z'],
-      ]);
+      const { legEnv: legacyEnv2, legSheet: legacySheet2 } = createLegacyFiveColEnv();
       const syncRes = JSON.parse(legacyEnv2.exports.doPost({
         postData: {
           contents: JSON.stringify({
@@ -1634,7 +1636,7 @@ describe('GAS Backend Actions', () => {
       const doc = env.context.DocumentApp.create('Habbit – Diary 2026');
 
       // 1. Titled entry with content -> H2, H3, content, blank separator
-      env.exports.insertEntryIntoDoc(doc, {
+      env.exports.upsertEntryInDoc(doc, {
         day: '2026-10-20',
         title: 'Breakthrough Morning',
         content: 'Shipped the feature.'
@@ -1650,7 +1652,7 @@ describe('GAS Backend Actions', () => {
       expect(body.getChild(3).getText()).toBe('');
 
       // 2. Remove title in-place while keeping content -> H3 omitted, single H2 preserved
-      env.exports.insertEntryIntoDoc(doc, {
+      env.exports.upsertEntryInDoc(doc, {
         day: '2026-10-20',
         title: '',
         content: 'Updated reflection.'
@@ -1661,7 +1663,7 @@ describe('GAS Backend Actions', () => {
       expect(body.getChild(1).getHeading()).toBe('Normal');
 
       // 3. Clear content while adding/keeping title (title-only) -> H2, H3, single blank separator
-      env.exports.insertEntryIntoDoc(doc, {
+      env.exports.upsertEntryInDoc(doc, {
         day: '2026-10-20',
         title: 'Title Only Survivor',
         content: ''
@@ -1674,7 +1676,7 @@ describe('GAS Backend Actions', () => {
       expect(body.getChild(2).getText()).toBe('');
 
       // 4. Clear BOTH title and content -> removes entire section including H2 and H3
-      env.exports.insertEntryIntoDoc(doc, {
+      env.exports.upsertEntryInDoc(doc, {
         day: '2026-10-20',
         title: '',
         content: ''

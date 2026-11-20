@@ -1367,15 +1367,19 @@ export function mount(rootEl) {
       }
     }
 
+    function commitJournalSave(compiled) {
+      const normalizedTitle = normalizeJournalTitle(journalTitle);
+      if (day === today()) {
+        isTodayJournalWritten = isJournalEntryWritten({ title: normalizedTitle, content: compiled });
+      }
+      return saveJournalEntry(day, compiled, { title: normalizedTitle });
+    }
+
     async function persistJournalForDay() {
       const statusBadge = wrap.querySelector('#journal-status');
       try {
         const compiled = compilePromptJournal(prompts, answers);
-        const normalizedTitle = normalizeJournalTitle(journalTitle);
-        if (day === today()) {
-          isTodayJournalWritten = isJournalEntryWritten({ title: normalizedTitle, content: compiled });
-        }
-        await saveJournalEntry(day, compiled, { title: normalizedTitle });
+        await commitJournalSave(compiled);
         if (statusBadge) statusBadge.textContent = 'Saved';
       } catch {
         if (statusBadge) statusBadge.textContent = 'Error';
@@ -1399,21 +1403,13 @@ export function mount(rootEl) {
       scheduleJournalAutosave();
     }
 
-    function handleUpdateAnswers() {
-      scheduleJournalAutosave();
-    }
-
     function handleSavePrompts(newPrompts) {
       cachedPrompts = newPrompts;
       prompts = [...newPrompts];
       saveJournalPrompts(setSetting, newPrompts);
       if (hasNonEmptyJournalAnswers(answers)) {
         const compiled = compilePromptJournal(newPrompts, answers);
-        const normalizedTitle = normalizeJournalTitle(journalTitle);
-        if (day === today()) {
-          isTodayJournalWritten = isJournalEntryWritten({ title: normalizedTitle, content: compiled });
-        }
-        saveJournalEntry(day, compiled, { title: normalizedTitle }).catch(() => {});
+        commitJournalSave(compiled).catch(() => {});
       }
     }
 
@@ -1449,7 +1445,7 @@ export function mount(rootEl) {
       showCustomizeButton: mode === 'write' && isTodayTarget,
       dateSubtitle: mode === 'edit' ? formatLong(day) : '',
       onUpdateTitle: handleUpdateTitle,
-      onUpdateAnswers: handleUpdateAnswers,
+      onUpdateAnswers: scheduleJournalAutosave,
       onOpenCustomizeModal: handleOpenCustomizeModal,
       onBack: async () => {
         await flushPendingJournalSave();

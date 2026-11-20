@@ -48,7 +48,6 @@ export {
   JOURNAL_SUBVIEW,
   SETTINGS_KEY,
   DEFAULT_JOURNAL_PROMPTS,
-  JOURNAL_TITLE_MAX_LENGTH,
   escapeHtml,
   sanitizeJournalHtml,
   compilePromptJournal,
@@ -56,9 +55,6 @@ export {
   decompilePromptJournal,
   computeWordCount,
   hasNonEmptyJournalAnswers,
-  normalizeJournalTitle,
-  isJournalEntryWritten,
-  resolveJournalDisplayHeader,
 } from '../domain/journal.js';
 
 import {

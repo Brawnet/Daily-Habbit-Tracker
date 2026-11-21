@@ -1205,6 +1205,10 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     expect(replaceState).toHaveBeenCalled();
     expect(new URLSearchParams(global.window.location.search).get('subview')).toBeNull();
     expect(shellModule.navigate).toHaveBeenCalledWith('today');
+    expect(shellModule.showToast).toHaveBeenCalledWith('Your journal has been saved', {
+      position: 'top',
+      duration: 3000,
+    });
 
     cleanup();
   });
@@ -1234,6 +1238,7 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
 
     expect(root.querySelector('#journals-menu-view')).not.toBeNull();
     expect(shellModule.navigate).not.toHaveBeenCalled();
+    expect(shellModule.showToast).not.toHaveBeenCalled();
 
     // Open Past Entries -> Entry Reader -> Edit Journal
     root.querySelector('#btn-choice-journal-history').click();
@@ -1274,6 +1279,10 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
       { title: 'Revised Edit Title' }
     );
     expect(shellModule.navigate).not.toHaveBeenCalled();
+    expect(shellModule.showToast).toHaveBeenCalledWith('Your journal has been saved', {
+      position: 'top',
+      duration: 3000,
+    });
     expect(root.querySelector('#journal-read-view')).not.toBeNull();
     expect(root.querySelector('#journal-reader-title').textContent).toBe('Revised Edit Title');
     expect(root.querySelector('#journal-reader-card').textContent).toContain('Refined reflection content');

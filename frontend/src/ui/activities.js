@@ -1476,11 +1476,12 @@ export function mount(rootEl) {
       onDone: async () => {
         if (mode === 'edit') {
           await exitJournalToSubview('journal-read');
-          return;
+        } else {
+          await flushPendingJournalSave();
+          clearJournalSubviewParam();
+          navigate('today');
         }
-        await flushPendingJournalSave();
-        clearJournalSubviewParam();
-        navigate('today');
+        showToast('Your journal has been saved', { position: 'top', duration: 3000 });
       },
     });
 

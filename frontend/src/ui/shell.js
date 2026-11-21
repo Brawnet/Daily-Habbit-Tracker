@@ -90,6 +90,7 @@ function getCurrentDayString() {
 
 const UNCONFIGURED_SYNC_LABEL = 'Offline / Local';
 const TOAST_BOTTOM_OFFSET = 'calc(max(12px, env(safe-area-inset-bottom, 12px)) + 84px)';
+const TOAST_TOP_OFFSET = 'calc(env(safe-area-inset-top, 0px) + 12px)';
 
 /**
  * Updates header sync indicator UI
@@ -310,27 +311,34 @@ export function navigate(name, updateUrl = true) {
   }
 }
 
-function createToastContainer() {
+function createToastContainer(position = 'bottom') {
+  const isTop = position === 'top';
   const container = document.createElement('div');
-  container.id = 'toast-container';
+  container.id = isTop ? 'top-toast-container' : 'toast-container';
   container.setAttribute('aria-live', 'polite');
   container.setAttribute('aria-atomic', 'true');
   container.className =
     'fixed left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none w-full max-w-sm px-4';
-  container.style.bottom = TOAST_BOTTOM_OFFSET;
+  if (isTop) {
+    container.style.top = TOAST_TOP_OFFSET;
+  } else {
+    container.style.bottom = TOAST_BOTTOM_OFFSET;
+  }
   return container;
 }
 
 /**
  * Displays an accessible floating toast notification.
  * @param {string} message
- * @param {{ action?: { label: string, onClick: () => void } }} [options]
+ * @param {{ action?: { label: string, onClick: () => void }, position?: 'top' | 'bottom', duration?: number }} [options]
  * @returns {() => void} dismiss function
  */
-export function showToast(message, { action } = {}) {
-  let container = document.getElementById('toast-container');
+export function showToast(message, { action, position = 'bottom', duration = 4000 } = {}) {
+  const isTop = position === 'top';
+  const containerId = isTop ? 'top-toast-container' : 'toast-container';
+  let container = document.getElementById(containerId);
   if (!container && rootElement) {
-    container = createToastContainer();
+    container = createToastContainer(isTop ? 'top' : 'bottom');
     rootElement.appendChild(container);
   }
 
@@ -353,7 +361,7 @@ export function showToast(message, { action } = {}) {
       timer = null;
     }
     toast.classList.remove('opacity-100', 'translate-y-0');
-    toast.classList.add('opacity-0', 'translate-y-2');
+    toast.classList.add('opacity-0', isTop ? '-translate-y-2' : 'translate-y-2');
     setTimeout(() => {
       try {
         toast.remove();
@@ -379,7 +387,8 @@ export function showToast(message, { action } = {}) {
   }
 
   container.appendChild(toast);
-  timer = setTimeout(dismiss, 4000);
+  const timeoutMs = typeof duration === 'number' && duration > 0 ? duration : 4000;
+  timer = setTimeout(dismiss, timeoutMs);
 
   return dismiss;
 }
@@ -484,8 +493,9 @@ export function mountShell(rootEl) {
   tabContentElement.style.paddingRight = 'max(16px, env(safe-area-inset-right, 0px))';
   tabContentElement.style.paddingBottom = 'calc(max(12px, env(safe-area-inset-bottom, 12px)) + 88px)';
 
-  // --- Floating Toast Container ---
-  const toastContainer = createToastContainer();
+  // --- Floating Toast Containers ---
+  const toastContainer = createToastContainer('bottom');
+  const topToastContainer = createToastContainer('top');
 
   // --- Bottom Navigation Bar ---
   bottomNavElement = document.createElement('nav');
@@ -500,6 +510,7 @@ export function mountShell(rootEl) {
   shellLayout.appendChild(header);
   shellLayout.appendChild(tabContentElement);
   shellLayout.appendChild(toastContainer);
+  shellLayout.appendChild(topToastContainer);
   shellLayout.appendChild(bottomNavElement);
   rootEl.appendChild(shellLayout);
 

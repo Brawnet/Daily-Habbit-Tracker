@@ -945,11 +945,20 @@ test.describe('Habbit App E2E', () => {
     await page.locator('#editor-journal-content').fill('Finished via bottom Done button.');
     await doneBtn.click();
 
-    // Lands back on Today with subview=journal cleared and linked Habit auto-checked
+    // Lands back on Today with subview=journal cleared, linked Habit auto-checked, and 3s top saved notification
     await expect(page).toHaveURL(/tab=today/);
     await expect(page).not.toHaveURL(/subview=journal/);
     await expect(page.locator('#today-date')).toBeVisible();
     await expect(page.locator('#today-progress')).toContainText('1/2 done');
+
+    const topToast = page.locator('#top-toast-container > *').first();
+    await expect(topToast).toBeVisible();
+    await expect(topToast).toContainText('Your journal has been saved');
+    const topToastBox = await topToast.boundingBox();
+    expect(topToastBox).not.toBeNull();
+    expect(topToastBox.y).toBeLessThan(120);
+    await expect(page.locator('#toast-container > *')).toHaveCount(0);
+    await expect(page.locator('#top-toast-container > *')).toHaveCount(0, { timeout: 4500 });
 
     // Subsequent visit to Activities opens Choice Hub instead of jumping back into Write a Journal
     await page.click('button[data-tab="activities"]');
@@ -990,5 +999,7 @@ test.describe('Habbit App E2E', () => {
     await expect(page.locator('#journal-read-view')).toBeVisible();
     await expect(page.locator('#journal-reader-title')).toHaveText('Edited Reader Headline');
     await expect(page.locator('#journal-reader-card')).toContainText('Updated while editing existing entry.');
+    await expect(page.locator('#top-toast-container > *').first()).toContainText('Your journal has been saved');
+    await expect(page.locator('#top-toast-container > *')).toHaveCount(0, { timeout: 4500 });
   });
 });

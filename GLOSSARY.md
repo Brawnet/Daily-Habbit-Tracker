@@ -7,8 +7,12 @@ Aplikasi pribadi (satu pengguna) untuk mencatat kebiasaan harian dan menulis jur
 ### Kebiasaan
 
 **Habit**:
-Kebiasaan yang ingin dilakukan pengguna setiap Day, dengan status selesai atau belum.
+Kebiasaan yang ingin dilakukan pengguna setiap Day, dengan status selesai atau belum, serta Scheduled Time opsional sebagai panduan harian.
 _Avoid_: Task, tugas, kegiatan, rutinitas
+
+**Scheduled Time**:
+Jam pilihan pada suatu Day yang menandai kapan pengguna berniat menjalankan sebuah Habit; bersifat panduan visual tanpa paksaan dan terpisah dari Reminder.
+_Avoid_: Alarm, deadline, reminder time
 
 **Archived Habit**:
 Habit yang tidak lagi dijalankan dan tidak muncul di checklist, tetapi riwayat Check-in-nya tetap disimpan dan bisa diaktifkan kembali.

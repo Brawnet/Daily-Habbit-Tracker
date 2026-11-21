@@ -907,4 +907,122 @@ test.describe('Habbit App E2E', () => {
     await expect(titleInput).toHaveCSS('color', 'rgb(244, 241, 234)');
     await expectNoHorizontalOverflow();
   });
+
+  test('supports optional Scheduled Time on Habits across Today, Settings, reload, archive/restore, and omits from History', async ({ page }) => {
+    // 1. Add Evening Walk (21:00) and Drink Water (Anytime) in Settings -> Manage Habits
+    await page.click('button[data-tab="settings"]');
+    await page.fill('#input-new-habit', 'Evening Walk');
+    await page.fill('#input-new-habit-time', '21:00');
+    await page.click('#btn-add-habit');
+    await expect(page.locator('#settings-scheduled-habits-group')).toContainText('Evening Walk');
+
+    await page.fill('#input-new-habit', 'Drink Water');
+    await page.click('#btn-add-habit');
+    await expect(page.locator('#settings-anytime-habits-group')).toContainText('Drink Water');
+
+    // 2. Add Journaling (05:00) and Stretch (Anytime) from Today + Add Habit
+    await page.click('button[data-tab="today"]');
+    await page.click('#today-add-habit-trigger');
+    await page.fill('#today-add-habit-input', 'Journaling');
+    await page.fill('#today-add-habit-scheduled-time', '05:00');
+    await page.click('#today-add-habit-submit');
+
+    await page.click('#today-add-habit-trigger');
+    await page.fill('#today-add-habit-input', 'Stretch');
+    await page.click('#today-add-habit-submit');
+
+    // 3. Verify Today chronological order (05:00 then 21:00), conditional Anytime heading, and card time display
+    const scheduledItems = page.locator('#today-scheduled-list li');
+    const anytimeItems = page.locator('#today-anytime-list li');
+    await expect(scheduledItems).toHaveCount(2);
+    await expect(scheduledItems.nth(0)).toContainText('Journaling');
+    await expect(scheduledItems.nth(0).locator('.habit-scheduled-time')).toBeVisible();
+    await expect(scheduledItems.nth(1)).toContainText('Evening Walk');
+    await expect(scheduledItems.nth(1).locator('.habit-scheduled-time')).toBeVisible();
+
+    await expect(page.locator('#today-anytime-heading')).toHaveText('Anytime');
+    await expect(anytimeItems).toHaveCount(2);
+    await expect(anytimeItems.nth(0)).toContainText('Drink Water');
+    await expect(anytimeItems.nth(1)).toContainText('Stretch');
+
+    // 4. Complete check-in on Journaling -> stays in first slot and persists across reload
+    await scheduledItems.nth(0).locator('button[data-action="toggle-checkin"]').click();
+    await expect(page.locator('#today-progress')).toContainText('1/4 done');
+    await page.reload();
+    await expect(page.locator('#today-progress')).toContainText('1/4 done');
+    await expect(scheduledItems.nth(0)).toContainText('Journaling');
+    await expect(scheduledItems.nth(0).locator('button[data-action="toggle-checkin"]')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+
+    // 5. Settings -> locked timed move toast, Anytime reorder, inline Clear unlocking moves, Archive/Restore preservation
+    await page.click('button[data-tab="settings"]');
+    await expect(page.locator('#settings-scheduled-order-note')).toHaveText(
+      "Scheduled habits follow clock order automatically. Clear a habit's time to reorder it manually."
+    );
+
+    const settingsSchedRows = page.locator('#settings-scheduled-habits-group .habit-row');
+    await expect(settingsSchedRows.nth(0)).toContainText('Journaling');
+    await expect(settingsSchedRows.nth(0).locator('.btn-move-up')).toHaveAttribute('aria-disabled', 'true');
+    await settingsSchedRows.nth(0).locator('.btn-move-up').click({ force: true });
+    await expect(page.locator('#toast-container')).toContainText(
+      'Scheduled habits follow clock order — clear time to reorder'
+    );
+
+    // Reorder Anytime habits: move Stretch above Drink Water
+    const settingsAnyRows = page.locator('#settings-anytime-habits-group .habit-row');
+    await settingsAnyRows.filter({ hasText: 'Stretch' }).locator('.btn-move-up').click();
+    await expect(settingsAnyRows.nth(0)).toContainText('Stretch');
+
+    // Reflects in Today
+    await page.click('button[data-tab="today"]');
+    await expect(anytimeItems.nth(0)).toContainText('Stretch');
+
+    // Clear Scheduled Time on Journaling via inline Edit -> moves into Anytime with unlocked ▲/▼
+    await page.click('button[data-tab="settings"]');
+    const journalingRow = page
+      .locator('#settings-scheduled-habits-group .habit-row')
+      .filter({ hasText: 'Journaling' });
+    await journalingRow.locator('.btn-edit').click();
+    await expect(page.locator('.input-edit-scheduled-time')).toHaveValue('05:00');
+    await page.click('.btn-clear-edit-time');
+    await expect(page.locator('.input-edit-scheduled-time')).toHaveValue('');
+    await page.click('.rename-form button[type="submit"]');
+
+    const unlockedJournalingRow = page
+      .locator('#settings-anytime-habits-group .habit-row')
+      .filter({ hasText: 'Journaling' });
+    await expect(unlockedJournalingRow).toBeVisible();
+    await expect(unlockedJournalingRow.locator('.btn-move-up')).toBeEnabled();
+
+    // Archive and restore Evening Walk (21:00) -> preserves scheduledTime
+    const walkRow = page
+      .locator('#settings-scheduled-habits-group .habit-row')
+      .filter({ hasText: 'Evening Walk' });
+    await walkRow.locator('.btn-archive').click();
+    await expect(page.locator('#settings-scheduled-habits-group')).toHaveCount(0);
+
+    await page.click('#btn-toggle-archived');
+    await page
+      .locator('#archived-habits-list .habit-archived-row')
+      .filter({ hasText: 'Evening Walk' })
+      .locator('.btn-restore')
+      .click();
+
+    const restoredWalkRow = page
+      .locator('#settings-scheduled-habits-group .habit-row')
+      .filter({ hasText: 'Evening Walk' });
+    await expect(restoredWalkRow).toBeVisible();
+    await expect(restoredWalkRow.locator('.habit-scheduled-time-badge')).toHaveAttribute(
+      'data-scheduled-time',
+      '21:00'
+    );
+
+    // 6. History tab omits Scheduled Time
+    await page.click('button[data-tab="history"]');
+    await expect(page.locator('[aria-label="Evening Walk 12-week activity heatmap"]')).toBeVisible();
+    await expect(page.locator('.habit-scheduled-time')).toHaveCount(0);
+    await expect(page.locator('.habit-scheduled-time-badge')).toHaveCount(0);
+  });
 });

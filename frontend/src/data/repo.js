@@ -3,6 +3,11 @@ import { STORES, ACTIVITY_STATUS, LINKED_ACTIVITIES } from '../shared/contracts.
 import { scheduleSync } from './sync.js';
 import { isCheckInEditable, isJournalCreatable, isJournalEditable, today } from '../domain/day.js';
 import { isJournalEntryWritten, normalizeJournalTitle } from '../domain/journal.js';
+import {
+  isValidScheduledTime,
+  hasScheduledTime,
+  partitionAndSortHabits,
+} from '../domain/schedule.js';
 import { isBlank } from '../domain/text.js';
 
 const changeListeners = new Set();
@@ -109,16 +114,34 @@ export async function listHabits({ includeArchived = false } = {}) {
 }
 
 /**
+ * Validates and normalizes an optional Scheduled Time input for Habit mutations.
+ *
+ * @param {unknown} value
+ * @returns {string}
+ */
+function validateScheduledTime(value) {
+  if (value === null || value === undefined) return '';
+  const trimmed = String(value).trim();
+  if (!trimmed) return '';
+  if (!isValidScheduledTime(trimmed)) {
+    throw new Error('Invalid scheduled time');
+  }
+  return trimmed;
+}
+
+/**
  * Adds a new habit with sortOrder = maxSortOrder + 1.
  *
  * @param {string} name
+ * @param {{ linkedActivity?: 'journal' | 'book_summary' | null, scheduledTime?: string }} [options]
  * @returns {Promise<import('../shared/contracts.js').Habit>}
  */
-export async function addHabit(name, { linkedActivity = null } = {}) {
+export async function addHabit(name, { linkedActivity = null, scheduledTime = '' } = {}) {
   const trimmed = (name || '').trim();
   if (!trimmed) {
     throw new Error('Habit name cannot be empty');
   }
+  const normalizedTime = validateScheduledTime(scheduledTime);
 
   const db = await getDb();
   const allHabits = await db.getAll(STORES.HABITS);
@@ -135,6 +158,7 @@ export async function addHabit(name, { linkedActivity = null } = {}) {
     sortOrder: maxSortOrder + 1,
     archived: false,
     linkedActivity: linkedActivity || null,
+    scheduledTime: normalizedTime,
     createdAt: now,
     updatedAt: now,
   };
@@ -144,17 +168,21 @@ export async function addHabit(name, { linkedActivity = null } = {}) {
 }
 
 /**
- * Renames an existing habit.
+ * Renames an existing habit and optionally updates linkedActivity and scheduledTime.
  *
  * @param {string} id
  * @param {string} name
+ * @param {'journal' | 'book_summary' | null} [linkedActivity]
+ * @param {string} [scheduledTime]
  * @returns {Promise<import('../shared/contracts.js').Habit>}
  */
-export async function renameHabit(id, name, linkedActivity) {
+export async function renameHabit(id, name, linkedActivity, scheduledTime) {
   const trimmed = (name || '').trim();
   if (!trimmed) {
     throw new Error('Habit name cannot be empty');
   }
+  const validatedTime =
+    scheduledTime !== undefined ? validateScheduledTime(scheduledTime) : undefined;
 
   const db = await getDb();
   const existing = await db.get(STORES.HABITS, id);
@@ -172,13 +200,17 @@ export async function renameHabit(id, name, linkedActivity) {
   if (linkedActivity !== undefined) {
     updated.linkedActivity = linkedActivity || null;
   }
+  if (validatedTime !== undefined) {
+    updated.scheduledTime = validatedTime;
+  }
 
   await commitSingleMutation(STORES.HABITS, updated, 'habits', id);
   return updated;
 }
 
 /**
- * Swaps sortOrder with the adjacent active habit.
+ * Swaps sortOrder with the adjacent active Anytime habit.
+ * Timed habits (with Scheduled Time) follow clock order and cannot be manually reordered.
  *
  * @param {string} id
  * @param {'up' | 'down'} direction
@@ -186,18 +218,24 @@ export async function renameHabit(id, name, linkedActivity) {
  */
 export async function moveHabit(id, direction) {
   const activeHabits = await listHabits({ includeArchived: false });
-  const index = activeHabits.findIndex((h) => h.id === id);
+  const targetHabit = activeHabits.find((h) => h.id === id);
+  if (!targetHabit || hasScheduledTime(targetHabit)) {
+    return activeHabits;
+  }
+
+  const { anytime } = partitionAndSortHabits(activeHabits);
+  const index = anytime.findIndex((h) => h.id === id);
   if (index === -1) {
     return activeHabits;
   }
 
   const targetIndex = direction === 'up' ? index - 1 : index + 1;
-  if (targetIndex < 0 || targetIndex >= activeHabits.length) {
+  if (targetIndex < 0 || targetIndex >= anytime.length) {
     return activeHabits;
   }
 
-  const current = { ...activeHabits[index] };
-  const target = { ...activeHabits[targetIndex] };
+  const current = { ...anytime[index] };
+  const target = { ...anytime[targetIndex] };
 
   let currentOrder = current.sortOrder;
   let targetOrder = target.sortOrder;

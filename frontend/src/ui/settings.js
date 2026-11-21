@@ -21,6 +21,11 @@ import { getPushState, enablePush, sendTestPush } from '../pwa/push.js';
 import { showToast } from './shell.js';
 import { THEME_MODES, getThemePreference, setThemePreference } from './theme.js';
 import { LINKED_ACTIVITIES } from '../shared/contracts.js';
+import {
+  partitionAndSortHabits,
+  formatScheduledTime,
+  hasScheduledTime,
+} from '../domain/schedule.js';
 
 const THEME_OPTIONS = Object.freeze([
   { value: THEME_MODES.LIGHT, label: 'Light' },
@@ -200,9 +205,9 @@ export function mount(el) {
     setThemePreference(theme);
   });
 
-  const sectionsContainer = document.createElement('div');
-  sectionsContainer.className = 'space-y-6';
-  sectionsContainer.innerHTML = `
+  const syncSectionContainer = document.createElement('div');
+  syncSectionContainer.className = 'space-y-6';
+  syncSectionContainer.innerHTML = `
       <!-- Section 1: Sync -->
       <section id="settings-sync" class="editorial-card p-4 sm:p-5 space-y-4 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]" aria-labelledby="heading-sync">
         <div class="flex items-center justify-between border-b border-[#E6E4DF] dark:border-[#33302C] pb-3">
@@ -275,68 +280,164 @@ export function mount(el) {
           </button>
         </div>
       </section>
+  `;
 
-      <!-- Section 2: Manage Habits -->
-      <section id="settings-habits" class="editorial-card p-4 sm:p-5 space-y-4 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]" aria-labelledby="heading-habits">
-        <div class="flex items-center justify-between border-b border-[#E6E4DF] dark:border-[#33302C] pb-3">
-          <h2 id="heading-habits" class="text-base font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]">Manage Habits</h2>
-        </div>
+  // Section 2: Manage Habits (built via createElement so both browser & unit tests interact with live elements)
+  const habitsSection = document.createElement('section');
+  habitsSection.id = 'settings-habits';
+  habitsSection.className =
+    'editorial-card p-4 sm:p-5 space-y-4 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
+  habitsSection.setAttribute('aria-labelledby', 'heading-habits');
 
-        <!-- Add Habit Form -->
-        <form id="form-add-habit" class="flex flex-col sm:flex-row gap-2">
-          <input
-            id="input-new-habit"
-            type="text"
-            maxlength="60"
-            placeholder="New habit name..."
-            aria-label="New habit name"
-            class="flex-1 min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F] focus:outline-none focus:ring-2 focus:ring-[#C86D51]"
-          />
-          <select
-            id="select-habit-linked-activity"
-            class="min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]"
-          >
-            <option value="">No Activity Link</option>
-            <option value="book_summary">Link: Book Summary 📖</option>
-            <option value="journal">Link: Daily Journal ✍️</option>
-          </select>
-          <button
-            id="btn-add-habit"
-            type="submit"
-            class="btn-terracotta min-h-[44px] px-5 py-2 text-sm font-semibold rounded-lg cursor-pointer select-none shrink-0 tactile-spring"
-          >
-            Add Habit
-          </button>
-        </form>
+  const habitsTitleRow = document.createElement('div');
+  habitsTitleRow.className =
+    'flex items-center justify-between border-b border-[#E6E4DF] dark:border-[#33302C] pb-3';
+  const headingHabits = document.createElement('h2');
+  headingHabits.id = 'heading-habits';
+  headingHabits.className = 'text-base font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]';
+  headingHabits.textContent = 'Manage Habits';
+  habitsTitleRow.appendChild(headingHabits);
+  habitsSection.appendChild(habitsTitleRow);
 
-        <!-- Active Habits List -->
-        <div class="space-y-2">
-          <div class="text-xs font-semibold uppercase tracking-wider text-[#68655F] dark:text-[#A39E93]">
-            Active Habits
-          </div>
-          <div id="active-habits-list" class="space-y-2">
-            <div class="py-4 text-center text-zinc-400 dark:text-zinc-500 text-xs">Loading habits...</div>
-          </div>
-        </div>
+  const formAddHabit = document.createElement('form');
+  formAddHabit.id = 'form-add-habit';
+  formAddHabit.className = 'flex flex-col gap-2';
 
-        <!-- Archived Habits Section -->
-        <div class="pt-2 border-t border-[#E6E4DF] dark:border-[#33302C]">
-          <button
-            id="btn-toggle-archived"
-            type="button"
-            aria-expanded="false"
-            aria-pressed="false"
-            class="flex items-center justify-between w-full min-h-[44px] px-3 py-2 text-xs font-semibold uppercase tracking-wider text-[#68655F] dark:text-[#A39E93] bg-[#F6F5F2] dark:bg-[#161514] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] rounded-lg transition cursor-pointer select-none border border-[#E6E4DF] dark:border-[#33302C]"
-          >
-            <span>Archived Habits (<span id="archived-habits-count">0</span>)</span>
-            <span id="archived-toggle-icon" class="text-xs transition-transform pointer-events-none">▼</span>
-          </button>
-          <div id="archived-habits-container" class="space-y-2 mt-2 hidden" aria-hidden="true">
-            <div id="archived-habits-list" class="space-y-2"></div>
-          </div>
-        </div>
-      </section>
+  const inputNewHabit = document.createElement('input');
+  inputNewHabit.id = 'input-new-habit';
+  inputNewHabit.type = 'text';
+  inputNewHabit.maxLength = 60;
+  inputNewHabit.placeholder = 'New habit name...';
+  inputNewHabit.setAttribute('aria-label', 'New habit name');
+  inputNewHabit.className =
+    'w-full min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
+  inputNewHabit.style.fontSize = '16px';
 
+  const addHabitMetaRow = document.createElement('div');
+  addHabitMetaRow.className = 'flex flex-col sm:flex-row gap-2';
+
+  const addTimeWrap = document.createElement('div');
+  addTimeWrap.className = 'flex items-center gap-2 sm:w-auto';
+
+  const newHabitTimeLabel = document.createElement('label');
+  newHabitTimeLabel.htmlFor = 'input-new-habit-time';
+  newHabitTimeLabel.className = 'sr-only';
+  newHabitTimeLabel.textContent = 'Scheduled Time (optional)';
+
+  const inputNewHabitTime = document.createElement('input');
+  inputNewHabitTime.id = 'input-new-habit-time';
+  inputNewHabitTime.type = 'time';
+  inputNewHabitTime.setAttribute('aria-label', 'Scheduled time (optional)');
+  inputNewHabitTime.className =
+    'flex-1 sm:w-40 min-h-[44px] min-w-[44px] px-3.5 py-2 text-base font-mono rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
+  inputNewHabitTime.style.fontSize = '16px';
+
+  const btnClearNewHabitTime = document.createElement('button');
+  btnClearNewHabitTime.id = 'btn-clear-new-habit-time';
+  btnClearNewHabitTime.type = 'button';
+  btnClearNewHabitTime.setAttribute('aria-label', 'Clear scheduled time');
+  btnClearNewHabitTime.className =
+    'btn-secondary-surface min-h-[44px] min-w-[44px] px-3 py-2 text-xs font-mono font-medium rounded-lg border border-[#E6E4DF] dark:border-[#33302C] cursor-pointer shrink-0 tactile-spring';
+  btnClearNewHabitTime.textContent = 'Clear';
+
+  addTimeWrap.appendChild(newHabitTimeLabel);
+  addTimeWrap.appendChild(inputNewHabitTime);
+  addTimeWrap.appendChild(btnClearNewHabitTime);
+
+  const selectHabitLinkedActivity = document.createElement('select');
+  selectHabitLinkedActivity.id = 'select-habit-linked-activity';
+  selectHabitLinkedActivity.setAttribute('aria-label', 'Link to activity');
+  selectHabitLinkedActivity.className =
+    'flex-1 min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
+  selectHabitLinkedActivity.style.fontSize = '16px';
+
+  const addOptNone = document.createElement('option');
+  addOptNone.value = '';
+  addOptNone.textContent = 'No Activity Link';
+  selectHabitLinkedActivity.appendChild(addOptNone);
+
+  const addOptBook = document.createElement('option');
+  addOptBook.value = 'book_summary';
+  addOptBook.textContent = 'Link: Book Summary 📖';
+  selectHabitLinkedActivity.appendChild(addOptBook);
+
+  const addOptJournal = document.createElement('option');
+  addOptJournal.value = 'journal';
+  addOptJournal.textContent = 'Link: Daily Journal ✍️';
+  selectHabitLinkedActivity.appendChild(addOptJournal);
+
+  const btnAddHabit = document.createElement('button');
+  btnAddHabit.id = 'btn-add-habit';
+  btnAddHabit.type = 'submit';
+  btnAddHabit.className =
+    'btn-terracotta min-h-[44px] min-w-[44px] px-5 py-2 text-sm font-semibold rounded-lg cursor-pointer select-none shrink-0 tactile-spring';
+  btnAddHabit.textContent = 'Add Habit';
+
+  addHabitMetaRow.appendChild(addTimeWrap);
+  addHabitMetaRow.appendChild(selectHabitLinkedActivity);
+  addHabitMetaRow.appendChild(btnAddHabit);
+  formAddHabit.appendChild(inputNewHabit);
+  formAddHabit.appendChild(addHabitMetaRow);
+  habitsSection.appendChild(formAddHabit);
+
+  const activeHabitsBlock = document.createElement('div');
+  activeHabitsBlock.className = 'space-y-2';
+  const activeHabitsLabel = document.createElement('div');
+  activeHabitsLabel.className = 'text-xs font-semibold uppercase tracking-wider text-[#68655F] dark:text-[#A39E93]';
+  activeHabitsLabel.textContent = 'Active Habits';
+  const activeHabitsListEl = document.createElement('div');
+  activeHabitsListEl.id = 'active-habits-list';
+  activeHabitsListEl.className = 'space-y-4';
+  const loadingHabitsEl = document.createElement('div');
+  loadingHabitsEl.className = 'py-4 text-center text-zinc-400 dark:text-zinc-500 text-xs';
+  loadingHabitsEl.textContent = 'Loading habits...';
+  activeHabitsListEl.appendChild(loadingHabitsEl);
+  activeHabitsBlock.appendChild(activeHabitsLabel);
+  activeHabitsBlock.appendChild(activeHabitsListEl);
+  habitsSection.appendChild(activeHabitsBlock);
+
+  const archivedSectionWrap = document.createElement('div');
+  archivedSectionWrap.className = 'pt-2 border-t border-[#E6E4DF] dark:border-[#33302C]';
+  const btnToggleArchived = document.createElement('button');
+  btnToggleArchived.id = 'btn-toggle-archived';
+  btnToggleArchived.type = 'button';
+  btnToggleArchived.setAttribute('aria-expanded', 'false');
+  btnToggleArchived.setAttribute('aria-pressed', 'false');
+  btnToggleArchived.className =
+    'flex items-center justify-between w-full min-h-[44px] px-3 py-2 text-xs font-semibold uppercase tracking-wider text-[#68655F] dark:text-[#A39E93] bg-[#F6F5F2] dark:bg-[#161514] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] rounded-lg transition cursor-pointer select-none border border-[#E6E4DF] dark:border-[#33302C]';
+  const archivedBtnTextSpan = document.createElement('span');
+  const archivedBtnPrefix = document.createElement('span');
+  archivedBtnPrefix.textContent = 'Archived Habits (';
+  const archivedHabitsCountEl = document.createElement('span');
+  archivedHabitsCountEl.id = 'archived-habits-count';
+  archivedHabitsCountEl.textContent = '0';
+  const archivedBtnSuffix = document.createElement('span');
+  archivedBtnSuffix.textContent = ')';
+  archivedBtnTextSpan.appendChild(archivedBtnPrefix);
+  archivedBtnTextSpan.appendChild(archivedHabitsCountEl);
+  archivedBtnTextSpan.appendChild(archivedBtnSuffix);
+  const archivedToggleIcon = document.createElement('span');
+  archivedToggleIcon.id = 'archived-toggle-icon';
+  archivedToggleIcon.className = 'text-xs transition-transform pointer-events-none';
+  archivedToggleIcon.textContent = '▼';
+  btnToggleArchived.appendChild(archivedBtnTextSpan);
+  btnToggleArchived.appendChild(archivedToggleIcon);
+
+  const archivedHabitsContainerEl = document.createElement('div');
+  archivedHabitsContainerEl.id = 'archived-habits-container';
+  archivedHabitsContainerEl.className = 'space-y-2 mt-2 hidden';
+  archivedHabitsContainerEl.setAttribute('aria-hidden', 'true');
+  const archivedHabitsListEl = document.createElement('div');
+  archivedHabitsListEl.id = 'archived-habits-list';
+  archivedHabitsListEl.className = 'space-y-2';
+  archivedHabitsContainerEl.appendChild(archivedHabitsListEl);
+  archivedSectionWrap.appendChild(btnToggleArchived);
+  archivedSectionWrap.appendChild(archivedHabitsContainerEl);
+  habitsSection.appendChild(archivedSectionWrap);
+
+  const restSectionsContainer = document.createElement('div');
+  restSectionsContainer.className = 'space-y-6';
+  restSectionsContainer.innerHTML = `
       <!-- Section 3: Reminder -->
       <section id="settings-reminder" class="editorial-card p-4 sm:p-5 space-y-4 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]" aria-labelledby="heading-reminder">
         <div class="flex items-center justify-between border-b border-[#E6E4DF] dark:border-[#33302C] pb-3">
@@ -357,6 +458,7 @@ export function mount(el) {
             value="20:00"
             class="w-full sm:w-48 min-h-[44px] px-3.5 py-2 text-base font-mono rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]"
           />
+        </div>
 
         <!-- Web Push Card -->
         <div class="p-3.5 rounded-lg bg-[#F6F5F2] dark:bg-[#161514] border border-[#E6E4DF] dark:border-[#33302C] space-y-3">
@@ -413,7 +515,9 @@ export function mount(el) {
 
   wrapper.appendChild(header);
   wrapper.appendChild(appearanceSection);
-  wrapper.appendChild(sectionsContainer);
+  wrapper.appendChild(syncSectionContainer);
+  wrapper.appendChild(habitsSection);
+  wrapper.appendChild(restSectionsContainer);
   el.appendChild(wrapper);
 
   // DOM references
@@ -427,16 +531,6 @@ export function mount(el) {
   const syncPendingBadgeEl = el.querySelector('#sync-pending-badge');
   const syncLastSyncedEl = el.querySelector('#sync-last-synced');
 
-  const formAddHabit = el.querySelector('#form-add-habit');
-  const inputNewHabit = el.querySelector('#input-new-habit');
-  const btnAddHabit = el.querySelector('#btn-add-habit');
-  const activeHabitsListEl = el.querySelector('#active-habits-list');
-  const btnToggleArchived = el.querySelector('#btn-toggle-archived');
-  const archivedHabitsCountEl = el.querySelector('#archived-habits-count');
-  const archivedHabitsContainerEl = el.querySelector('#archived-habits-container');
-  const archivedToggleIcon = el.querySelector('#archived-toggle-icon');
-  const archivedHabitsListEl = el.querySelector('#archived-habits-list');
-
   const settingReminderTimeInput = el.querySelector('#setting-reminder-time');
   const pushStatusBadgeEl = el.querySelector('#push-status-badge');
   const pushStatusHelperEl = el.querySelector('#push-status-helper');
@@ -449,10 +543,9 @@ export function mount(el) {
   if (syncGasUrlInput) syncGasUrlInput.value = currentConfig.gasUrl || '';
   if (syncPinInput) syncPinInput.value = currentConfig.pin || '';
   if (settingReminderTimeInput) settingReminderTimeInput.value = '20:00';
-  if (btnToggleArchived) {
-    btnToggleArchived.setAttribute('aria-expanded', 'false');
-    btnToggleArchived.setAttribute('aria-pressed', 'false');
-  }
+  btnClearNewHabitTime.addEventListener('click', () => {
+    inputNewHabitTime.value = '';
+  });
   // --- SECTION 1: SYNC ---
 
   function updateSyncStatusRow(status) {
@@ -558,6 +651,288 @@ export function mount(el) {
 
   // --- SECTION 2: MANAGE HABITS ---
 
+  function createMoveButton({ habit, direction, isScheduled, isBoundary }) {
+    const isUp = direction === 'up';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `${isUp ? 'btn-move-up' : 'btn-move-down'} min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg border border-[#E6E4DF] dark:border-[#33302C] text-[#68655F] dark:text-[#A39E93] ${
+      isScheduled
+        ? 'opacity-35 cursor-not-allowed'
+        : 'hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] disabled:opacity-30 disabled:cursor-not-allowed'
+    } select-none transition tactile-spring`;
+    btn.setAttribute('aria-label', isUp ? 'Move up' : 'Move down');
+    btn.title = isScheduled
+      ? 'Scheduled habits follow clock order automatically'
+      : isUp
+        ? 'Move up'
+        : 'Move down';
+    btn.textContent = isUp ? '▲' : '▼';
+
+    if (isScheduled) {
+      btn.setAttribute('aria-disabled', 'true');
+      btn.dataset.lockedMove = 'true';
+      btn.addEventListener('click', () => {
+        showToast('Scheduled habits follow clock order — clear time to reorder');
+      });
+    } else {
+      if (isBoundary) {
+        btn.disabled = true;
+      }
+      btn.addEventListener('click', async () => {
+        try {
+          await moveHabit(habit.id, direction);
+          await renderHabits();
+        } catch (err) {
+          showToast(err.message || 'Failed to move habit');
+        }
+      });
+    }
+    return btn;
+  }
+
+  function createActiveHabitRow(habit, { isScheduled, isFirstAnytime, isLastAnytime }) {
+    const row = document.createElement('div');
+    row.className =
+      'habit-row editorial-card flex items-center justify-between gap-2 p-2.5 bg-[#FFFFFF] dark:bg-[#161514] border-[#E6E4DF] dark:border-[#33302C]';
+    row.dataset.habitId = habit.id;
+
+    // Habit name & inline rename trigger
+    const nameWrapper = document.createElement('div');
+    nameWrapper.className = 'flex flex-wrap items-center gap-1.5 flex-1 min-w-0';
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className =
+      'habit-name flex-1 min-w-[120px] text-sm font-medium text-[#1C1B18] dark:text-[#F4F1EA] hover:text-[#C86D51] dark:hover:text-[#D97E63] cursor-pointer truncate py-2 px-2 min-h-[44px] flex items-center rounded-lg transition';
+    nameSpan.textContent = habit.name;
+    nameSpan.title = 'Click to rename';
+    nameSpan.setAttribute('role', 'button');
+    nameSpan.setAttribute('tabindex', '0');
+
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className =
+      'btn-edit btn-rename min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-lg cursor-pointer transition shrink-0';
+    editBtn.setAttribute('aria-label', `Rename ${habit.name}`);
+    editBtn.innerHTML = `
+      <svg class="w-4 h-4 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+      </svg>
+    `;
+
+    if (hasScheduledTime(habit)) {
+      const timeBadge = document.createElement('span');
+      timeBadge.className =
+        'habit-scheduled-time-badge text-xs font-mono font-semibold px-2 py-0.5 rounded-full badge-ochre shrink-0';
+      timeBadge.dataset.scheduledTime = habit.scheduledTime;
+      timeBadge.textContent = formatScheduledTime(habit.scheduledTime);
+      nameWrapper.appendChild(timeBadge);
+    }
+
+    if (habit.linkedActivity) {
+      const badge = document.createElement('span');
+      const isBook = habit.linkedActivity === LINKED_ACTIVITIES.BOOK_SUMMARY;
+      badge.className = `text-[10px] font-semibold font-mono uppercase px-2 py-0.5 rounded-full ${isBook ? 'badge-slate' : 'badge-rose'} shrink-0`;
+      badge.textContent = isBook ? '📖 Book' : '✍️ Journal';
+      nameWrapper.appendChild(badge);
+    }
+    nameWrapper.appendChild(nameSpan);
+    nameWrapper.appendChild(editBtn);
+
+    const startRename = () => {
+      editingHabitId = habit.id;
+      const form = document.createElement('form');
+      form.className = 'rename-form flex-1 flex flex-col gap-2 min-w-0';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.maxLength = 60;
+      input.value = habit.name;
+      input.className =
+        'rename-input input-rename w-full min-h-[44px] px-3 py-1.5 text-base rounded-lg border-2 border-[#C86D51] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none';
+      input.setAttribute('aria-label', `New name for ${habit.name}`);
+      input.style.fontSize = '16px';
+
+      const editControlsRow = document.createElement('div');
+      editControlsRow.className = 'flex flex-wrap items-center gap-1.5';
+
+      const editTimeInput = document.createElement('input');
+      editTimeInput.type = 'time';
+      editTimeInput.value = habit.scheduledTime || '';
+      editTimeInput.className =
+        'input-edit-scheduled-time min-h-[44px] min-w-[44px] px-2.5 py-1.5 text-base font-mono rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
+      editTimeInput.setAttribute('aria-label', `Scheduled time for ${habit.name}`);
+      editTimeInput.style.fontSize = '16px';
+
+      const clearEditTimeBtn = document.createElement('button');
+      clearEditTimeBtn.type = 'button';
+      clearEditTimeBtn.className =
+        'btn-clear-edit-time btn-secondary-surface min-h-[44px] min-w-[44px] px-3 py-1.5 text-xs font-mono font-medium rounded-lg border border-[#E6E4DF] dark:border-[#33302C] cursor-pointer shrink-0 tactile-spring';
+      clearEditTimeBtn.setAttribute('aria-label', `Clear scheduled time for ${habit.name}`);
+      clearEditTimeBtn.textContent = 'Clear';
+      clearEditTimeBtn.addEventListener('click', () => {
+        editTimeInput.value = '';
+      });
+
+      const select = document.createElement('select');
+      select.className =
+        'select-edit-linked-activity min-h-[44px] px-2.5 py-1.5 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
+      select.setAttribute('aria-label', `Linked activity for ${habit.name}`);
+      select.style.fontSize = '16px';
+
+      const optNone = document.createElement('option');
+      optNone.value = '';
+      optNone.textContent = 'No Link';
+      optNone.selected = !habit.linkedActivity;
+      select.appendChild(optNone);
+
+      const optBook = document.createElement('option');
+      optBook.value = 'book_summary';
+      optBook.textContent = 'Book Summary 📖';
+      optBook.selected = habit.linkedActivity === 'book_summary';
+      select.appendChild(optBook);
+
+      const optJournal = document.createElement('option');
+      optJournal.value = 'journal';
+      optJournal.textContent = 'Daily Journal ✍️';
+      optJournal.selected = habit.linkedActivity === 'journal';
+      select.appendChild(optJournal);
+      select.value = habit.linkedActivity || '';
+
+      const cancelEditBtn = document.createElement('button');
+      cancelEditBtn.type = 'button';
+      cancelEditBtn.className =
+        'btn-cancel-edit btn-secondary-surface px-3 py-1.5 min-h-[44px] min-w-[44px] text-xs font-mono font-medium rounded-lg border border-[#E6E4DF] dark:border-[#33302C] cursor-pointer transition shrink-0 tactile-spring';
+      cancelEditBtn.textContent = 'Cancel';
+
+      const saveBtn = document.createElement('button');
+      saveBtn.type = 'submit';
+      saveBtn.className =
+        'btn-terracotta px-4 py-1.5 min-h-[44px] min-w-[44px] text-xs font-mono font-semibold rounded-lg cursor-pointer transition shrink-0 tactile-spring';
+      saveBtn.textContent = 'Save';
+
+      editControlsRow.appendChild(editTimeInput);
+      editControlsRow.appendChild(clearEditTimeBtn);
+      editControlsRow.appendChild(select);
+      editControlsRow.appendChild(cancelEditBtn);
+      editControlsRow.appendChild(saveBtn);
+
+      form.appendChild(input);
+      form.appendChild(editControlsRow);
+      nameWrapper.replaceWith(form);
+      input.focus();
+      if (typeof input.select === 'function') input.select();
+
+      let finished = false;
+      const cancelRename = () => {
+        if (finished) return;
+        finished = true;
+        editingHabitId = null;
+        renderHabits();
+      };
+
+      const commit = async () => {
+        if (finished) return;
+        finished = true;
+        editingHabitId = null;
+        const newName = input.value.trim();
+        const newLinked = select.value || null;
+        const newScheduledTime = (editTimeInput.value || '').trim();
+        const prevScheduledTime = habit.scheduledTime || '';
+        if (
+          newName &&
+          (newName !== habit.name ||
+            newLinked !== (habit.linkedActivity || null) ||
+            newScheduledTime !== prevScheduledTime)
+        ) {
+          try {
+            await renameHabit(habit.id, newName, newLinked, newScheduledTime);
+            showToast('Habit updated');
+          } catch (err) {
+            showToast(err.message || 'Failed to update habit');
+          }
+        }
+        await renderHabits();
+      };
+
+      form.addEventListener('submit', (e) => {
+        e?.preventDefault?.();
+        commit();
+      });
+
+      saveBtn.addEventListener('click', (e) => {
+        e?.preventDefault?.();
+        commit();
+      });
+
+      cancelEditBtn.addEventListener('click', cancelRename);
+
+      form.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          e?.preventDefault?.();
+          cancelRename();
+        }
+      });
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          e?.preventDefault?.();
+          cancelRename();
+        }
+      });
+    };
+
+    nameSpan.addEventListener('click', startRename);
+    nameSpan.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        startRename();
+      }
+    });
+    editBtn.addEventListener('click', startRename);
+
+    // Action buttons: Move up, Move down, Archive
+    const actionsWrapper = document.createElement('div');
+    actionsWrapper.className = 'flex items-center gap-1 shrink-0';
+
+    const upBtn = createMoveButton({
+      habit,
+      direction: 'up',
+      isScheduled,
+      isBoundary: isFirstAnytime,
+    });
+    const downBtn = createMoveButton({
+      habit,
+      direction: 'down',
+      isScheduled,
+      isBoundary: isLastAnytime,
+    });
+
+    const archiveBtn = document.createElement('button');
+    archiveBtn.type = 'button';
+    archiveBtn.className =
+      'btn-archive min-h-[44px] px-3.5 text-xs font-mono font-semibold rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 transition cursor-pointer select-none tactile-spring';
+    archiveBtn.setAttribute('aria-label', `Archive ${habit.name}`);
+    archiveBtn.textContent = 'Archive';
+    archiveBtn.addEventListener('click', async () => {
+      try {
+        archiveBtn.disabled = true;
+        await setHabitArchived(habit.id, true);
+        showToast('Habit archived');
+        await renderHabits();
+      } catch (err) {
+        showToast(err.message || 'Failed to archive habit');
+      }
+    });
+
+    actionsWrapper.appendChild(upBtn);
+    actionsWrapper.appendChild(downBtn);
+    actionsWrapper.appendChild(archiveBtn);
+
+    row.appendChild(nameWrapper);
+    row.appendChild(actionsWrapper);
+    return row;
+  }
+
   async function renderHabits() {
     if (!isMounted || !activeHabitsListEl || !archivedHabitsListEl) return;
     if (editingHabitId) return;
@@ -570,228 +945,88 @@ export function mount(el) {
       const archivedHabits = allHabits.filter((h) => h.archived);
 
       // Render Active Habits
+      activeHabitsListEl.innerHTML = '';
       if (activeHabits.length === 0) {
-        activeHabitsListEl.innerHTML = `
-          <div class="py-6 text-center text-zinc-400 dark:text-zinc-500 text-xs sm:text-sm">
-            No active habits yet. Add your first habit above!
-          </div>
-        `;
+        const emptyEl = document.createElement('div');
+        emptyEl.className = 'py-6 text-center text-zinc-400 dark:text-zinc-500 text-xs sm:text-sm';
+        emptyEl.textContent = 'No active habits yet. Add your first habit above!';
+        activeHabitsListEl.appendChild(emptyEl);
       } else {
-        activeHabitsListEl.innerHTML = '';
-        activeHabits.forEach((habit, index) => {
-          const isFirst = index === 0;
-          const isLast = index === activeHabits.length - 1;
+        const { scheduled, anytime } = partitionAndSortHabits(activeHabits);
 
-          const row = document.createElement('div');
-          row.className =
-            'habit-row editorial-card flex items-center justify-between gap-2 p-2.5 bg-[#FFFFFF] dark:bg-[#161514] border-[#E6E4DF] dark:border-[#33302C]';
-          row.dataset.habitId = habit.id;
+        if (scheduled.length > 0) {
+          const scheduledGroup = document.createElement('div');
+          scheduledGroup.id = 'settings-scheduled-habits-group';
+          scheduledGroup.className = 'space-y-2';
 
-          // Habit name & inline rename trigger
-          const nameWrapper = document.createElement('div');
-          nameWrapper.className = 'flex items-center gap-1.5 flex-1 min-w-0';
+          const schedHeader = document.createElement('div');
+          schedHeader.className = 'space-y-0.5';
 
-          const nameSpan = document.createElement('span');
-          nameSpan.className =
-            'habit-name flex-1 text-sm font-medium text-[#1C1B18] dark:text-[#F4F1EA] hover:text-[#C86D51] dark:hover:text-[#D97E63] cursor-pointer truncate py-2 px-2 min-h-[44px] flex items-center rounded-lg transition';
-          nameSpan.textContent = habit.name;
-          nameSpan.title = 'Click to rename';
-          nameSpan.setAttribute('role', 'button');
-          nameSpan.setAttribute('tabindex', '0');
+          const schedHeading = document.createElement('h3');
+          schedHeading.className =
+            'text-xs font-mono font-semibold uppercase tracking-wider text-[#68655F] dark:text-[#A39E93]';
+          schedHeading.textContent = 'Scheduled';
 
-          const editBtn = document.createElement('button');
-          editBtn.type = 'button';
-          editBtn.className =
-            'btn-edit btn-rename min-w-[44px] min-h-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-lg cursor-pointer transition';
-          editBtn.setAttribute('aria-label', `Rename ${habit.name}`);
-          editBtn.innerHTML = `
-            <svg class="w-4 h-4 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-            </svg>
-          `;
+          const schedNote = document.createElement('p');
+          schedNote.id = 'settings-scheduled-order-note';
+          schedNote.className = 'text-xs text-[#68655F] dark:text-[#A39E93]';
+          schedNote.textContent =
+            "Scheduled habits follow clock order automatically. Clear a habit's time to reorder it manually.";
 
-          if (habit.linkedActivity) {
-            const isBook = habit.linkedActivity === LINKED_ACTIVITIES.BOOK_SUMMARY;
-            badge.className =
-              `text-[10px] font-semibold font-mono uppercase px-2 py-0.5 rounded-full ${isBook ? 'badge-slate' : 'badge-rose'} shrink-0`;
-            badge.textContent = isBook ? '📖 Book' : '✍️ Journal';
-            nameWrapper.appendChild(badge);
+          schedHeader.appendChild(schedHeading);
+          schedHeader.appendChild(schedNote);
+          scheduledGroup.appendChild(schedHeader);
+
+          scheduled.forEach((habit) => {
+            scheduledGroup.appendChild(
+              createActiveHabitRow(habit, {
+                isScheduled: true,
+                isFirstAnytime: false,
+                isLastAnytime: false,
+              })
+            );
+          });
+          activeHabitsListEl.appendChild(scheduledGroup);
+        }
+
+        if (anytime.length > 0) {
+          const anytimeGroup = document.createElement('div');
+          anytimeGroup.id = 'settings-anytime-habits-group';
+          anytimeGroup.className = 'space-y-2';
+
+          if (scheduled.length > 0) {
+            const anytimeHeading = document.createElement('h3');
+            anytimeHeading.id = 'settings-anytime-habits-heading';
+            anytimeHeading.className =
+              'text-xs font-mono font-semibold uppercase tracking-wider text-[#68655F] dark:text-[#A39E93] pt-1';
+            anytimeHeading.textContent = 'Anytime';
+            anytimeGroup.appendChild(anytimeHeading);
           }
-          nameWrapper.appendChild(nameSpan);
-          nameWrapper.appendChild(editBtn);
 
-          const startRename = () => {
-            editingHabitId = habit.id;
-            const form = document.createElement('form');
-            form.className = 'rename-form flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 min-w-0';
-
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.maxLength = 60;
-            input.value = habit.name;
-            input.className =
-              'rename-input input-rename flex-1 min-h-[44px] px-3 py-1.5 text-base rounded-lg border-2 border-[#C86D51] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none';
-            input.setAttribute('aria-label', `New name for ${habit.name}`);
-
-            const select = document.createElement('select');
-            select.className =
-              'select-edit-linked-activity min-h-[44px] px-2.5 py-1.5 text-xs rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
-            select.setAttribute('aria-label', `Linked activity for ${habit.name}`);
-
-            const optNone = document.createElement('option');
-            optNone.value = '';
-            optNone.textContent = 'No Link';
-            optNone.selected = !habit.linkedActivity;
-            select.appendChild(optNone);
-
-            const optBook = document.createElement('option');
-            optBook.value = 'book_summary';
-            optBook.textContent = 'Book Summary 📖';
-            optBook.selected = habit.linkedActivity === 'book_summary';
-            select.appendChild(optBook);
-
-            const optJournal = document.createElement('option');
-            optJournal.value = 'journal';
-            optJournal.textContent = 'Daily Journal ✍️';
-            optJournal.selected = habit.linkedActivity === 'journal';
-            select.appendChild(optJournal);
-
-            const saveBtn = document.createElement('button');
-            saveBtn.type = 'submit';
-            saveBtn.className =
-              'btn-terracotta px-4 py-1.5 min-h-[44px] text-xs font-mono font-semibold rounded-lg cursor-pointer transition shrink-0 tactile-spring';
-            saveBtn.textContent = 'Save';
-
-            form.appendChild(input);
-            form.appendChild(select);
-            form.appendChild(saveBtn);
-            nameWrapper.replaceWith(form);
-            input.focus();
-            if (typeof input.select === 'function') input.select();
-
-            let finished = false;
-            const commit = async () => {
-              if (finished) return;
-              finished = true;
-              editingHabitId = null;
-              const newName = input.value.trim();
-              const newLinked = select.value || null;
-              if (newName && (newName !== habit.name || newLinked !== (habit.linkedActivity || null))) {
-                try {
-                  await renameHabit(habit.id, newName, newLinked);
-                  showToast('Habit updated');
-                } catch (err) {
-                  showToast(err.message || 'Failed to update habit');
-                }
-              }
-              await renderHabits();
-            };
-
-            form.addEventListener('submit', (e) => {
-              e.preventDefault();
-              commit();
-            });
-
-            input.addEventListener('blur', () => {
-              commit();
-            });
-
-            input.addEventListener('keydown', (e) => {
-              if (e.key === 'Escape') {
-                e.preventDefault();
-                finished = true;
-                editingHabitId = null;
-                renderHabits();
-              }
-            });
-          };
-
-          nameSpan.addEventListener('click', startRename);
-          nameSpan.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              startRename();
-            }
+          anytime.forEach((habit, index) => {
+            anytimeGroup.appendChild(
+              createActiveHabitRow(habit, {
+                isScheduled: false,
+                isFirstAnytime: index === 0,
+                isLastAnytime: index === anytime.length - 1,
+              })
+            );
           });
-          editBtn.addEventListener('click', startRename);
-
-          // Action buttons: Move up, Move down, Archive
-          const actionsWrapper = document.createElement('div');
-          actionsWrapper.className = 'flex items-center gap-1 shrink-0';
-
-          const upBtn = document.createElement('button');
-          upBtn.type = 'button';
-          upBtn.className =
-            'btn-move-up min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg border border-[#E6E4DF] dark:border-[#33302C] text-[#68655F] dark:text-[#A39E93] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] disabled:opacity-30 disabled:cursor-not-allowed select-none transition tactile-spring';
-          upBtn.setAttribute('aria-label', 'Move up');
-          upBtn.title = 'Move up';
-          upBtn.textContent = '▲';
-          if (isFirst) upBtn.disabled = true;
-          upBtn.addEventListener('click', async () => {
-            try {
-              await moveHabit(habit.id, 'up');
-              await renderHabits();
-            } catch (err) {
-              showToast(err.message || 'Failed to move habit');
-            }
-          });
-
-          const downBtn = document.createElement('button');
-          downBtn.type = 'button';
-          downBtn.className =
-            'btn-move-down min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg border border-[#E6E4DF] dark:border-[#33302C] text-[#68655F] dark:text-[#A39E93] hover:bg-[#EFECE6] dark:hover:bg-[#2C2926] disabled:opacity-30 disabled:cursor-not-allowed select-none transition tactile-spring';
-          downBtn.setAttribute('aria-label', 'Move down');
-          downBtn.title = 'Move down';
-          downBtn.textContent = '▼';
-          if (isLast) downBtn.disabled = true;
-          downBtn.addEventListener('click', async () => {
-            try {
-              await moveHabit(habit.id, 'down');
-              await renderHabits();
-            } catch (err) {
-              showToast(err.message || 'Failed to move habit');
-            }
-          });
-
-          const archiveBtn = document.createElement('button');
-          archiveBtn.type = 'button';
-          archiveBtn.className =
-            'btn-archive min-h-[44px] px-3.5 text-xs font-mono font-semibold rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 transition cursor-pointer select-none tactile-spring';
-          archiveBtn.setAttribute('aria-label', `Archive ${habit.name}`);
-          archiveBtn.textContent = 'Archive';
-          archiveBtn.addEventListener('click', async () => {
-            try {
-              archiveBtn.disabled = true;
-              await setHabitArchived(habit.id, true);
-              showToast('Habit archived');
-              await renderHabits();
-            } catch (err) {
-              showToast(err.message || 'Failed to archive habit');
-            }
-          });
-
-          actionsWrapper.appendChild(upBtn);
-          actionsWrapper.appendChild(downBtn);
-          actionsWrapper.appendChild(archiveBtn);
-
-          row.appendChild(nameWrapper);
-          row.appendChild(actionsWrapper);
-          activeHabitsListEl.appendChild(row);
-        });
+          activeHabitsListEl.appendChild(anytimeGroup);
+        }
       }
 
       // Render Archived Habits
       if (archivedHabitsCountEl) {
         archivedHabitsCountEl.textContent = String(archivedHabits.length);
       }
+      archivedHabitsListEl.innerHTML = '';
       if (archivedHabits.length === 0) {
-        archivedHabitsListEl.innerHTML = `
-          <div class="py-3 text-center text-zinc-400 dark:text-zinc-500 text-xs">
-            No archived habits.
-          </div>
-        `;
+        const noArchivedEl = document.createElement('div');
+        noArchivedEl.className = 'py-3 text-center text-zinc-400 dark:text-zinc-500 text-xs';
+        noArchivedEl.textContent = 'No archived habits.';
+        archivedHabitsListEl.appendChild(noArchivedEl);
       } else {
-        archivedHabitsListEl.innerHTML = '';
         archivedHabits.forEach((habit) => {
           const row = document.createElement('div');
           row.className =
@@ -838,10 +1073,12 @@ export function mount(el) {
 
     isAddingHabit = true;
     try {
-      const linkedSelect = el.querySelector('#select-habit-linked-activity');
-      const linkedActivity = linkedSelect?.value || null;
-      await addHabit(name, { linkedActivity });
+      const linkedActivity = selectHabitLinkedActivity?.value || null;
+      const scheduledTime = inputNewHabitTime ? inputNewHabitTime.value.trim() : '';
+      await addHabit(name, { linkedActivity, scheduledTime });
       inputNewHabit.value = '';
+      if (inputNewHabitTime) inputNewHabitTime.value = '';
+      if (selectHabitLinkedActivity) selectHabitLinkedActivity.value = '';
       showToast('Habit added');
       await renderHabits();
     } catch (err) {

@@ -567,3 +567,218 @@ describe('ui/today.js persistent quick-add when habits exist', () => {
     cleanup();
   });
 });
+
+describe('ui/today.js Scheduled Time', () => {
+  let mockDoc;
+  let repoModule;
+  let shellModule;
+  let mount;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    mockDoc = new MockDocument();
+    global.document = mockDoc;
+    global.HTMLElement = MockElement;
+
+    vi.doMock('../domain/day.js', async (importOriginal) => {
+      const actual = await importOriginal();
+      return {
+        ...actual,
+        today: () => '2026-10-21',
+        formatLong: () => 'Wednesday, October 21, 2026',
+      };
+    });
+
+    shellModule = {
+      navigate: vi.fn(),
+      showToast: vi.fn(),
+    };
+    vi.doMock('./shell.js', () => shellModule);
+
+    let habitsList = [];
+    let checkedIds = new Set();
+    const listeners = new Set();
+    repoModule = {
+      listHabits: vi.fn(async () => [...habitsList]),
+      getCheckInDays: vi.fn(async (id) =>
+        checkedIds.has(id) ? new Set(['2026-10-21']) : new Set()
+      ),
+      toggleCheckIn: vi.fn(async () => {}),
+      addHabit: vi.fn(async (name, { linkedActivity = null, scheduledTime = '' } = {}) => {
+        const trimmed = (name || '').trim();
+        if (!trimmed) throw new Error('Habit name cannot be empty');
+        const h = {
+          id: `h-${habitsList.length + 1}`,
+          name: trimmed,
+          sortOrder: habitsList.length,
+          linkedActivity,
+          scheduledTime,
+        };
+        habitsList.push(h);
+        for (const l of listeners) l();
+        return h;
+      }),
+      onChange: vi.fn((l) => {
+        listeners.add(l);
+        return () => listeners.delete(l);
+      }),
+      _setHabits: (h) => {
+        habitsList = h;
+      },
+      _setChecked: (ids) => {
+        checkedIds = new Set(ids);
+      },
+    };
+    vi.doMock('../data/repo.js', () => repoModule);
+
+    const mod = await import('./today.js');
+    mount = mod.mount;
+  });
+
+  afterEach(() => {
+    delete global.document;
+    delete global.HTMLElement;
+    vi.restoreAllMocks();
+  });
+
+  it('orders timed Habits chronologically (ties by sortOrder) before Anytime Habits and renders conditional Anytime header', async () => {
+    repoModule._setHabits([
+      { id: 'any-2', name: 'Untimed B', sortOrder: 5, scheduledTime: '' },
+      { id: 'night', name: 'Evening Walk', sortOrder: 0, scheduledTime: '21:00' },
+      { id: 'morning-2', name: 'Stretch', sortOrder: 4, scheduledTime: '05:00' },
+      { id: 'any-1', name: 'Drink Water', sortOrder: 1, scheduledTime: '' },
+      { id: 'morning-1', name: 'Journaling', sortOrder: 2, scheduledTime: '05:00', linkedActivity: 'journal' },
+    ]);
+    // Check off earliest Habit to verify checked-in items stay in their chronological slot
+    repoModule._setChecked(['morning-1']);
+
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 20));
+
+    const container = mockDoc.getElementById('habits-list-container');
+    const items = container.querySelectorAll('li');
+    expect(items.map((el) => el.dataset.habitId)).toEqual([
+      'morning-1',
+      'morning-2',
+      'night',
+      'any-1',
+      'any-2',
+    ]);
+
+    const anytimeHeading = mockDoc.getElementById('today-anytime-heading');
+    expect(anytimeHeading).not.toBeNull();
+    expect(anytimeHeading.textContent).toBe('Anytime');
+
+    const firstTimeEl = items[0].querySelector('.habit-scheduled-time');
+    expect(firstTimeEl).not.toBeNull();
+    expect(firstTimeEl.dataset.scheduledTime).toBe('05:00');
+    expect(firstTimeEl.textContent.length).toBeGreaterThan(0);
+
+    // Linked activity badge still renders alongside Scheduled Time on secondary metadata line
+    expect(items[0].querySelector('.habit-activity-link')).not.toBeNull();
+
+    // Checked-in Habit remains in first slot with check button pressed
+    const firstCheckBtn = items[0].querySelector('[data-action="toggle-checkin"]');
+    expect(firstCheckBtn.getAttribute('aria-pressed')).toBe('true');
+
+    // Anytime items have no scheduled time label
+    expect(items[3].querySelector('.habit-scheduled-time')).toBeNull();
+
+    cleanup();
+  });
+
+  it('omits Anytime header when all Habits are timed or all Habits are untimed', async () => {
+    repoModule._setHabits([
+      { id: 't2', name: 'Night', sortOrder: 0, scheduledTime: '22:00' },
+      { id: 't1', name: 'Dawn', sortOrder: 1, scheduledTime: '05:00' },
+    ]);
+
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(mockDoc.getElementById('today-anytime-heading')).toBeNull();
+    expect(mockDoc.getElementById('habits-list-container').querySelectorAll('li').map((el) => el.dataset.habitId)).toEqual([
+      't1',
+      't2',
+    ]);
+    cleanup();
+
+    repoModule._setHabits([
+      { id: 'u1', name: 'Water', sortOrder: 0, scheduledTime: '' },
+      { id: 'u2', name: 'Read', sortOrder: 1 },
+    ]);
+    const root2 = mockDoc.createElement('div');
+    const cleanup2 = mount(root2);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(mockDoc.getElementById('today-anytime-heading')).toBeNull();
+    cleanup2();
+  });
+
+  it('supports optional scheduledTime and Clear button in + Add Habit form without breaking untimed adds', async () => {
+    repoModule._setHabits([{ id: 'h-init', name: 'Existing', sortOrder: 0 }]);
+
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 20));
+
+    // 1. Add Habit with scheduledTime and linkedActivity
+    mockDoc.getElementById('today-add-habit-trigger').click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    const nameInput = mockDoc.getElementById('today-add-habit-input');
+    const timeInput = mockDoc.getElementById('today-add-habit-scheduled-time');
+    const clearBtn = mockDoc.getElementById('today-add-habit-clear-time');
+    const linkedSelect = mockDoc.getElementById('today-add-habit-linked-activity');
+    const submitBtn = mockDoc.getElementById('today-add-habit-submit');
+
+    expect(timeInput).not.toBeNull();
+    expect(timeInput.type).toBe('time');
+    expect(timeInput.style.fontSize).toBe('16px');
+    expect(timeInput.classList.contains('min-h-[44px]')).toBe(true);
+    expect(clearBtn).not.toBeNull();
+    expect(clearBtn.classList.contains('min-h-[44px]')).toBe(true);
+    expect(clearBtn.classList.contains('min-w-[44px]')).toBe(true);
+
+    nameInput.value = 'Journaling';
+    timeInput.value = '05:00';
+    linkedSelect.value = 'journal';
+    submitBtn.click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(repoModule.addHabit).toHaveBeenLastCalledWith('Journaling', {
+      linkedActivity: 'journal',
+      scheduledTime: '05:00',
+    });
+
+    // 2. Add Habit with scheduledTime only
+    mockDoc.getElementById('today-add-habit-trigger').click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    mockDoc.getElementById('today-add-habit-input').value = 'Walk';
+    mockDoc.getElementById('today-add-habit-scheduled-time').value = '18:30';
+    mockDoc.getElementById('today-add-habit-submit').click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(repoModule.addHabit).toHaveBeenLastCalledWith('Walk', {
+      scheduledTime: '18:30',
+    });
+
+    // 3. Clearing scheduledTime resets value back to '' and calls single-arg addHabit
+    mockDoc.getElementById('today-add-habit-trigger').click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    const timeInput3 = mockDoc.getElementById('today-add-habit-scheduled-time');
+    timeInput3.value = '07:00';
+    mockDoc.getElementById('today-add-habit-clear-time').click();
+    expect(timeInput3.value).toBe('');
+
+    mockDoc.getElementById('today-add-habit-input').value = 'Hydrate';
+    mockDoc.getElementById('today-add-habit-submit').click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(repoModule.addHabit).toHaveBeenLastCalledWith('Hydrate');
+
+    cleanup();
+  });
+});

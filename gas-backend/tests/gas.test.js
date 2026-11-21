@@ -27,7 +27,8 @@ const {
   clampClientTimestamp,
   sanitizeFormulaInjection,
   desanitizeFormulaInjection,
-  isValidPushEndpoint
+  isValidPushEndpoint,
+  normalizeScheduledTime
 } = pureContext.module.exports;
 
 /**
@@ -41,12 +42,14 @@ function createGasEnv(initialProps = {}) {
   const sheets = new Map();
   function createSheet(name) {
     let grid = [];
+    let lastNumberFormat = null;
     return {
       getName: () => name,
       getLastRow: () => grid.length,
       getLastColumn: () => (grid.length > 0 ? grid[0].length : 0),
       getMaxRows: () => Math.max(grid.length, 100),
       getMaxColumns: () => Math.max(grid.length > 0 ? grid[0].length : 0, 20),
+      _getLastNumberFormat: () => lastNumberFormat,
       getDataRange: () => ({
         getValues: () => grid.map(r => [...r])
       }),
@@ -74,7 +77,9 @@ function createGasEnv(initialProps = {}) {
           }
           return res;
         },
-        setNumberFormat: () => {}
+        setNumberFormat: (fmt) => {
+          lastNumberFormat = fmt;
+        }
       }),
       deleteRow: (rowNum) => {
         grid.splice(rowNum - 1, 1);
@@ -791,6 +796,17 @@ describe('Pure Functions', () => {
       expect(isValidPushEndpoint('https://[::1]/push')).toBe(false); // IPv6
       expect(isValidPushEndpoint(null)).toBe(false);
     });
+
+    it('normalizeScheduledTime accepts valid 24-hour HH:MM strings and rejects empty or invalid values', () => {
+      expect(normalizeScheduledTime('05:00')).toBe('05:00');
+      expect(normalizeScheduledTime('  23:59  ')).toBe('23:59');
+      expect(normalizeScheduledTime('')).toBe('');
+      expect(normalizeScheduledTime(null)).toBe('');
+      expect(normalizeScheduledTime(undefined)).toBe('');
+      expect(normalizeScheduledTime('24:00')).toBe('');
+      expect(normalizeScheduledTime('=05:00')).toBe('');
+      expect(normalizeScheduledTime('abc')).toBe('');
+    });
   });
 
   describe('Pure Function Isolation Guardrail (SPEC §6)', () => {
@@ -816,7 +832,8 @@ describe('Pure Functions', () => {
         'isBlankText',
         'isJournalEntryWritten',
         'sanitizeJournalTitle',
-        'desanitizeJournalTitle'
+        'desanitizeJournalTitle',
+        'normalizeScheduledTime'
       ];
 
       const bannedAmbientSymbols = [
@@ -1271,6 +1288,221 @@ describe('GAS Backend Actions', () => {
       ]);
       expect(upgradedRows[1][5]).toBe('');
       expect(upgradedRows[2][5]).toBe('Fresh Title');
+    });
+
+    it('syncs Habit scheduledTime via Column 8 as plain text @, and auto-expands legacy 7-column Habits sheets', () => {
+      const hSheet = env.ss.getSheetByName('Habits');
+      expect(hSheet.getDataRange().getValues()[0]).toEqual([
+        'id',
+        'name',
+        'sortOrder',
+        'archived',
+        'createdAt',
+        'updatedAt',
+        'serverUpdatedAt',
+        'scheduledTime',
+      ]);
+
+      // 1. Sync new Habit with scheduledTime '05:00' and another without time
+      const res1 = JSON.parse(
+        env.exports
+          .doPost({
+            postData: {
+              contents: JSON.stringify({
+                pin: PIN,
+                deviceId: 'dev-1',
+                action: 'sync',
+                changes: {
+                  habits: [
+                    {
+                      id: 'h-sched-1',
+                      name: 'Journaling',
+                      sortOrder: 1,
+                      archived: false,
+                      scheduledTime: '05:00',
+                      createdAt: '2026-10-20T04:00:00Z',
+                      updatedAt: '2026-10-20T04:00:00Z',
+                    },
+                    {
+                      id: 'h-any-1',
+                      name: 'Drink Water',
+                      sortOrder: 2,
+                      archived: false,
+                      scheduledTime: '',
+                      createdAt: '2026-10-20T04:05:00Z',
+                      updatedAt: '2026-10-20T04:05:00Z',
+                    },
+                  ],
+                },
+              }),
+            },
+          })
+          .getContent()
+      );
+      expect(res1.ok).toBe(true);
+      expect(hSheet._getLastNumberFormat()).toBe('@');
+      expect(res1.changes.habits).toHaveLength(2);
+      expect(res1.changes.habits.find((h) => h.id === 'h-sched-1').scheduledTime).toBe('05:00');
+      expect(res1.changes.habits.find((h) => h.id === 'h-any-1').scheduledTime).toBe('');
+      expect(hSheet.getDataRange().getValues()[1][7]).toBe('05:00');
+
+      // 2. Legacy client omitting scheduledTime preserves existing scheduledTime on newer rename
+      const res2 = JSON.parse(
+        env.exports
+          .doPost({
+            postData: {
+              contents: JSON.stringify({
+                pin: PIN,
+                deviceId: 'dev-legacy',
+                action: 'sync',
+                changes: {
+                  habits: [
+                    {
+                      id: 'h-sched-1',
+                      name: 'Morning Journaling',
+                      sortOrder: 1,
+                      archived: false,
+                      createdAt: '2026-10-20T04:00:00Z',
+                      updatedAt: '2026-10-20T04:10:00Z',
+                    },
+                  ],
+                },
+              }),
+            },
+          })
+          .getContent()
+      );
+      expect(res2.ok).toBe(true);
+      expect(res2.changes.habits.find((h) => h.id === 'h-sched-1').scheduledTime).toBe('05:00');
+
+      // 3. Updating scheduledTime to '06:30' then clearing back to ''
+      JSON.parse(
+        env.exports
+          .doPost({
+            postData: {
+              contents: JSON.stringify({
+                pin: PIN,
+                deviceId: 'dev-1',
+                action: 'sync',
+                changes: {
+                  habits: [
+                    {
+                      id: 'h-sched-1',
+                      name: 'Morning Journaling',
+                      sortOrder: 1,
+                      archived: false,
+                      scheduledTime: '06:30',
+                      createdAt: '2026-10-20T04:00:00Z',
+                      updatedAt: '2026-10-20T04:20:00Z',
+                    },
+                  ],
+                },
+              }),
+            },
+          })
+          .getContent()
+      );
+      expect(hSheet.getDataRange().getValues()[1][7]).toBe('06:30');
+
+      const resClear = JSON.parse(
+        env.exports
+          .doPost({
+            postData: {
+              contents: JSON.stringify({
+                pin: PIN,
+                deviceId: 'dev-1',
+                action: 'sync',
+                changes: {
+                  habits: [
+                    {
+                      id: 'h-sched-1',
+                      name: 'Morning Journaling',
+                      sortOrder: 1,
+                      archived: false,
+                      scheduledTime: '',
+                      createdAt: '2026-10-20T04:00:00Z',
+                      updatedAt: '2026-10-20T04:30:00Z',
+                    },
+                  ],
+                },
+              }),
+            },
+          })
+          .getContent()
+      );
+      expect(resClear.changes.habits.find((h) => h.id === 'h-sched-1').scheduledTime).toBe('');
+
+      // 4. Legacy 7-column Habits sheet helper & expansion
+      const createLegacySevenColEnv = () => {
+        const legEnv = createGasEnv({ PIN });
+        const legSheet = legEnv.ss.insertSheet('Habits');
+        legSheet.getRange(1, 1, 2, 7).setValues([
+          ['id', 'name', 'sortOrder', 'archived', 'createdAt', 'updatedAt', 'serverUpdatedAt'],
+          ['h-legacy', 'Old Habit', 1, 'FALSE', '2026-10-18T10:00:00Z', '2026-10-18T10:00:00Z', '2026-10-18T10:00:00Z'],
+        ]);
+        return { legEnv, legSheet };
+      };
+
+      const { legEnv: legSetupEnv, legSheet: legSetupSheet } = createLegacySevenColEnv();
+      expect(legSetupEnv.exports.readAllHabits(legSetupSheet)[0].scheduledTime).toBe('');
+
+      legSetupEnv.exports.setup();
+      expect(legSetupSheet.getDataRange().getValues()[0]).toEqual([
+        'id',
+        'name',
+        'sortOrder',
+        'archived',
+        'createdAt',
+        'updatedAt',
+        'serverUpdatedAt',
+        'scheduledTime',
+      ]);
+      expect(legSetupSheet.getDataRange().getValues()[1][1]).toBe('Old Habit');
+      expect(legSetupSheet._getLastNumberFormat()).toBe('@');
+
+      // Direct sync on un-upgraded 7-col Habits sheet expands to 8 columns cleanly
+      const { legEnv: legSyncEnv, legSheet: legSyncSheet } = createLegacySevenColEnv();
+      const legSyncRes = JSON.parse(
+        legSyncEnv.exports
+          .doPost({
+            postData: {
+              contents: JSON.stringify({
+                pin: PIN,
+                deviceId: 'dev-1',
+                action: 'sync',
+                changes: {
+                  habits: [
+                    {
+                      id: 'h-new-timed',
+                      name: 'Dawn Walk',
+                      sortOrder: 2,
+                      archived: false,
+                      scheduledTime: '05:15',
+                      createdAt: '2026-10-20T05:00:00Z',
+                      updatedAt: '2026-10-20T05:00:00Z',
+                    },
+                  ],
+                },
+              }),
+            },
+          })
+          .getContent()
+      );
+      expect(legSyncRes.ok).toBe(true);
+      expect(legSyncSheet._getLastNumberFormat()).toBe('@');
+      const expandedRows = legSyncSheet.getDataRange().getValues();
+      expect(expandedRows[0]).toEqual([
+        'id',
+        'name',
+        'sortOrder',
+        'archived',
+        'createdAt',
+        'updatedAt',
+        'serverUpdatedAt',
+        'scheduledTime',
+      ]);
+      expect(expandedRows[1][7]).toBe('');
+      expect(expandedRows[2][7]).toBe('05:15');
     });
   });
 

@@ -1173,4 +1173,143 @@ describe('Data Layer - API & Sync Flow', () => {
     expect(incomingEntry).not.toBeNull();
     expect(incomingEntry.title).toBe('Remote Title');
   });
+
+  it('supports optional scheduledTime on addHabit, renameHabit, archive/restore, and outbox', async () => {
+    const timed = await addHabit('Journaling', { scheduledTime: '05:00' });
+    expect(timed.scheduledTime).toBe('05:00');
+
+    const untimed = await addHabit('Drink Water');
+    expect(untimed.scheduledTime).toBe('');
+
+    await expect(addHabit('Bad Habit', { scheduledTime: '25:99' })).rejects.toThrow(
+      'Invalid scheduled time'
+    );
+
+    // Outbox includes scheduledTime
+    let outbox = await getOutboxEntries();
+    const timedOutbox = outbox.find((o) => o.key === `habits:${timed.id}`);
+    expect(timedOutbox.record.scheduledTime).toBe('05:00');
+
+    // Update scheduledTime via renameHabit
+    const updatedTime = await renameHabit(timed.id, 'Morning Journal', null, '06:30');
+    expect(updatedTime.scheduledTime).toBe('06:30');
+
+    // Preserves scheduledTime when omitted (undefined)
+    const renamedOnly = await renameHabit(timed.id, 'Journaling');
+    expect(renamedOnly.scheduledTime).toBe('06:30');
+
+    // Rejects invalid scheduledTime on renameHabit
+    await expect(renameHabit(timed.id, 'Journaling', undefined, '99:00')).rejects.toThrow(
+      'Invalid scheduled time'
+    );
+
+    // Archive and restore preserve scheduledTime
+    const archived = await setHabitArchived(timed.id, true);
+    expect(archived.scheduledTime).toBe('06:30');
+    const restored = await setHabitArchived(timed.id, false);
+    expect(restored.scheduledTime).toBe('06:30');
+
+    // Clearing scheduledTime back to '' works cleanly
+    const cleared = await renameHabit(timed.id, 'Journaling', undefined, '');
+    expect(cleared.scheduledTime).toBe('');
+  });
+
+  it('locks moveHabit for timed Habits and reorders Anytime Habits across Anytime slots only', async () => {
+    const timedMorning = await addHabit('Journaling', { scheduledTime: '05:00' }); // sortOrder 1
+    const anyA = await addHabit('Drink Water'); // sortOrder 2
+    const timedNight = await addHabit('Evening Walk', { scheduledTime: '21:00' }); // sortOrder 3
+    const anyB = await addHabit('Stretch'); // sortOrder 4
+
+    const beforeOutbox = await getOutboxEntries();
+    const beforeTimedUpdated = beforeOutbox.find((o) => o.key === `habits:${timedMorning.id}`).updatedAt;
+
+    // Attempt to move a timed habit -> must be a no-op with no timestamp/outbox change
+    const afterTimedAttempt = await moveHabit(timedMorning.id, 'down');
+    expect(afterTimedAttempt.find((h) => h.id === timedMorning.id).sortOrder).toBe(1);
+    const afterOutbox = await getOutboxEntries();
+    expect(afterOutbox.find((o) => o.key === `habits:${timedMorning.id}`).updatedAt).toBe(
+      beforeTimedUpdated
+    );
+
+    // Moving anyB 'up' should swap sortOrder with anyA, skipping over timedNight (3)
+    const afterAnytimeMove = await moveHabit(anyB.id, 'up');
+    const updatedAnyA = afterAnytimeMove.find((h) => h.id === anyA.id);
+    const updatedAnyB = afterAnytimeMove.find((h) => h.id === anyB.id);
+    const untouchedTimedNight = afterAnytimeMove.find((h) => h.id === timedNight.id);
+    expect(updatedAnyB.sortOrder).toBe(2);
+    expect(updatedAnyA.sortOrder).toBe(4);
+    expect(untouchedTimedNight.sortOrder).toBe(3);
+  });
+
+  it('normalizes scheduledTime on habits during mergeRecord and syncNow', async () => {
+    const mergedValid = mergeRecord('habits', {
+      id: 'h-sync-1',
+      name: 'Meditation',
+      sortOrder: 1,
+      archived: false,
+      scheduledTime: ' 07:15 ',
+      updatedAt: '2026-10-20T10:00:00Z',
+    });
+    expect(mergedValid.record.scheduledTime).toBe('07:15');
+
+    const mergedMissing = mergeRecord('habits', {
+      id: 'h-sync-2',
+      name: 'Legacy',
+      sortOrder: 2,
+      archived: false,
+      updatedAt: '2026-10-20T10:00:00Z',
+    });
+    expect(mergedMissing.record.scheduledTime).toBe('');
+
+    const mergedInvalid = mergeRecord('habits', {
+      id: 'h-sync-3',
+      name: 'Bad Remote',
+      sortOrder: 3,
+      archived: false,
+      scheduledTime: '=05:00',
+      updatedAt: '2026-10-20T10:00:00Z',
+    });
+    expect(mergedInvalid.record.scheduledTime).toBe('');
+
+    await addHabit('Sunrise Stretch', { scheduledTime: '05:30' });
+
+    let sentBody = null;
+    globalThis.fetch = vi.fn().mockImplementation(async (url, init) => {
+      sentBody = JSON.parse(init.body);
+      return {
+        ok: true,
+        json: async () => ({
+          ok: true,
+          cursor: '2026-10-20T16:00:00Z',
+          changes: {
+            habits: [
+              {
+                id: 'h-remote',
+                name: 'Night Reading',
+                sortOrder: 2,
+                archived: false,
+                scheduledTime: '22:00',
+                createdAt: '2026-10-20T09:00:00Z',
+                updatedAt: '2026-10-20T15:00:00Z',
+              },
+            ],
+            checkIns: [],
+            journalEntries: [],
+            settings: [],
+            activities: [],
+          },
+          rejected: [],
+        }),
+      };
+    });
+
+    await syncNow();
+
+    expect(sentBody.changes.habits).toHaveLength(1);
+    expect(sentBody.changes.habits[0].scheduledTime).toBe('05:30');
+
+    const habits = await listHabits();
+    const remoteHabit = habits.find((h) => h.id === 'h-remote');
+    expect(remoteHabit.scheduledTime).toBe('22:00');
+  });
 });

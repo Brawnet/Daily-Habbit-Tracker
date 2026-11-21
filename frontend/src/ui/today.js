@@ -7,6 +7,11 @@
 import { today, formatLong } from '../domain/day.js';
 import { currentStreak } from '../domain/streak.js';
 import {
+  partitionAndSortHabits,
+  formatScheduledTime,
+  hasScheduledTime,
+} from '../domain/schedule.js';
+import {
   listHabits,
   addHabit,
   getCheckInDays,
@@ -78,7 +83,14 @@ export function mount(el) {
   el.appendChild(container);
 
   // Shared habit creation helper with unified validation, loading guard, and toast notifications
-  async function executeAddHabit({ name, linkedActivity = null, setSubmitting, onSuccess, onError }) {
+  async function executeAddHabit({
+    name,
+    linkedActivity = null,
+    scheduledTime = '',
+    setSubmitting,
+    onSuccess,
+    onError,
+  }) {
     const trimmed = (name || '').trim();
     if (!trimmed) {
       onError?.();
@@ -86,8 +98,16 @@ export function mount(el) {
     }
     setSubmitting(true);
     try {
+      const opts = {};
       if (linkedActivity) {
-        await addHabit(trimmed, { linkedActivity });
+        opts.linkedActivity = linkedActivity;
+      }
+      const trimmedTime = (scheduledTime || '').trim();
+      if (trimmedTime) {
+        opts.scheduledTime = trimmedTime;
+      }
+      if (Object.keys(opts).length > 0) {
+        await addHabit(trimmed, opts);
       } else {
         await addHabit(trimmed);
       }
@@ -117,12 +137,12 @@ export function mount(el) {
       console.warn('Failed to list habits:', err);
     }
 
-    // Sort by sortOrder ascending
-    habits.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const { scheduled, anytime } = partitionAndSortHabits(habits);
+    const orderedHabits = [...scheduled, ...anytime];
 
     // Fetch check-in days and calculate streaks for each habit
     const habitData = await Promise.all(
-      habits.map(async (habit) => {
+      orderedHabits.map(async (habit) => {
         let days = new Set();
         try {
           days = await getCheckInDays(habit.id);
@@ -292,123 +312,191 @@ export function mount(el) {
 
       habitsListContainerEl.appendChild(emptyCard);
     } else {
-      // Habit list
-      const listEl = document.createElement('ul');
-      listEl.className = 'flex flex-col gap-2.5';
-      listEl.setAttribute('role', 'list');
+      const scheduledData = habitData.filter((item) => hasScheduledTime(item.habit));
+      const anytimeData = habitData.filter((item) => !hasScheduledTime(item.habit));
 
-      for (const { habit, isChecked, streak } of habitData) {
-        const itemEl = document.createElement('li');
-        itemEl.className =
-          'editorial-card flex items-center justify-between p-3.5 gap-3 transition-all hover:border-[#68655F] dark:hover:border-[#A39E93] tactile-spring bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
-        itemEl.dataset.habitId = habit.id;
+      if (scheduledData.length > 0 && anytimeData.length > 0) {
+        habitsListContainerEl.appendChild(createHabitListEl(scheduledData, 'today-scheduled-list'));
 
-        const leftWrap = document.createElement('div');
-        leftWrap.className = 'flex items-center gap-3 min-w-0 flex-1';
+        const anytimeHeading = document.createElement('h3');
+        anytimeHeading.id = 'today-anytime-heading';
+        anytimeHeading.className =
+          'text-xs font-mono font-semibold uppercase tracking-wider text-[#68655F] dark:text-[#A39E93] pt-2 px-1';
+        anytimeHeading.textContent = 'Anytime';
+        habitsListContainerEl.appendChild(anytimeHeading);
 
-        // Check-in toggle button (min 44px touch target)
-        const checkBtn = document.createElement('button');
-        checkBtn.type = 'button';
-        checkBtn.id = `checkin-${habit.id}`;
-        checkBtn.setAttribute('data-action', 'toggle-checkin');
-        checkBtn.setAttribute('data-habit-id', habit.id);
-        checkBtn.className =
-          'min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C86D51] cursor-pointer tactile-spring';
-        checkBtn.style.minWidth = '44px';
-        checkBtn.style.minHeight = '44px';
-        checkBtn.setAttribute('aria-pressed', isChecked ? 'true' : 'false');
-        checkBtn.setAttribute(
-          'aria-label',
-          isChecked ? `Mark ${habit.name} incomplete` : `Mark ${habit.name} complete`
-        );
-
-        const iconWrap = document.createElement('span');
-        if (isChecked) {
-          iconWrap.className =
-            'w-7 h-7 rounded-lg bg-[#3D6B58] dark:bg-[#5F8776] text-[#FFFFFF] flex items-center justify-center shadow-xs transition-all';
-          iconWrap.innerHTML = `
-            <svg class="w-4 h-4 stroke-[2.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-          `;
-        } else {
-          iconWrap.className =
-            'w-7 h-7 rounded-lg border-2 border-[#E6E4DF] dark:border-[#33302C] hover:border-[#3D6B58] transition-colors bg-[#FFFFFF] dark:bg-[#161514]';
-        }
-        checkBtn.appendChild(iconWrap);
-
-        checkBtn.addEventListener('click', async () => {
-          if (checkBtn.disabled) return;
-          checkBtn.disabled = true;
-          try {
-            await toggleCheckIn(habit.id, today());
-          } catch (err) {
-            showToast(err?.message || 'Failed to update check-in');
-          } finally {
-            checkBtn.disabled = false;
-          }
-        });
-
-        leftWrap.appendChild(checkBtn);
-
-        // Habit name
-        const nameEl = document.createElement('span');
-        nameEl.className = `text-base font-medium truncate flex-1 ${
-          isChecked
-            ? 'text-[#68655F] dark:text-[#A39E93] line-through'
-            : 'text-[#1C1B18] dark:text-[#F4F1EA]'
-        }`;
-        nameEl.textContent = habit.name;
-        if (habit.linkedActivity) {
-          const isJournal = habit.linkedActivity === LINKED_ACTIVITIES.JOURNAL;
-          const navigateToActivity = () => {
-            if (typeof window !== 'undefined' && window.location && window.history) {
-              try {
-                const url = new URL(window.location.href);
-                if (isJournal) {
-                  url.searchParams.set('subview', JOURNAL_SUBVIEW);
-                } else {
-                  url.searchParams.delete('subview');
-                }
-                window.history.replaceState({}, '', url.toString());
-              } catch {}
-            }
-            navigate('activities');
-          };
-          nameEl.classList.add('cursor-pointer', 'hover:text-indigo-600');
-          nameEl.addEventListener('click', navigateToActivity);
-          const actBadge = document.createElement('button');
-          actBadge.type = 'button';
-          const isBook = habit.linkedActivity === LINKED_ACTIVITIES.BOOK_SUMMARY;
-          actBadge.className = `habit-activity-link min-h-[44px] min-w-[44px] inline-flex items-center text-xs px-2.5 py-1 rounded-full ${isBook ? 'badge-slate' : 'badge-rose'} font-mono font-medium hover:underline cursor-pointer ml-2 shrink-0 tactile-spring`;
-          actBadge.textContent = isBook ? '📖 Book Summary' : '✍️ Journal';
-          actBadge.addEventListener('click', (e) => {
-            e.stopPropagation();
-            navigateToActivity();
-          });
-          leftWrap.appendChild(actBadge);
-        }
-        leftWrap.appendChild(nameEl);
-        itemEl.appendChild(leftWrap);
-
-        // Streak badge
-        const streakWrap = document.createElement('div');
-        streakWrap.className = 'flex items-center shrink-0';
-
-        const streakBadge = document.createElement('span');
-        streakBadge.className = `inline-flex items-center gap-1 px-2.5 py-1 text-xs font-mono font-semibold rounded-full badge-ochre`;
-        streakBadge.textContent = `🔥 ${streak}`;
-        streakWrap.appendChild(streakBadge);
-
-        itemEl.appendChild(streakWrap);
-        listEl.appendChild(itemEl);
+        habitsListContainerEl.appendChild(createHabitListEl(anytimeData, 'today-anytime-list'));
+      } else {
+        const listId = scheduledData.length > 0 ? 'today-scheduled-list' : 'today-anytime-list';
+        habitsListContainerEl.appendChild(createHabitListEl(habitData, listId));
       }
-
-      habitsListContainerEl.appendChild(listEl);
 
       renderAddHabitControl(habitsListContainerEl);
       renderManageSettingsLink(habitsListContainerEl);
     }
+  }
+
+  /**
+   * Builds a role="list" container populated with Habit items.
+   *
+   * @param {Array<{ habit: import('../shared/contracts.js').Habit, isChecked: boolean, streak: number }>} items
+   * @param {string} [listId]
+   * @returns {HTMLElement}
+   */
+  function createHabitListEl(items, listId) {
+    const listEl = document.createElement('ul');
+    if (listId) {
+      listEl.id = listId;
+    }
+    listEl.className = 'flex flex-col gap-2.5';
+    listEl.setAttribute('role', 'list');
+
+    for (const item of items) {
+      listEl.appendChild(createHabitItem(item));
+    }
+    return listEl;
+  }
+
+  /**
+   * Builds one Habit checklist row with optional Scheduled Time and Linked Activity metadata.
+   *
+   * @param {{ habit: import('../shared/contracts.js').Habit, isChecked: boolean, streak: number }} item
+   * @returns {HTMLElement}
+   */
+  function createHabitItem({ habit, isChecked, streak }) {
+    const itemEl = document.createElement('li');
+    itemEl.className =
+      'editorial-card flex items-center justify-between p-3.5 gap-3 transition-all hover:border-[#68655F] dark:hover:border-[#A39E93] tactile-spring bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
+    itemEl.dataset.habitId = habit.id;
+    if (hasScheduledTime(habit)) {
+      itemEl.dataset.scheduledTime = habit.scheduledTime;
+    }
+
+    const leftWrap = document.createElement('div');
+    leftWrap.className = 'flex items-center gap-3 min-w-0 flex-1';
+
+    // Check-in toggle button (min 44px touch target)
+    const checkBtn = document.createElement('button');
+    checkBtn.type = 'button';
+    checkBtn.id = `checkin-${habit.id}`;
+    checkBtn.setAttribute('data-action', 'toggle-checkin');
+    checkBtn.setAttribute('data-habit-id', habit.id);
+    checkBtn.className =
+      'min-w-[44px] min-h-[44px] shrink-0 flex items-center justify-center rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C86D51] cursor-pointer tactile-spring';
+    checkBtn.style.minWidth = '44px';
+    checkBtn.style.minHeight = '44px';
+    checkBtn.setAttribute('aria-pressed', isChecked ? 'true' : 'false');
+    checkBtn.setAttribute(
+      'aria-label',
+      isChecked ? `Mark ${habit.name} incomplete` : `Mark ${habit.name} complete`
+    );
+
+    const iconWrap = document.createElement('span');
+    if (isChecked) {
+      iconWrap.className =
+        'w-7 h-7 rounded-lg bg-[#3D6B58] dark:bg-[#5F8776] text-[#FFFFFF] flex items-center justify-center shadow-xs transition-all';
+      iconWrap.innerHTML = `
+        <svg class="w-4 h-4 stroke-[2.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      `;
+    } else {
+      iconWrap.className =
+        'w-7 h-7 rounded-lg border-2 border-[#E6E4DF] dark:border-[#33302C] hover:border-[#3D6B58] transition-colors bg-[#FFFFFF] dark:bg-[#161514]';
+    }
+    checkBtn.appendChild(iconWrap);
+
+    checkBtn.addEventListener('click', async () => {
+      if (checkBtn.disabled) return;
+      checkBtn.disabled = true;
+      try {
+        await toggleCheckIn(habit.id, today());
+      } catch (err) {
+        showToast(err?.message || 'Failed to update check-in');
+      } finally {
+        checkBtn.disabled = false;
+      }
+    });
+
+    leftWrap.appendChild(checkBtn);
+
+    const textStack = document.createElement('div');
+    textStack.className = 'flex flex-col min-w-0 flex-1 gap-0.5';
+
+    // Habit name
+    const nameEl = document.createElement('span');
+    nameEl.className = `text-base font-medium truncate ${
+      isChecked
+        ? 'text-[#68655F] dark:text-[#A39E93] line-through'
+        : 'text-[#1C1B18] dark:text-[#F4F1EA]'
+    }`;
+    nameEl.textContent = habit.name;
+    textStack.appendChild(nameEl);
+
+    const formattedTime = hasScheduledTime(habit) ? formatScheduledTime(habit.scheduledTime) : '';
+    const hasMeta = Boolean(formattedTime || habit.linkedActivity);
+
+    if (hasMeta) {
+      const metaRow = document.createElement('div');
+      metaRow.className = 'flex flex-wrap items-center gap-2';
+
+      if (formattedTime) {
+        const timeEl = document.createElement('span');
+        timeEl.className =
+          'habit-scheduled-time inline-flex items-center text-xs font-mono font-medium text-[#68655F] dark:text-[#A39E93]';
+        timeEl.dataset.scheduledTime = habit.scheduledTime;
+        timeEl.textContent = formattedTime;
+        metaRow.appendChild(timeEl);
+      }
+
+      if (habit.linkedActivity) {
+        const isJournal = habit.linkedActivity === LINKED_ACTIVITIES.JOURNAL;
+        const navigateToActivity = () => {
+          if (typeof window !== 'undefined' && window.location && window.history) {
+            try {
+              const url = new URL(window.location.href);
+              if (isJournal) {
+                url.searchParams.set('subview', JOURNAL_SUBVIEW);
+              } else {
+                url.searchParams.delete('subview');
+              }
+              window.history.replaceState({}, '', url.toString());
+            } catch {}
+          }
+          navigate('activities');
+        };
+        nameEl.classList.add('cursor-pointer', 'hover:text-indigo-600');
+        nameEl.addEventListener('click', navigateToActivity);
+
+        const actBadge = document.createElement('button');
+        actBadge.type = 'button';
+        const isBook = habit.linkedActivity === LINKED_ACTIVITIES.BOOK_SUMMARY;
+        actBadge.className = `habit-activity-link min-h-[44px] min-w-[44px] inline-flex items-center text-xs px-2.5 py-1 rounded-full ${isBook ? 'badge-slate' : 'badge-rose'} font-mono font-medium hover:underline cursor-pointer shrink-0 tactile-spring`;
+        actBadge.textContent = isBook ? '📖 Book Summary' : '✍️ Journal';
+        actBadge.addEventListener('click', (e) => {
+          e.stopPropagation();
+          navigateToActivity();
+        });
+        metaRow.appendChild(actBadge);
+      }
+
+      textStack.appendChild(metaRow);
+    }
+
+    leftWrap.appendChild(textStack);
+    itemEl.appendChild(leftWrap);
+
+    // Streak badge
+    const streakWrap = document.createElement('div');
+    streakWrap.className = 'flex items-center shrink-0';
+
+    const streakBadge = document.createElement('span');
+    streakBadge.className = 'inline-flex items-center gap-1 px-2.5 py-1 text-xs font-mono font-semibold rounded-full badge-ochre';
+    streakBadge.textContent = `🔥 ${streak}`;
+    streakWrap.appendChild(streakBadge);
+
+    itemEl.appendChild(streakWrap);
+    return itemEl;
   }
 
   function renderAddHabitControl(containerEl) {
@@ -470,7 +558,43 @@ export function mount(el) {
       optJournal.textContent = 'Link to Activity: Daily Journal ✍️';
       selectActivityEl.appendChild(optJournal);
 
+      const timeFieldWrap = document.createElement('div');
+      timeFieldWrap.className = 'flex flex-col gap-1';
+
+      const timeLabelEl = document.createElement('label');
+      timeLabelEl.htmlFor = 'today-add-habit-scheduled-time';
+      timeLabelEl.className = 'text-xs font-medium text-[#68655F] dark:text-[#A39E93] font-mono';
+      timeLabelEl.textContent = 'Scheduled Time (optional)';
+
+      const timeRowEl = document.createElement('div');
+      timeRowEl.className = 'flex items-center gap-2';
+
+      const timeInputEl = document.createElement('input');
+      timeInputEl.type = 'time';
+      timeInputEl.id = 'today-add-habit-scheduled-time';
+      timeInputEl.className =
+        'flex-1 min-h-[44px] min-w-[44px] px-3.5 py-2 text-base font-mono rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
+      timeInputEl.setAttribute('aria-label', 'Scheduled time (optional)');
+      timeInputEl.style.fontSize = '16px';
+
+      const clearTimeBtn = document.createElement('button');
+      clearTimeBtn.type = 'button';
+      clearTimeBtn.id = 'today-add-habit-clear-time';
+      clearTimeBtn.setAttribute('aria-label', 'Clear scheduled time');
+      clearTimeBtn.className =
+        'btn-secondary-surface min-h-[44px] min-w-[44px] px-3.5 py-2 text-xs font-mono font-medium rounded-lg border border-[#E6E4DF] dark:border-[#33302C] cursor-pointer shrink-0 tactile-spring';
+      clearTimeBtn.textContent = 'Clear';
+      clearTimeBtn.addEventListener('click', () => {
+        timeInputEl.value = '';
+      });
+
+      timeRowEl.appendChild(timeInputEl);
+      timeRowEl.appendChild(clearTimeBtn);
+      timeFieldWrap.appendChild(timeLabelEl);
+      timeFieldWrap.appendChild(timeRowEl);
+
       formEl.appendChild(inputEl);
+      formEl.appendChild(timeFieldWrap);
       formEl.appendChild(selectActivityEl);
       const actionsWrap = document.createElement('div');
       actionsWrap.className = 'flex items-center gap-2 justify-end';
@@ -508,6 +632,7 @@ export function mount(el) {
         await executeAddHabit({
           name: inputEl.value,
           linkedActivity: selectActivityEl.value || null,
+          scheduledTime: timeInputEl.value || '',
           setSubmitting: (submitting) => {
             isSubmitting = submitting;
             submitBtn.disabled = submitting;
@@ -542,7 +667,6 @@ export function mount(el) {
 
       actionsWrap.appendChild(cancelBtn);
       actionsWrap.appendChild(submitBtn);
-      formEl.appendChild(inputEl);
       formEl.appendChild(actionsWrap);
       addControlWrap.appendChild(formEl);
 

@@ -7,7 +7,7 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 const SCHEMA = {
-  Habits: ['id', 'name', 'sortOrder', 'archived', 'createdAt', 'updatedAt', 'serverUpdatedAt'],
+  Habits: ['id', 'name', 'sortOrder', 'archived', 'createdAt', 'updatedAt', 'serverUpdatedAt', 'scheduledTime'],
   Check_Ins: ['id', 'habitId', 'day', 'deleted', 'updatedAt', 'serverUpdatedAt'],
   Journal_Entries: ['day', 'content', 'updatedAt', 'printedToDiaryAt', 'serverUpdatedAt', 'title'],
   Settings: ['key', 'value', 'updatedAt', 'serverUpdatedAt'],
@@ -46,6 +46,17 @@ function sanitizeJournalTitle(title) {
 
 function desanitizeJournalTitle(rawTitle) {
   return normalizeJournalTitle(desanitizeFormulaInjection(rawTitle || ''));
+}
+
+/**
+ * Normalizes a candidate Scheduled Time value into canonical 24-hour 'HH:MM' or ''.
+ * @param {unknown} value
+ * @returns {string}
+ */
+function normalizeScheduledTime(value) {
+  if (value === null || value === undefined) return '';
+  const str = desanitizeFormulaInjection(String(value)).trim();
+  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(str) ? str : '';
 }
 
 /**
@@ -451,6 +462,19 @@ function ensureSheetHeaders(sheet, headers, force) {
   }
 }
 
+function padSheetDataToSchema(data, schemaHeaders) {
+  const expectedCols = schemaHeaders.length;
+  if (!data[0] || data[0].length < expectedCols) {
+    data[0] = [...schemaHeaders];
+  }
+  for (let i = 1; i < data.length; i++) {
+    while (data[i].length < expectedCols) {
+      data[i].push('');
+    }
+  }
+  return expectedCols;
+}
+
 function getOrCreateSheet(ss, name, headers) {
   let sheet = ss.getSheetByName(name);
   if (!sheet) {
@@ -477,7 +501,8 @@ function readAllHabits(sheet) {
       archived: row[3] === 'TRUE' || row[3] === true,
       createdAt: String(row[4] || ''),
       updatedAt: String(row[5] || ''),
-      serverUpdatedAt: String(row[6] || '')
+      serverUpdatedAt: String(row[6] || ''),
+      scheduledTime: normalizeScheduledTime(row[7])
     });
   }
   return list;
@@ -581,7 +606,7 @@ function readAllPushSubscriptions(sheet) {
 
 function syncHabits(sheet, incomingHabits, nowMonotonic) {
   const data = sheet.getDataRange().getValues();
-  const headers = data[0] || SCHEMA.Habits;
+  const expectedCols = padSheetDataToSchema(data, SCHEMA.Habits);
   const rowMap = new Map();
   for (let i = 1; i < data.length; i++) {
     if (data[i][0]) rowMap.set(String(data[i][0]), i);
@@ -601,6 +626,9 @@ function syncHabits(sheet, incomingHabits, nowMonotonic) {
         data[rowIndex][4] = habit.createdAt || data[rowIndex][4] || nowMonotonic;
         data[rowIndex][5] = clientUpdatedAt;
         data[rowIndex][6] = nowMonotonic;
+        data[rowIndex][7] = habit.scheduledTime !== undefined
+          ? normalizeScheduledTime(habit.scheduledTime)
+          : normalizeScheduledTime(data[rowIndex][7]);
       }
     } else {
       const newRow = [
@@ -610,14 +638,15 @@ function syncHabits(sheet, incomingHabits, nowMonotonic) {
         habit.archived ? 'TRUE' : 'FALSE',
         habit.createdAt || nowMonotonic,
         clientUpdatedAt,
-        nowMonotonic
+        nowMonotonic,
+        normalizeScheduledTime(habit.scheduledTime)
       ];
       data.push(newRow);
       rowMap.set(id, data.length - 1);
     }
   }
-  sheet.getRange(1, 1, data.length, headers.length).setNumberFormat('@');
-  sheet.getRange(1, 1, data.length, headers.length).setValues(data);
+  sheet.getRange(1, 1, data.length, expectedCols).setNumberFormat('@');
+  sheet.getRange(1, 1, data.length, expectedCols).setValues(data);
 }
 
 function syncCheckIns(sheet, incomingCheckIns, nowMonotonic) {
@@ -679,15 +708,7 @@ function syncCheckIns(sheet, incomingCheckIns, nowMonotonic) {
 
 function syncJournalEntries(sheet, incomingJournalEntries, nowMonotonic) {
   const data = sheet.getDataRange().getValues();
-  const expectedCols = SCHEMA.Journal_Entries.length;
-  if (!data[0] || data[0].length < expectedCols) {
-    data[0] = [...SCHEMA.Journal_Entries];
-  }
-  for (let i = 1; i < data.length; i++) {
-    while (data[i].length < expectedCols) {
-      data[i].push('');
-    }
-  }
+  const expectedCols = padSheetDataToSchema(data, SCHEMA.Journal_Entries);
 
   const rowMap = new Map();
   for (let i = 1; i < data.length; i++) {
@@ -1599,6 +1620,7 @@ if (typeof module !== 'undefined' && module.exports) {
     isJournalEntryWritten,
     sanitizeJournalTitle,
     desanitizeJournalTitle,
+    normalizeScheduledTime,
     formatDiaryHeading,
     parseDiaryHeading,
     findChronologicalInsertIndex,

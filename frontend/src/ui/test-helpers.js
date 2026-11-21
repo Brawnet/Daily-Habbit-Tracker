@@ -1,3 +1,12 @@
+function unregisterElementIds(el) {
+  if (el.doc && el._id) {
+    el.doc.elementsById.delete(el._id);
+  }
+  for (const child of el.children) {
+    unregisterElementIds(child);
+  }
+}
+
 export class MockClassList {
   constructor(el) {
     this.el = el;
@@ -90,16 +99,8 @@ export class MockElement {
   }
   set innerHTML(val) {
     this._innerHTML = String(val ?? '');
-    const unregister = (el) => {
-      if (el.doc && el._id) {
-        el.doc.elementsById.delete(el._id);
-      }
-      for (const child of el.children) {
-        unregister(child);
-      }
-    };
     for (const child of this.children) {
-      unregister(child);
+      unregisterElementIds(child);
     }
     this.children = [];
   }
@@ -140,19 +141,23 @@ export class MockElement {
   }
 
   remove() {
-    const unregister = (el) => {
-      if (el.doc && el._id) {
-        el.doc.elementsById.delete(el._id);
-      }
-      for (const child of el.children) {
-        unregister(child);
-      }
-    };
-    unregister(this);
+    unregisterElementIds(this);
     if (this.parentElement) {
       const idx = this.parentElement.children.indexOf(this);
       if (idx !== -1) {
         this.parentElement.children.splice(idx, 1);
+      }
+      this.parentElement = null;
+    }
+  }
+
+  replaceWith(newEl) {
+    unregisterElementIds(this);
+    if (this.parentElement && newEl) {
+      const idx = this.parentElement.children.indexOf(this);
+      if (idx !== -1) {
+        newEl.parentElement = this.parentElement;
+        this.parentElement.children.splice(idx, 1, newEl);
       }
       this.parentElement = null;
     }

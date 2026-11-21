@@ -744,6 +744,50 @@ describe('Pure Functions', () => {
       expect(storeRes.merged.activities[0].title).toBe('Deep Work');
       expect('printedToDiaryAt' in storeRes.merged.activities[0]).toBe(false);
     });
+
+    it('normalizes, preserves, and clears scheduledTime on Habit records in mergeRecordsLWW', () => {
+      const existing = [
+        {
+          id: 'h-1',
+          name: 'Journaling',
+          sortOrder: 1,
+          archived: false,
+          scheduledTime: '05:00',
+          updatedAt: '2026-10-20T08:00:00Z',
+        },
+      ];
+
+      // 1. Incoming with padded/valid scheduledTime normalizes cleanly; invalid resets to ''
+      const res1 = mergeRecordsLWW(
+        existing,
+        [{ id: 'h-1', name: 'Journaling', sortOrder: 1, scheduledTime: ' 06:30 ', updatedAt: '2026-10-20T09:00:00Z' }],
+        '2026-10-20T09:05:00Z'
+      );
+      expect(res1[0].scheduledTime).toBe('06:30');
+
+      const resInvalid = mergeRecordsLWW(
+        existing,
+        [{ id: 'h-2', name: 'Bad', sortOrder: 2, scheduledTime: '25:00', updatedAt: '2026-10-20T09:00:00Z' }],
+        '2026-10-20T09:05:00Z'
+      );
+      expect(resInvalid.find((h) => h.id === 'h-2').scheduledTime).toBe('');
+
+      // 2. Legacy Device omitting scheduledTime preserves existing scheduledTime
+      const resLegacy = mergeRecordsLWW(
+        existing,
+        [{ id: 'h-1', name: 'Morning Journaling', sortOrder: 1, updatedAt: '2026-10-20T10:00:00Z' }],
+        '2026-10-20T10:05:00Z'
+      );
+      expect(resLegacy[0].scheduledTime).toBe('05:00');
+
+      // 3. Explicit empty scheduledTime clears back to ''
+      const resClear = mergeRecordsLWW(
+        existing,
+        [{ id: 'h-1', name: 'Journaling', sortOrder: 1, scheduledTime: '', updatedAt: '2026-10-20T11:00:00Z' }],
+        '2026-10-20T11:05:00Z'
+      );
+      expect(resClear[0].scheduledTime).toBe('');
+    });
   });
 
   describe('Pure Helper Functions', () => {
@@ -1346,7 +1390,7 @@ describe('GAS Backend Actions', () => {
       expect(res1.changes.habits.find((h) => h.id === 'h-any-1').scheduledTime).toBe('');
       expect(hSheet.getDataRange().getValues()[1][7]).toBe('05:00');
 
-      // 2. Legacy client omitting scheduledTime preserves existing scheduledTime on newer rename
+      // 2. Legacy Device omitting scheduledTime preserves existing scheduledTime on newer rename
       const res2 = JSON.parse(
         env.exports
           .doPost({

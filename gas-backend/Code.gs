@@ -311,6 +311,14 @@ function mergeRecordsLWW(existingRecords, incomingRecords, nowMonotonic, todayJa
         ...incoming,
         serverUpdatedAt: nowMonotonic
       };
+      const isHabit =
+        (incoming && incoming.sortOrder !== undefined) ||
+        (existing && existing.sortOrder !== undefined);
+      if (isHabit) {
+        toWrite.scheduledTime = incoming.scheduledTime !== undefined
+          ? normalizeScheduledTime(incoming.scheduledTime)
+          : (existing ? normalizeScheduledTime(existing.scheduledTime) : '');
+      }
       if (isJournal) {
         toWrite.printedToDiaryAt = existing ? (existing.printedToDiaryAt || '') : '';
         toWrite.title = incoming.title !== undefined

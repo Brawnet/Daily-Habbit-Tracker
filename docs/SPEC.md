@@ -134,7 +134,7 @@ Satu file, tetapi logika murni (format/parse heading Diary, posisi sisip, keputu
 
 ### 6.2 `setup()` — idempoten, dijalankan manual sekali
 
-Buat sheet + header (termasuk perluasan otomatis header `Journal_Entries` dari 5 ke 6 kolom pada spreadsheet eksisting) + format teks bila belum ada; buat folder Drive `Habbit Diary`; generate `PUSH_SHARED_SECRET` bila kosong; hapus lalu pasang ulang trigger `printDiary` (harian ~02:00) dan `checkReminder` (tiap 10 menit); log ringkasan + langkah berikutnya.
+Buat sheet + header (termasuk perluasan otomatis header `Habits` dari 7 ke 8 kolom dan `Journal_Entries` dari 5 ke 6 kolom pada spreadsheet eksisting) + format teks bila belum ada; buat folder Drive `Habbit Diary`; generate `PUSH_SHARED_SECRET` bila kosong; hapus lalu pasang ulang trigger `printDiary` (harian ~02:00) dan `checkReminder` (tiap 10 menit); log ringkasan + langkah berikutnya.
 
 ### 6.3 `syncDiaryEntries()` & `printDiary()` (auto-sync 10 menit & trigger harian)
 

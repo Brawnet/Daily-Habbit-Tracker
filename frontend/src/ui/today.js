@@ -21,6 +21,11 @@ import {
 import { navigate, showToast } from './shell.js';
 import { LINKED_ACTIVITIES } from '../shared/contracts.js';
 import { JOURNAL_SUBVIEW } from '../domain/journal.js';
+import {
+  createScheduledTimePair,
+  populateLinkedActivitySelect,
+  bindEscapeKey,
+} from './habit-form-controls.js';
 
 /**
  * Mounts the Today tab into the provided element.
@@ -337,13 +342,13 @@ export function mount(el) {
   }
 
   /**
-   * Builds a role="list" container populated with Habit items.
+   * Builds a role="list" container populated with Habit cards.
    *
-   * @param {Array<{ habit: import('../shared/contracts.js').Habit, isChecked: boolean, streak: number }>} items
+   * @param {Array<{ habit: import('../shared/contracts.js').Habit, isChecked: boolean, streak: number }>} entries
    * @param {string} [listId]
    * @returns {HTMLElement}
    */
-  function createHabitListEl(items, listId) {
+  function createHabitListEl(entries, listId) {
     const listEl = document.createElement('ul');
     if (listId) {
       listEl.id = listId;
@@ -351,19 +356,19 @@ export function mount(el) {
     listEl.className = 'flex flex-col gap-2.5';
     listEl.setAttribute('role', 'list');
 
-    for (const item of items) {
-      listEl.appendChild(createHabitItem(item));
+    for (const entry of entries) {
+      listEl.appendChild(createHabitCard(entry));
     }
     return listEl;
   }
 
   /**
-   * Builds one Habit checklist row with optional Scheduled Time and Linked Activity metadata.
+   * Builds one Habit checklist card with optional Scheduled Time and Linked Activity metadata.
    *
-   * @param {{ habit: import('../shared/contracts.js').Habit, isChecked: boolean, streak: number }} item
+   * @param {{ habit: import('../shared/contracts.js').Habit, isChecked: boolean, streak: number }} entry
    * @returns {HTMLElement}
    */
-  function createHabitItem({ habit, isChecked, streak }) {
+  function createHabitCard({ habit, isChecked, streak }) {
     const itemEl = document.createElement('li');
     itemEl.className =
       'editorial-card flex items-center justify-between p-3.5 gap-3 transition-all hover:border-[#68655F] dark:hover:border-[#A39E93] tactile-spring bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
@@ -542,21 +547,13 @@ export function mount(el) {
       selectActivityEl.className =
         'w-full min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
       selectActivityEl.style.fontSize = '16px';
-
-      const optNone = document.createElement('option');
-      optNone.value = '';
-      optNone.textContent = 'Link to Activity: None';
-      selectActivityEl.appendChild(optNone);
-
-      const optBook = document.createElement('option');
-      optBook.value = 'book_summary';
-      optBook.textContent = 'Link to Activity: Book Summary 📖';
-      selectActivityEl.appendChild(optBook);
-
-      const optJournal = document.createElement('option');
-      optJournal.value = 'journal';
-      optJournal.textContent = 'Link to Activity: Daily Journal ✍️';
-      selectActivityEl.appendChild(optJournal);
+      populateLinkedActivitySelect(selectActivityEl, {
+        labels: {
+          none: 'Link to Activity: None',
+          book: 'Link to Activity: Book Summary 📖',
+          journal: 'Link to Activity: Daily Journal ✍️',
+        },
+      });
 
       const timeFieldWrap = document.createElement('div');
       timeFieldWrap.className = 'flex flex-col gap-1';
@@ -569,23 +566,15 @@ export function mount(el) {
       const timeRowEl = document.createElement('div');
       timeRowEl.className = 'flex items-center gap-2';
 
-      const timeInputEl = document.createElement('input');
-      timeInputEl.type = 'time';
-      timeInputEl.id = 'today-add-habit-scheduled-time';
-      timeInputEl.className =
-        'flex-1 min-h-[44px] min-w-[44px] px-3.5 py-2 text-base font-mono rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
-      timeInputEl.setAttribute('aria-label', 'Scheduled time (optional)');
-      timeInputEl.style.fontSize = '16px';
-
-      const clearTimeBtn = document.createElement('button');
-      clearTimeBtn.type = 'button';
-      clearTimeBtn.id = 'today-add-habit-clear-time';
-      clearTimeBtn.setAttribute('aria-label', 'Clear scheduled time');
-      clearTimeBtn.className =
-        'btn-secondary-surface min-h-[44px] min-w-[44px] px-3.5 py-2 text-xs font-mono font-medium rounded-lg border border-[#E6E4DF] dark:border-[#33302C] cursor-pointer shrink-0 tactile-spring';
-      clearTimeBtn.textContent = 'Clear';
-      clearTimeBtn.addEventListener('click', () => {
-        timeInputEl.value = '';
+      const { timeInput: timeInputEl, clearBtn: clearTimeBtn } = createScheduledTimePair({
+        inputId: 'today-add-habit-scheduled-time',
+        inputClassName:
+          'flex-1 min-h-[44px] min-w-[44px] px-3.5 py-2 text-base font-mono rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]',
+        ariaLabel: 'Scheduled time (optional)',
+        clearButtonId: 'today-add-habit-clear-time',
+        clearButtonClassName:
+          'btn-secondary-surface min-h-[44px] min-w-[44px] px-3.5 py-2 text-xs font-mono font-medium rounded-lg border border-[#E6E4DF] dark:border-[#33302C] cursor-pointer shrink-0 tactile-spring',
+        clearAriaLabel: 'Clear scheduled time',
       });
 
       timeRowEl.appendChild(timeInputEl);
@@ -649,12 +638,7 @@ export function mount(el) {
 
       formEl.addEventListener('submit', handleSubmit);
       submitBtn.addEventListener('click', handleSubmit);
-      formEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-          if (typeof e.preventDefault === 'function') e.preventDefault();
-          collapseAddControl();
-        }
-      });
+      bindEscapeKey([formEl, timeInputEl], collapseAddControl);
       inputEl.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           if (typeof e.preventDefault === 'function') e.preventDefault();

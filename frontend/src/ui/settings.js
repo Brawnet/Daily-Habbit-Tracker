@@ -26,6 +26,11 @@ import {
   formatScheduledTime,
   hasScheduledTime,
 } from '../domain/schedule.js';
+import {
+  createScheduledTimePair,
+  populateLinkedActivitySelect,
+  bindEscapeKey,
+} from './habit-form-controls.js';
 
 const THEME_OPTIONS = Object.freeze([
   { value: THEME_MODES.LIGHT, label: 'Light' },
@@ -324,21 +329,16 @@ export function mount(el) {
   newHabitTimeLabel.className = 'sr-only';
   newHabitTimeLabel.textContent = 'Scheduled Time (optional)';
 
-  const inputNewHabitTime = document.createElement('input');
-  inputNewHabitTime.id = 'input-new-habit-time';
-  inputNewHabitTime.type = 'time';
-  inputNewHabitTime.setAttribute('aria-label', 'Scheduled time (optional)');
-  inputNewHabitTime.className =
-    'flex-1 sm:w-40 min-h-[44px] min-w-[44px] px-3.5 py-2 text-base font-mono rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
-  inputNewHabitTime.style.fontSize = '16px';
-
-  const btnClearNewHabitTime = document.createElement('button');
-  btnClearNewHabitTime.id = 'btn-clear-new-habit-time';
-  btnClearNewHabitTime.type = 'button';
-  btnClearNewHabitTime.setAttribute('aria-label', 'Clear scheduled time');
-  btnClearNewHabitTime.className =
-    'btn-secondary-surface min-h-[44px] min-w-[44px] px-3 py-2 text-xs font-mono font-medium rounded-lg border border-[#E6E4DF] dark:border-[#33302C] cursor-pointer shrink-0 tactile-spring';
-  btnClearNewHabitTime.textContent = 'Clear';
+  const { timeInput: inputNewHabitTime, clearBtn: btnClearNewHabitTime } = createScheduledTimePair({
+    inputId: 'input-new-habit-time',
+    inputClassName:
+      'flex-1 sm:w-40 min-h-[44px] min-w-[44px] px-3.5 py-2 text-base font-mono rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]',
+    ariaLabel: 'Scheduled time (optional)',
+    clearButtonId: 'btn-clear-new-habit-time',
+    clearButtonClassName:
+      'btn-secondary-surface min-h-[44px] min-w-[44px] px-3 py-2 text-xs font-mono font-medium rounded-lg border border-[#E6E4DF] dark:border-[#33302C] cursor-pointer shrink-0 tactile-spring',
+    clearAriaLabel: 'Clear scheduled time',
+  });
 
   addTimeWrap.appendChild(newHabitTimeLabel);
   addTimeWrap.appendChild(inputNewHabitTime);
@@ -350,21 +350,13 @@ export function mount(el) {
   selectHabitLinkedActivity.className =
     'flex-1 min-h-[44px] px-3.5 py-2 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
   selectHabitLinkedActivity.style.fontSize = '16px';
-
-  const addOptNone = document.createElement('option');
-  addOptNone.value = '';
-  addOptNone.textContent = 'No Activity Link';
-  selectHabitLinkedActivity.appendChild(addOptNone);
-
-  const addOptBook = document.createElement('option');
-  addOptBook.value = 'book_summary';
-  addOptBook.textContent = 'Link: Book Summary 📖';
-  selectHabitLinkedActivity.appendChild(addOptBook);
-
-  const addOptJournal = document.createElement('option');
-  addOptJournal.value = 'journal';
-  addOptJournal.textContent = 'Link: Daily Journal ✍️';
-  selectHabitLinkedActivity.appendChild(addOptJournal);
+  populateLinkedActivitySelect(selectHabitLinkedActivity, {
+    labels: {
+      none: 'No Activity Link',
+      book: 'Link: Book Summary 📖',
+      journal: 'Link: Daily Journal ✍️',
+    },
+  });
 
   const btnAddHabit = document.createElement('button');
   btnAddHabit.id = 'btn-add-habit';
@@ -543,9 +535,6 @@ export function mount(el) {
   if (syncGasUrlInput) syncGasUrlInput.value = currentConfig.gasUrl || '';
   if (syncPinInput) syncPinInput.value = currentConfig.pin || '';
   if (settingReminderTimeInput) settingReminderTimeInput.value = '20:00';
-  btnClearNewHabitTime.addEventListener('click', () => {
-    inputNewHabitTime.value = '';
-  });
   // --- SECTION 1: SYNC ---
 
   function updateSyncStatusRow(status) {
@@ -738,7 +727,7 @@ export function mount(el) {
     nameWrapper.appendChild(nameSpan);
     nameWrapper.appendChild(editBtn);
 
-    const startRename = () => {
+    const startEditHabit = () => {
       editingHabitId = habit.id;
       const form = document.createElement('form');
       form.className = 'rename-form flex-1 flex flex-col gap-2 min-w-0';
@@ -755,22 +744,14 @@ export function mount(el) {
       const editControlsRow = document.createElement('div');
       editControlsRow.className = 'flex flex-wrap items-center gap-1.5';
 
-      const editTimeInput = document.createElement('input');
-      editTimeInput.type = 'time';
-      editTimeInput.value = habit.scheduledTime || '';
-      editTimeInput.className =
-        'input-edit-scheduled-time min-h-[44px] min-w-[44px] px-2.5 py-1.5 text-base font-mono rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
-      editTimeInput.setAttribute('aria-label', `Scheduled time for ${habit.name}`);
-      editTimeInput.style.fontSize = '16px';
-
-      const clearEditTimeBtn = document.createElement('button');
-      clearEditTimeBtn.type = 'button';
-      clearEditTimeBtn.className =
-        'btn-clear-edit-time btn-secondary-surface min-h-[44px] min-w-[44px] px-3 py-1.5 text-xs font-mono font-medium rounded-lg border border-[#E6E4DF] dark:border-[#33302C] cursor-pointer shrink-0 tactile-spring';
-      clearEditTimeBtn.setAttribute('aria-label', `Clear scheduled time for ${habit.name}`);
-      clearEditTimeBtn.textContent = 'Clear';
-      clearEditTimeBtn.addEventListener('click', () => {
-        editTimeInput.value = '';
+      const { timeInput: editTimeInput, clearBtn: clearEditTimeBtn } = createScheduledTimePair({
+        inputClassName:
+          'input-edit-scheduled-time min-h-[44px] min-w-[44px] px-2.5 py-1.5 text-base font-mono rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]',
+        ariaLabel: `Scheduled time for ${habit.name}`,
+        value: habit.scheduledTime || '',
+        clearButtonClassName:
+          'btn-clear-edit-time btn-secondary-surface min-h-[44px] min-w-[44px] px-3 py-1.5 text-xs font-mono font-medium rounded-lg border border-[#E6E4DF] dark:border-[#33302C] cursor-pointer shrink-0 tactile-spring',
+        clearAriaLabel: `Clear scheduled time for ${habit.name}`,
       });
 
       const select = document.createElement('select');
@@ -778,25 +759,14 @@ export function mount(el) {
         'select-edit-linked-activity min-h-[44px] px-2.5 py-1.5 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
       select.setAttribute('aria-label', `Linked activity for ${habit.name}`);
       select.style.fontSize = '16px';
-
-      const optNone = document.createElement('option');
-      optNone.value = '';
-      optNone.textContent = 'No Link';
-      optNone.selected = !habit.linkedActivity;
-      select.appendChild(optNone);
-
-      const optBook = document.createElement('option');
-      optBook.value = 'book_summary';
-      optBook.textContent = 'Book Summary 📖';
-      optBook.selected = habit.linkedActivity === 'book_summary';
-      select.appendChild(optBook);
-
-      const optJournal = document.createElement('option');
-      optJournal.value = 'journal';
-      optJournal.textContent = 'Daily Journal ✍️';
-      optJournal.selected = habit.linkedActivity === 'journal';
-      select.appendChild(optJournal);
-      select.value = habit.linkedActivity || '';
+      populateLinkedActivitySelect(select, {
+        selectedValue: habit.linkedActivity || '',
+        labels: {
+          none: 'No Link',
+          book: 'Book Summary 📖',
+          journal: 'Daily Journal ✍️',
+        },
+      });
 
       const cancelEditBtn = document.createElement('button');
       cancelEditBtn.type = 'button';
@@ -823,14 +793,14 @@ export function mount(el) {
       if (typeof input.select === 'function') input.select();
 
       let finished = false;
-      const cancelRename = () => {
+      const cancelEdit = () => {
         if (finished) return;
         finished = true;
         editingHabitId = null;
         renderHabits();
       };
 
-      const commit = async () => {
+      const commitEdit = async () => {
         if (finished) return;
         finished = true;
         editingHabitId = null;
@@ -856,39 +826,26 @@ export function mount(el) {
 
       form.addEventListener('submit', (e) => {
         e?.preventDefault?.();
-        commit();
+        commitEdit();
       });
 
       saveBtn.addEventListener('click', (e) => {
         e?.preventDefault?.();
-        commit();
+        commitEdit();
       });
 
-      cancelEditBtn.addEventListener('click', cancelRename);
-
-      form.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-          e?.preventDefault?.();
-          cancelRename();
-        }
-      });
-
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-          e?.preventDefault?.();
-          cancelRename();
-        }
-      });
+      cancelEditBtn.addEventListener('click', cancelEdit);
+      bindEscapeKey([form, input, editTimeInput], cancelEdit);
     };
 
-    nameSpan.addEventListener('click', startRename);
+    nameSpan.addEventListener('click', startEditHabit);
     nameSpan.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        startRename();
+        startEditHabit();
       }
     });
-    editBtn.addEventListener('click', startRename);
+    editBtn.addEventListener('click', startEditHabit);
 
     // Action buttons: Move up, Move down, Archive
     const actionsWrapper = document.createElement('div');

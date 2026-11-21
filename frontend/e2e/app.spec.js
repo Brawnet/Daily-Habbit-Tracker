@@ -976,6 +976,10 @@ test.describe('Habbit App E2E', () => {
 
     await expect(doneBtn).toBeVisible();
     await expect(doneBtn).toHaveCSS('background-color', 'rgb(158, 75, 75)');
+    const editDoneBox = await doneBtn.boundingBox();
+    expect(editDoneBox).not.toBeNull();
+    expect(editDoneBox.width).toBeGreaterThanOrEqual(44);
+    expect(editDoneBox.height).toBeGreaterThanOrEqual(44);
     await assertNoHorizontalOverflow(page);
 
     await page.fill('#input-journal-title', 'Edited Reader Headline');

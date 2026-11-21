@@ -1446,6 +1446,12 @@ export function mount(rootEl) {
       });
     }
 
+    async function exitJournalToSubview(nextView) {
+      await flushPendingJournalSave();
+      currentView = nextView;
+      render();
+    }
+
     const cardsEl = renderPromptCardsJournal({
       prompts,
       answers,
@@ -1466,24 +1472,15 @@ export function mount(rootEl) {
       onUpdateTitle: handleUpdateTitle,
       onUpdateAnswers: scheduleJournalAutosave,
       onOpenCustomizeModal: handleOpenCustomizeModal,
-      onBack: async () => {
-        await flushPendingJournalSave();
-        if (mode === 'edit') {
-          currentView = 'journal-read';
-        } else {
-          currentView = 'journals-menu';
-        }
-        render();
-      },
+      onBack: () => exitJournalToSubview(mode === 'edit' ? 'journal-read' : 'journals-menu'),
       onDone: async () => {
-        await flushPendingJournalSave();
-        if (mode === 'write') {
-          clearJournalSubviewParam();
-          navigate('today');
-        } else {
-          currentView = 'journal-read';
-          render();
+        if (mode === 'edit') {
+          await exitJournalToSubview('journal-read');
+          return;
         }
+        await flushPendingJournalSave();
+        clearJournalSubviewParam();
+        navigate('today');
       },
     });
 

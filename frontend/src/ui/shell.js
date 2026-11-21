@@ -89,8 +89,24 @@ function getCurrentDayString() {
 }
 
 const UNCONFIGURED_SYNC_LABEL = 'Offline / Local';
-const TOAST_BOTTOM_OFFSET = 'calc(max(12px, env(safe-area-inset-bottom, 12px)) + 84px)';
-const TOAST_TOP_OFFSET = 'calc(env(safe-area-inset-top, 0px) + 12px)';
+const TOAST_POSITIONS = {
+  bottom: {
+    containerId: 'toast-container',
+    styleProp: 'bottom',
+    offset: 'calc(max(12px, env(safe-area-inset-bottom, 12px)) + 84px)',
+    exitClass: 'translate-y-2',
+  },
+  top: {
+    containerId: 'top-toast-container',
+    styleProp: 'top',
+    offset: 'calc(env(safe-area-inset-top, 0px) + 12px)',
+    exitClass: '-translate-y-2',
+  },
+};
+
+function getToastPositionConfig(position) {
+  return position === 'top' ? TOAST_POSITIONS.top : TOAST_POSITIONS.bottom;
+}
 
 /**
  * Updates header sync indicator UI
@@ -312,18 +328,14 @@ export function navigate(name, updateUrl = true) {
 }
 
 function createToastContainer(position = 'bottom') {
-  const isTop = position === 'top';
+  const cfg = getToastPositionConfig(position);
   const container = document.createElement('div');
-  container.id = isTop ? 'top-toast-container' : 'toast-container';
+  container.id = cfg.containerId;
   container.setAttribute('aria-live', 'polite');
   container.setAttribute('aria-atomic', 'true');
   container.className =
     'fixed left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none w-full max-w-sm px-4';
-  if (isTop) {
-    container.style.top = TOAST_TOP_OFFSET;
-  } else {
-    container.style.bottom = TOAST_BOTTOM_OFFSET;
-  }
+  container.style[cfg.styleProp] = cfg.offset;
   return container;
 }
 
@@ -334,11 +346,10 @@ function createToastContainer(position = 'bottom') {
  * @returns {() => void} dismiss function
  */
 export function showToast(message, { action, position = 'bottom', duration = 4000 } = {}) {
-  const isTop = position === 'top';
-  const containerId = isTop ? 'top-toast-container' : 'toast-container';
-  let container = document.getElementById(containerId);
+  const cfg = getToastPositionConfig(position);
+  let container = document.getElementById(cfg.containerId);
   if (!container && rootElement) {
-    container = createToastContainer(isTop ? 'top' : 'bottom');
+    container = createToastContainer(position);
     rootElement.appendChild(container);
   }
 
@@ -361,7 +372,7 @@ export function showToast(message, { action, position = 'bottom', duration = 400
       timer = null;
     }
     toast.classList.remove('opacity-100', 'translate-y-0');
-    toast.classList.add('opacity-0', isTop ? '-translate-y-2' : 'translate-y-2');
+    toast.classList.add('opacity-0', cfg.exitClass);
     setTimeout(() => {
       try {
         toast.remove();

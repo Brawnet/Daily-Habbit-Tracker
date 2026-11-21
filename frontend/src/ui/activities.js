@@ -157,12 +157,14 @@ export function mount(rootEl) {
   let renderToken = 0;
   let debounceTimer = null;
 
+  const JOURNAL_SUBVIEW_PARAMS = ['subview', 'view'];
+
   // View state: 'home' | 'journals-menu' | 'journal' | 'journal-history' | 'journal-read' | 'journal-edit' | 'books-list' | 'book-menu' | 'book-edit' | 'book-read'
   let currentView = 'home';
   try {
     if (typeof window !== 'undefined' && window.location) {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('subview') === JOURNAL_SUBVIEW || params.get('view') === JOURNAL_SUBVIEW) {
+      if (JOURNAL_SUBVIEW_PARAMS.some((k) => params.get(k) === JOURNAL_SUBVIEW)) {
         currentView = 'journal';
       }
     }
@@ -237,13 +239,11 @@ export function mount(rootEl) {
     try {
       const url = new URL(window.location.href);
       let changed = false;
-      if (url.searchParams.has('subview')) {
-        url.searchParams.delete('subview');
-        changed = true;
-      }
-      if (url.searchParams.get('view') === JOURNAL_SUBVIEW) {
-        url.searchParams.delete('view');
-        changed = true;
+      for (const key of JOURNAL_SUBVIEW_PARAMS) {
+        if (url.searchParams.get(key) === JOURNAL_SUBVIEW) {
+          url.searchParams.delete(key);
+          changed = true;
+        }
       }
       if (changed) {
         window.history.replaceState({}, '', url.toString());
@@ -1446,6 +1446,7 @@ export function mount(rootEl) {
       });
     }
 
+    let isExitingJournal = false;
     async function exitJournalToSubview(nextView) {
       await flushPendingJournalSave();
       currentView = nextView;
@@ -1474,14 +1475,20 @@ export function mount(rootEl) {
       onOpenCustomizeModal: handleOpenCustomizeModal,
       onBack: () => exitJournalToSubview(mode === 'edit' ? 'journal-read' : 'journals-menu'),
       onDone: async () => {
-        if (mode === 'edit') {
-          await exitJournalToSubview('journal-read');
-        } else {
-          await flushPendingJournalSave();
-          clearJournalSubviewParam();
-          navigate('today');
+        if (isExitingJournal) return;
+        isExitingJournal = true;
+        try {
+          if (mode === 'edit') {
+            await exitJournalToSubview('journal-read');
+          } else {
+            await flushPendingJournalSave();
+            clearJournalSubviewParam();
+            navigate('today');
+          }
+          showToast('Your journal has been saved', { position: 'top', duration: 3000 });
+        } finally {
+          isExitingJournal = false;
         }
-        showToast('Your journal has been saved', { position: 'top', duration: 3000 });
       },
     });
 

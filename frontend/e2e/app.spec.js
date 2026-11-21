@@ -931,14 +931,29 @@ test.describe('Habbit App E2E', () => {
     await expect(page.locator('#btn-back-from-journal-to-activities')).toContainText('Back to Journals');
 
     const doneBtn = page.locator('#btn-journal-done');
-    await expect(doneBtn).toBeVisible();
-    await expect(doneBtn).toHaveText('Done');
-    await expect(doneBtn).toHaveCSS('background-color', 'rgb(158, 75, 75)');
-    const doneBox = await doneBtn.boundingBox();
-    expect(doneBox).not.toBeNull();
-    expect(doneBox.width).toBeGreaterThanOrEqual(44);
-    expect(doneBox.height).toBeGreaterThanOrEqual(44);
-    await assertNoHorizontalOverflow(page);
+    const expectDoneButtonReady = async () => {
+      await expect(doneBtn).toBeVisible();
+      await expect(doneBtn).toHaveText('Done');
+      await expect(doneBtn).toHaveCSS('background-color', 'rgb(158, 75, 75)');
+      const box = await doneBtn.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box.width).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      await assertNoHorizontalOverflow(page);
+    };
+
+    const expectTopSavedToastDismisses = async () => {
+      const topToast = page.locator('#top-toast-container > *').first();
+      await expect(topToast).toBeVisible();
+      await expect(topToast).toContainText('Your journal has been saved');
+      const topToastBox = await topToast.boundingBox();
+      expect(topToastBox).not.toBeNull();
+      expect(topToastBox.y).toBeLessThan(120);
+      await expect(page.locator('#toast-container > *')).toHaveCount(0);
+      await expect(page.locator('#top-toast-container > *')).toHaveCount(0, { timeout: 4500 });
+    };
+
+    await expectDoneButtonReady();
 
     // Fill title + reflection and tap Done immediately (flushes 800ms debounce before leaving)
     await page.fill('#input-journal-title', 'Done Flow Title');
@@ -950,15 +965,7 @@ test.describe('Habbit App E2E', () => {
     await expect(page).not.toHaveURL(/subview=journal/);
     await expect(page.locator('#today-date')).toBeVisible();
     await expect(page.locator('#today-progress')).toContainText('1/2 done');
-
-    const topToast = page.locator('#top-toast-container > *').first();
-    await expect(topToast).toBeVisible();
-    await expect(topToast).toContainText('Your journal has been saved');
-    const topToastBox = await topToast.boundingBox();
-    expect(topToastBox).not.toBeNull();
-    expect(topToastBox.y).toBeLessThan(120);
-    await expect(page.locator('#toast-container > *')).toHaveCount(0);
-    await expect(page.locator('#top-toast-container > *')).toHaveCount(0, { timeout: 4500 });
+    await expectTopSavedToastDismisses();
 
     // Subsequent visit to Activities opens Choice Hub instead of jumping back into Write a Journal
     await page.click('button[data-tab="activities"]');
@@ -983,13 +990,7 @@ test.describe('Habbit App E2E', () => {
     await page.locator('.journal-entry-item').first().click();
     await page.click('#btn-edit-journal-entry');
 
-    await expect(doneBtn).toBeVisible();
-    await expect(doneBtn).toHaveCSS('background-color', 'rgb(158, 75, 75)');
-    const editDoneBox = await doneBtn.boundingBox();
-    expect(editDoneBox).not.toBeNull();
-    expect(editDoneBox.width).toBeGreaterThanOrEqual(44);
-    expect(editDoneBox.height).toBeGreaterThanOrEqual(44);
-    await assertNoHorizontalOverflow(page);
+    await expectDoneButtonReady();
 
     await page.fill('#input-journal-title', 'Edited Reader Headline');
     await page.locator('#editor-journal-content').fill('Updated while editing existing entry.');
@@ -999,7 +1000,6 @@ test.describe('Habbit App E2E', () => {
     await expect(page.locator('#journal-read-view')).toBeVisible();
     await expect(page.locator('#journal-reader-title')).toHaveText('Edited Reader Headline');
     await expect(page.locator('#journal-reader-card')).toContainText('Updated while editing existing entry.');
-    await expect(page.locator('#top-toast-container > *').first()).toContainText('Your journal has been saved');
-    await expect(page.locator('#top-toast-container > *')).toHaveCount(0, { timeout: 4500 });
+    await expectTopSavedToastDismisses();
   });
 });

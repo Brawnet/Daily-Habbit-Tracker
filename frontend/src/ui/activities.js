@@ -43,7 +43,7 @@ import {
   renderJournalReaderView,
 } from './journal-history.js';
 import { addDays, formatLong, today } from '../domain/day.js';
-import { showToast } from './shell.js';
+import { navigate, showToast } from './shell.js';
 import { isBlank, htmlToText, htmlToMarkdownText } from '../domain/text.js';
 import {
   isJournalEntryWritten,
@@ -231,6 +231,25 @@ export function mount(rootEl) {
       render();
     }
   });
+
+  function clearJournalSubviewParam() {
+    if (typeof window === 'undefined' || !window.location || !window.history) return;
+    try {
+      const url = new URL(window.location.href);
+      let changed = false;
+      if (url.searchParams.has('subview')) {
+        url.searchParams.delete('subview');
+        changed = true;
+      }
+      if (url.searchParams.get('view') === JOURNAL_SUBVIEW) {
+        url.searchParams.delete('view');
+        changed = true;
+      }
+      if (changed) {
+        window.history.replaceState({}, '', url.toString());
+      }
+    } catch {}
+  }
 
   async function flushPendingJournalSave() {
     if (debounceTimer) {
@@ -1433,7 +1452,7 @@ export function mount(rootEl) {
       title: journalTitle,
       status: journalStatus,
       targetDay: day,
-      backLabel: mode === 'edit' ? 'Done · Back to Entry' : 'Back to Journals',
+      backLabel: mode === 'edit' ? 'Back to Entry' : 'Back to Journals',
       showDatePicker: mode === 'write',
       minDay: addDays(todayDay, -7),
       maxDay: todayDay,
@@ -1455,6 +1474,16 @@ export function mount(rootEl) {
           currentView = 'journals-menu';
         }
         render();
+      },
+      onDone: async () => {
+        await flushPendingJournalSave();
+        if (mode === 'write') {
+          clearJournalSubviewParam();
+          navigate('today');
+        } else {
+          currentView = 'journal-read';
+          render();
+        }
       },
     });
 

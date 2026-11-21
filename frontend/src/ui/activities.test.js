@@ -1148,4 +1148,136 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
 
     cleanup();
   });
+
+  it('renders bottom Done button in Write a Journal that flushes pending autosave, clears subview=journal, and navigates to Today', async () => {
+    const todayDay = today();
+    let currentHref = 'http://localhost/?tab=activities&subview=journal';
+    const replaceState = vi.fn((_state, _title, nextUrl) => {
+      const parsed = new URL(nextUrl, 'http://localhost/');
+      currentHref = parsed.toString();
+      global.window.location.href = currentHref;
+      global.window.location.search = parsed.search;
+    });
+    global.window = {
+      location: {
+        href: currentHref,
+        search: '?tab=activities&subview=journal',
+      },
+      history: {
+        replaceState,
+      },
+    };
+
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 15));
+
+    expect(root.querySelector('#journal-view')).not.toBeNull();
+    const backBtn = root.querySelector('#btn-back-from-journal-to-activities');
+    expect(backBtn.textContent).toContain('Back to Journals');
+
+    const doneBtn = root.querySelector('#btn-journal-done');
+    expect(doneBtn).not.toBeNull();
+    expect(doneBtn.textContent.trim()).toBe('Done');
+    expect(doneBtn.classList.contains('min-h-[44px]')).toBe(true);
+    expect(doneBtn.classList.contains('min-w-[44px]')).toBe(true);
+
+    // Edit title & prompt answer and click Done immediately (before 800ms debounce fires)
+    const titleInput = root.querySelector('#input-journal-title');
+    titleInput.value = 'Done Flow Headline';
+    titleInput.dispatchEvent({ type: 'input' });
+
+    const editor = root.querySelector('#editor-journal-content');
+    editor.innerHTML = 'Shipped cleanly';
+    editor.dispatchEvent({ type: 'input' });
+
+    expect(repoModule.saveJournalEntry).not.toHaveBeenCalled();
+
+    doneBtn.click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(repoModule.saveJournalEntry).toHaveBeenCalledTimes(1);
+    expect(repoModule.saveJournalEntry).toHaveBeenCalledWith(
+      todayDay,
+      expect.stringContaining('Shipped cleanly'),
+      { title: 'Done Flow Headline' }
+    );
+    expect(replaceState).toHaveBeenCalled();
+    expect(new URLSearchParams(global.window.location.search).get('subview')).toBeNull();
+    expect(shellModule.navigate).toHaveBeenCalledWith('today');
+
+    cleanup();
+  });
+
+  it('returns to Entry Reader without navigating to Today when clicking Done in Edit Journal, and keeps top Back links intact', async () => {
+    const pastDay = addDays(today(), -4);
+    repoModule._seedJournalEntry({
+      day: pastDay,
+      title: 'Original Edit Title',
+      content: '<div class="journal-prompt-block" data-prompt-id="jp_day"><h3>How was your day?</h3><div class="journal-prompt-answer">Initial draft</div></div>',
+    });
+
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 15));
+
+    // Write a Journal -> Back to Journals goes to menu without navigate()
+    root.querySelector('#choice-journals').click();
+    await new Promise((r) => setTimeout(r, 15));
+    root.querySelector('#btn-choice-write-journal').click();
+    await new Promise((r) => setTimeout(r, 15));
+
+    const writeBackBtn = root.querySelector('#btn-back-from-journal-to-activities');
+    expect(writeBackBtn.textContent).toContain('Back to Journals');
+    writeBackBtn.click();
+    await new Promise((r) => setTimeout(r, 15));
+
+    expect(root.querySelector('#journals-menu-view')).not.toBeNull();
+    expect(shellModule.navigate).not.toHaveBeenCalled();
+
+    // Open Past Entries -> Entry Reader -> Edit Journal
+    root.querySelector('#btn-choice-journal-history').click();
+    await new Promise((r) => setTimeout(r, 15));
+    const entryCard = root.querySelectorAll('.journal-entry-item').find((c) => c.dataset.day === pastDay);
+    entryCard.click();
+    await new Promise((r) => setTimeout(r, 15));
+    root.querySelector('#btn-edit-journal-entry').click();
+    await new Promise((r) => setTimeout(r, 15));
+
+    const editBackBtn = root.querySelector('#btn-back-from-journal-to-activities');
+    expect(editBackBtn.textContent).toContain('Back to Entry');
+
+    const editDoneBtn = root.querySelector('#btn-journal-done');
+    expect(editDoneBtn).not.toBeNull();
+    expect(editDoneBtn.textContent.trim()).toBe('Done');
+    expect(editDoneBtn.classList.contains('min-h-[44px]')).toBe(true);
+    expect(editDoneBtn.classList.contains('min-w-[44px]')).toBe(true);
+
+    // Edit title & prompt answer, click bottom Done immediately (before 800ms debounce)
+    const editTitleInput = root.querySelector('#input-journal-title');
+    editTitleInput.value = 'Revised Edit Title';
+    editTitleInput.dispatchEvent({ type: 'input' });
+
+    const editEditor = root.querySelector('#editor-journal-content');
+    editEditor.innerHTML = 'Refined reflection content';
+    editEditor.dispatchEvent({ type: 'input' });
+
+    expect(repoModule.saveJournalEntry).not.toHaveBeenCalled();
+
+    editDoneBtn.click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(repoModule.saveJournalEntry).toHaveBeenCalledTimes(1);
+    expect(repoModule.saveJournalEntry).toHaveBeenCalledWith(
+      pastDay,
+      expect.stringContaining('Refined reflection content'),
+      { title: 'Revised Edit Title' }
+    );
+    expect(shellModule.navigate).not.toHaveBeenCalled();
+    expect(root.querySelector('#journal-read-view')).not.toBeNull();
+    expect(root.querySelector('#journal-reader-title').textContent).toBe('Revised Edit Title');
+    expect(root.querySelector('#journal-reader-card').textContent).toContain('Refined reflection content');
+
+    cleanup();
+  });
 });

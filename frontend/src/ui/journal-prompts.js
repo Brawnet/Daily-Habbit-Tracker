@@ -423,6 +423,7 @@ export function renderPromptCardsJournal({
   onUpdateAnswers,
   onOpenCustomizeModal,
   onBack,
+  onDone,
 }) {
   const container = document.createElement('div');
   container.className = 'flex flex-col gap-4 animate-in fade-in duration-150 pb-24';
@@ -634,6 +635,22 @@ export function renderPromptCardsJournal({
     card.appendChild(editor);
     container.appendChild(card);
   });
+
+  if (typeof onDone === 'function') {
+    const footer = document.createElement('div');
+    footer.className = 'pt-2 flex justify-end';
+
+    const doneBtn = document.createElement('button');
+    doneBtn.type = 'button';
+    doneBtn.id = 'btn-journal-done';
+    doneBtn.className =
+      'min-h-[44px] min-w-[44px] w-full sm:w-auto inline-flex items-center justify-center px-6 py-2.5 rounded-lg text-sm font-semibold bg-[#9E4B4B] text-[#FAF8F5] hover:opacity-90 active:scale-95 transition cursor-pointer tactile-spring focus:outline-none focus:ring-2 focus:ring-[#B56565] dark:focus:ring-[#C67878]';
+    doneBtn.textContent = 'Done';
+    doneBtn.addEventListener('click', onDone);
+
+    footer.appendChild(doneBtn);
+    container.appendChild(footer);
+  }
 
   return container;
 }

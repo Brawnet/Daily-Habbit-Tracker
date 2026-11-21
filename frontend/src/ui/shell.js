@@ -108,6 +108,23 @@ function getToastPositionConfig(position) {
   return position === 'top' ? TOAST_POSITIONS.top : TOAST_POSITIONS.bottom;
 }
 
+const TOAST_TONES = {
+  neutral: {
+    borderClass: 'border-[#E6E4DF] dark:border-[#33302C]',
+    badgeClass: '',
+  },
+  rose: {
+    borderClass: 'border-[#B56565] dark:border-[#C67878]',
+    badgeClass: 'badge-rose',
+  },
+};
+
+const TOAST_CHECK_SVG = `
+<svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M5 13l4 4L19 7" />
+</svg>
+`.trim();
+
 /**
  * Updates header sync indicator UI
  * @param {import('../shared/contracts.js').SyncStatus} status
@@ -342,11 +359,12 @@ function createToastContainer(position = 'bottom') {
 /**
  * Displays an accessible floating toast notification.
  * @param {string} message
- * @param {{ action?: { label: string, onClick: () => void }, position?: 'top' | 'bottom', duration?: number }} [options]
+ * @param {{ action?: { label: string, onClick: () => void }, position?: 'top' | 'bottom', duration?: number, tone?: 'neutral' | 'rose' }} [options]
  * @returns {() => void} dismiss function
  */
-export function showToast(message, { action, position = 'bottom', duration = 4000 } = {}) {
+export function showToast(message, { action, position = 'bottom', duration = 4000, tone = 'neutral' } = {}) {
   const cfg = getToastPositionConfig(position);
+  const toneCfg = TOAST_TONES[tone] || TOAST_TONES.neutral;
   let container = document.getElementById(cfg.containerId);
   if (!container && rootElement) {
     container = createToastContainer(position);
@@ -359,7 +377,15 @@ export function showToast(message, { action, position = 'bottom', duration = 400
   toast.setAttribute('role', 'status');
   toast.setAttribute('aria-live', 'polite');
   toast.className =
-    'pointer-events-auto flex items-center justify-between gap-3 px-4 py-3 rounded-xl shadow-lg bg-[#22201E] text-[#F4F1EA] border border-[#33302C] text-sm font-medium transition-all duration-200 transform translate-y-0 opacity-100';
+    `pointer-events-auto flex items-center justify-between gap-3 px-4 py-3 rounded-xl shadow-[0_8px_24px_-4px_rgba(28,27,24,0.08)] dark:shadow-[0_8px_24px_-4px_rgba(0,0,0,0.45)] bg-[#FFFFFF] dark:bg-[#22201E] text-[#1C1B18] dark:text-[#F4F1EA] border ${toneCfg.borderClass} text-sm font-medium transition-all duration-200 transform translate-y-0 opacity-100`;
+
+  if (toneCfg.badgeClass) {
+    const iconBadge = document.createElement('span');
+    iconBadge.className = `w-6 h-6 rounded-full ${toneCfg.badgeClass} inline-flex items-center justify-center shrink-0`;
+    iconBadge.innerHTML = TOAST_CHECK_SVG;
+    toast.appendChild(iconBadge);
+  }
+
   const textSpan = document.createElement('span');
   textSpan.className = 'flex-1 text-xs sm:text-sm';
   textSpan.textContent = message;
@@ -384,7 +410,7 @@ export function showToast(message, { action, position = 'bottom', duration = 400
     const actionBtn = document.createElement('button');
     actionBtn.type = 'button';
     actionBtn.className =
-      'min-h-[36px] min-w-[44px] px-3 py-1 text-xs font-bold font-mono text-[#D97E63] hover:underline cursor-pointer tactile-spring';
+      'min-h-[36px] min-w-[44px] px-3 py-1 text-xs font-bold font-mono text-[#C86D51] dark:text-[#D97E63] hover:underline cursor-pointer tactile-spring';
     actionBtn.textContent = action.label;
     actionBtn.addEventListener('click', (e) => {
       e.preventDefault();

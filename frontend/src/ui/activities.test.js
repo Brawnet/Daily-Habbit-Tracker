@@ -1208,6 +1208,7 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     expect(shellModule.showToast).toHaveBeenCalledWith('Your journal has been saved', {
       position: 'top',
       duration: 3000,
+      tone: 'rose',
     });
 
     cleanup();
@@ -1282,6 +1283,7 @@ describe('ui/activities.js UI view - Choice Hub & Books Summary', () => {
     expect(shellModule.showToast).toHaveBeenCalledWith('Your journal has been saved', {
       position: 'top',
       duration: 3000,
+      tone: 'rose',
     });
     expect(root.querySelector('#journal-read-view')).not.toBeNull();
     expect(root.querySelector('#journal-reader-title').textContent).toBe('Revised Edit Title');

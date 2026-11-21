@@ -1485,7 +1485,7 @@ export function mount(rootEl) {
             clearJournalSubviewParam();
             navigate('today');
           }
-          showToast('Your journal has been saved', { position: 'top', duration: 3000 });
+          showToast('Your journal has been saved', { position: 'top', duration: 3000, tone: 'rose' });
         } finally {
           isExitingJournal = false;
         }

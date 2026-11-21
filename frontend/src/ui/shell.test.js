@@ -482,20 +482,27 @@ describe('ui/shell.js', () => {
     dismiss();
   });
 
-  it('shows top toast at safe-area top offset and auto-dismisses after custom duration (3000ms)', () => {
+  it('shows themed top toast at safe-area top offset with Rose accent badge and auto-dismisses after custom duration (3000ms)', () => {
     vi.useFakeTimers();
     try {
       const root = mockDoc.createElement('div');
       mountShell(root);
 
-      showToast('Your journal has been saved', { position: 'top', duration: 3000 });
+      showToast('Your journal has been saved', { position: 'top', duration: 3000, tone: 'rose' });
 
       const topContainer = mockDoc.getElementById('top-toast-container');
       const bottomContainer = mockDoc.getElementById('toast-container');
       expect(topContainer).toBeDefined();
       expect(topContainer.style.top).toBe('calc(env(safe-area-inset-top, 0px) + 12px)');
       expect(topContainer.children.length).toBe(1);
-      expect(topContainer.children[0].textContent).toContain('Your journal has been saved');
+
+      const toast = topContainer.children[0];
+      expect(toast.textContent).toContain('Your journal has been saved');
+      expect(toast.className).toContain('bg-[#FFFFFF]');
+      expect(toast.className).toContain('dark:bg-[#22201E]');
+      expect(toast.className).toContain('border-[#B56565]');
+      expect(toast.className).toContain('dark:border-[#C67878]');
+      expect(toast.querySelector('.badge-rose')).not.toBeNull();
       expect(bottomContainer.children.length).toBe(0);
 
       // Still visible before 3000ms

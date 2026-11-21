@@ -942,10 +942,23 @@ test.describe('Habbit App E2E', () => {
       await assertNoHorizontalOverflow(page);
     };
 
-    const expectTopSavedToastDismisses = async () => {
+    const expectTopSavedToastDismisses = async (isDark = false) => {
       const topToast = page.locator('#top-toast-container > *').first();
       await expect(topToast).toBeVisible();
       await expect(topToast).toContainText('Your journal has been saved');
+      await expect(topToast.locator('.badge-rose')).toBeVisible();
+      await expect(topToast).toHaveCSS(
+        'background-color',
+        isDark ? 'rgb(34, 32, 30)' : 'rgb(255, 255, 255)'
+      );
+      await expect(topToast).toHaveCSS(
+        'color',
+        isDark ? 'rgb(244, 241, 234)' : 'rgb(28, 27, 24)'
+      );
+      await expect(topToast).toHaveCSS(
+        'border-top-color',
+        isDark ? 'rgb(198, 120, 120)' : 'rgb(181, 101, 101)'
+      );
       const topToastBox = await topToast.boundingBox();
       expect(topToastBox).not.toBeNull();
       expect(topToastBox.y).toBeLessThan(120);
@@ -1000,6 +1013,6 @@ test.describe('Habbit App E2E', () => {
     await expect(page.locator('#journal-read-view')).toBeVisible();
     await expect(page.locator('#journal-reader-title')).toHaveText('Edited Reader Headline');
     await expect(page.locator('#journal-reader-card')).toContainText('Updated while editing existing entry.');
-    await expectTopSavedToastDismisses();
+    await expectTopSavedToastDismisses(true);
   });
 });

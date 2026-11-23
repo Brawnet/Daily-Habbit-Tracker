@@ -1090,4 +1090,113 @@ test.describe('Habbit App E2E', () => {
     await expect(page.locator('.habit-scheduled-time')).toHaveCount(0);
     await expect(page.locator('.habit-scheduled-time-badge')).toHaveCount(0);
   });
+
+  test('Done button returns to Today from Write a Journal and returns to Entry Reader from Edit Journal in Light & Dark modes', async ({ page }) => {
+    await page.setViewportSize({ width: 393, height: 852 });
+    await page.emulateMedia({ colorScheme: 'light' });
+
+    // Seed a first habit via quick starter so Today shows the Active Habits list & inline + Add Habit control
+    await page.getByRole('button', { name: '+ Drink 2L Water' }).click();
+    await page.click('#today-empty-add-btn');
+    await expect(page.locator('#today-add-habit-trigger')).toBeVisible();
+
+    // Add a Journal-linked Habit directly on Today
+    await page.click('#today-add-habit-trigger');
+    await page.fill('#today-add-habit-input', 'Daily Evening Reflection');
+    await page.selectOption('#today-add-habit-linked-activity', 'journal');
+    await page.click('#today-add-habit-submit');
+    await expect(page.locator('#today-progress')).toContainText('0/2 done');
+
+    // Deep-link to Write a Journal from the Today Linked Activity badge
+    await page.click('.habit-activity-link');
+    await expect(page).toHaveURL(/tab=activities/);
+    await expect(page).toHaveURL(/subview=journal/);
+    await expect(page.locator('#journal-view')).toBeVisible();
+    await expect(page.locator('#btn-back-from-journal-to-activities')).toContainText('Back to Journals');
+
+    const doneBtn = page.locator('#btn-journal-done');
+    const expectDoneButtonReady = async () => {
+      await expect(doneBtn).toBeVisible();
+      await expect(doneBtn).toHaveText('Done');
+      await expect(doneBtn).toHaveCSS('background-color', 'rgb(158, 75, 75)');
+      const box = await doneBtn.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box.width).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      await assertNoHorizontalOverflow(page);
+    };
+
+    const expectTopSavedToastDismisses = async (isDark = false) => {
+      const topToast = page.locator('#top-toast-container > *').first();
+      await expect(topToast).toBeVisible();
+      await expect(topToast).toContainText('Your journal has been saved');
+      await expect(topToast.locator('.badge-rose')).toBeVisible();
+      await expect(topToast).toHaveCSS(
+        'background-color',
+        isDark ? 'rgb(34, 32, 30)' : 'rgb(255, 255, 255)'
+      );
+      await expect(topToast).toHaveCSS(
+        'color',
+        isDark ? 'rgb(244, 241, 234)' : 'rgb(28, 27, 24)'
+      );
+      await expect(topToast).toHaveCSS(
+        'border-top-color',
+        isDark ? 'rgb(198, 120, 120)' : 'rgb(181, 101, 101)'
+      );
+      const topToastBox = await topToast.boundingBox();
+      expect(topToastBox).not.toBeNull();
+      expect(topToastBox.y).toBeLessThan(120);
+      await expect(page.locator('#toast-container > *')).toHaveCount(0);
+      await expect(page.locator('#top-toast-container > *')).toHaveCount(0, { timeout: 4500 });
+    };
+
+    await expectDoneButtonReady();
+
+    // Fill title + reflection and tap Done immediately (flushes 800ms debounce before leaving)
+    await page.fill('#input-journal-title', 'Done Flow Title');
+    await page.locator('#editor-journal-content').fill('Finished via bottom Done button.');
+    await doneBtn.click();
+
+    // Lands back on Today with subview=journal cleared, linked Habit auto-checked, and 3s top saved notification
+    await expect(page).toHaveURL(/tab=today/);
+    await expect(page).not.toHaveURL(/subview=journal/);
+    await expect(page.locator('#today-date')).toBeVisible();
+    await expect(page.locator('#today-progress')).toContainText('1/2 done');
+    await expectTopSavedToastDismisses();
+
+    // Subsequent visit to Activities opens Choice Hub instead of jumping back into Write a Journal
+    await page.click('button[data-tab="activities"]');
+    await expect(page.locator('#activities-choice-hub')).toBeVisible();
+
+    // Open Past Entries -> Entry Reader -> Edit Journal
+    await page.click('#choice-journals');
+    await page.click('#btn-choice-journal-history');
+    await page.locator('.journal-entry-item').first().click();
+    await expect(page.locator('#journal-read-view')).toBeVisible();
+    await page.click('#btn-edit-journal-entry');
+    await expect(page.locator('#btn-back-from-journal-to-activities')).toContainText('Back to Entry');
+
+    // Switch to Dark mode, reopen Edit Journal, modify title & answer, click Done -> returns to Entry Reader (not Today)
+    await page.click('button[data-tab="settings"]');
+    await page.click('#theme-option-dark');
+    await expect(page.locator('html')).toHaveClass(/\bdark\b/);
+
+    await page.click('button[data-tab="activities"]');
+    await page.click('#choice-journals');
+    await page.click('#btn-choice-journal-history');
+    await page.locator('.journal-entry-item').first().click();
+    await page.click('#btn-edit-journal-entry');
+
+    await expectDoneButtonReady();
+
+    await page.fill('#input-journal-title', 'Edited Reader Headline');
+    await page.locator('#editor-journal-content').fill('Updated while editing existing entry.');
+    await doneBtn.click();
+
+    await expect(page).toHaveURL(/tab=activities/);
+    await expect(page.locator('#journal-read-view')).toBeVisible();
+    await expect(page.locator('#journal-reader-title')).toHaveText('Edited Reader Headline');
+    await expect(page.locator('#journal-reader-card')).toContainText('Updated while editing existing entry.');
+    await expectTopSavedToastDismisses(true);
+  });
 });

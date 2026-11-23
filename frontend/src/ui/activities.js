@@ -43,7 +43,7 @@ import {
   renderJournalReaderView,
 } from './journal-history.js';
 import { addDays, formatLong, today } from '../domain/day.js';
-import { showToast } from './shell.js';
+import { navigate, showToast } from './shell.js';
 import { isBlank, htmlToText, htmlToMarkdownText } from '../domain/text.js';
 import {
   isJournalEntryWritten,
@@ -157,12 +157,14 @@ export function mount(rootEl) {
   let renderToken = 0;
   let debounceTimer = null;
 
+  const JOURNAL_SUBVIEW_PARAMS = ['subview', 'view'];
+
   // View state: 'home' | 'journals-menu' | 'journal' | 'journal-history' | 'journal-read' | 'journal-edit' | 'books-list' | 'book-menu' | 'book-edit' | 'book-read'
   let currentView = 'home';
   try {
     if (typeof window !== 'undefined' && window.location) {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('subview') === JOURNAL_SUBVIEW || params.get('view') === JOURNAL_SUBVIEW) {
+      if (JOURNAL_SUBVIEW_PARAMS.some((k) => params.get(k) === JOURNAL_SUBVIEW)) {
         currentView = 'journal';
       }
     }
@@ -231,6 +233,23 @@ export function mount(rootEl) {
       render();
     }
   });
+
+  function clearJournalSubviewParam() {
+    if (typeof window === 'undefined' || !window.location || !window.history) return;
+    try {
+      const url = new URL(window.location.href);
+      let changed = false;
+      for (const key of JOURNAL_SUBVIEW_PARAMS) {
+        if (url.searchParams.get(key) === JOURNAL_SUBVIEW) {
+          url.searchParams.delete(key);
+          changed = true;
+        }
+      }
+      if (changed) {
+        window.history.replaceState({}, '', url.toString());
+      }
+    } catch {}
+  }
 
   async function flushPendingJournalSave() {
     if (debounceTimer) {
@@ -1427,13 +1446,20 @@ export function mount(rootEl) {
       });
     }
 
+    let isExitingJournal = false;
+    async function exitJournalToSubview(nextView) {
+      await flushPendingJournalSave();
+      currentView = nextView;
+      render();
+    }
+
     const cardsEl = renderPromptCardsJournal({
       prompts,
       answers,
       title: journalTitle,
       status: journalStatus,
       targetDay: day,
-      backLabel: mode === 'edit' ? 'Done · Back to Entry' : 'Back to Journals',
+      backLabel: mode === 'edit' ? 'Back to Entry' : 'Back to Journals',
       showDatePicker: mode === 'write',
       minDay: addDays(todayDay, -7),
       maxDay: todayDay,
@@ -1447,14 +1473,22 @@ export function mount(rootEl) {
       onUpdateTitle: handleUpdateTitle,
       onUpdateAnswers: scheduleJournalAutosave,
       onOpenCustomizeModal: handleOpenCustomizeModal,
-      onBack: async () => {
-        await flushPendingJournalSave();
-        if (mode === 'edit') {
-          currentView = 'journal-read';
-        } else {
-          currentView = 'journals-menu';
+      onBack: () => exitJournalToSubview(mode === 'edit' ? 'journal-read' : 'journals-menu'),
+      onDone: async () => {
+        if (isExitingJournal) return;
+        isExitingJournal = true;
+        try {
+          if (mode === 'edit') {
+            await exitJournalToSubview('journal-read');
+          } else {
+            await flushPendingJournalSave();
+            clearJournalSubviewParam();
+            navigate('today');
+          }
+          showToast('Your journal has been saved', { position: 'top', duration: 3000, tone: 'rose' });
+        } finally {
+          isExitingJournal = false;
         }
-        render();
       },
     });
 

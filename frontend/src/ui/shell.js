@@ -89,7 +89,41 @@ function getCurrentDayString() {
 }
 
 const UNCONFIGURED_SYNC_LABEL = 'Offline / Local';
-const TOAST_BOTTOM_OFFSET = 'calc(max(12px, env(safe-area-inset-bottom, 12px)) + 84px)';
+const TOAST_POSITIONS = {
+  bottom: {
+    containerId: 'toast-container',
+    styleProp: 'bottom',
+    offset: 'calc(max(12px, env(safe-area-inset-bottom, 12px)) + 84px)',
+    exitClass: 'translate-y-2',
+  },
+  top: {
+    containerId: 'top-toast-container',
+    styleProp: 'top',
+    offset: 'calc(env(safe-area-inset-top, 0px) + 12px)',
+    exitClass: '-translate-y-2',
+  },
+};
+
+function getToastPositionConfig(position) {
+  return position === 'top' ? TOAST_POSITIONS.top : TOAST_POSITIONS.bottom;
+}
+
+const TOAST_TONES = {
+  neutral: {
+    borderClass: 'border-[#E6E4DF] dark:border-[#33302C]',
+    badgeClass: '',
+  },
+  rose: {
+    borderClass: 'border-[#B56565] dark:border-[#C67878]',
+    badgeClass: 'badge-rose',
+  },
+};
+
+const TOAST_CHECK_SVG = `
+<svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M5 13l4 4L19 7" />
+</svg>
+`.trim();
 
 /**
  * Updates header sync indicator UI
@@ -310,27 +344,30 @@ export function navigate(name, updateUrl = true) {
   }
 }
 
-function createToastContainer() {
+function createToastContainer(position = 'bottom') {
+  const cfg = getToastPositionConfig(position);
   const container = document.createElement('div');
-  container.id = 'toast-container';
+  container.id = cfg.containerId;
   container.setAttribute('aria-live', 'polite');
   container.setAttribute('aria-atomic', 'true');
   container.className =
     'fixed left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none w-full max-w-sm px-4';
-  container.style.bottom = TOAST_BOTTOM_OFFSET;
+  container.style[cfg.styleProp] = cfg.offset;
   return container;
 }
 
 /**
  * Displays an accessible floating toast notification.
  * @param {string} message
- * @param {{ action?: { label: string, onClick: () => void } }} [options]
+ * @param {{ action?: { label: string, onClick: () => void }, position?: 'top' | 'bottom', duration?: number, tone?: 'neutral' | 'rose' }} [options]
  * @returns {() => void} dismiss function
  */
-export function showToast(message, { action } = {}) {
-  let container = document.getElementById('toast-container');
+export function showToast(message, { action, position = 'bottom', duration = 4000, tone = 'neutral' } = {}) {
+  const cfg = getToastPositionConfig(position);
+  const toneCfg = TOAST_TONES[tone] || TOAST_TONES.neutral;
+  let container = document.getElementById(cfg.containerId);
   if (!container && rootElement) {
-    container = createToastContainer();
+    container = createToastContainer(position);
     rootElement.appendChild(container);
   }
 
@@ -340,7 +377,15 @@ export function showToast(message, { action } = {}) {
   toast.setAttribute('role', 'status');
   toast.setAttribute('aria-live', 'polite');
   toast.className =
-    'pointer-events-auto flex items-center justify-between gap-3 px-4 py-3 rounded-xl shadow-lg bg-[#22201E] text-[#F4F1EA] border border-[#33302C] text-sm font-medium transition-all duration-200 transform translate-y-0 opacity-100';
+    `pointer-events-auto flex items-center justify-between gap-3 px-4 py-3 rounded-xl shadow-[0_8px_24px_-4px_rgba(28,27,24,0.08)] dark:shadow-[0_8px_24px_-4px_rgba(0,0,0,0.45)] bg-[#FFFFFF] dark:bg-[#22201E] text-[#1C1B18] dark:text-[#F4F1EA] border ${toneCfg.borderClass} text-sm font-medium transition-all duration-200 transform translate-y-0 opacity-100`;
+
+  if (toneCfg.badgeClass) {
+    const iconBadge = document.createElement('span');
+    iconBadge.className = `w-6 h-6 rounded-full ${toneCfg.badgeClass} inline-flex items-center justify-center shrink-0`;
+    iconBadge.innerHTML = TOAST_CHECK_SVG;
+    toast.appendChild(iconBadge);
+  }
+
   const textSpan = document.createElement('span');
   textSpan.className = 'flex-1 text-xs sm:text-sm';
   textSpan.textContent = message;
@@ -353,7 +398,7 @@ export function showToast(message, { action } = {}) {
       timer = null;
     }
     toast.classList.remove('opacity-100', 'translate-y-0');
-    toast.classList.add('opacity-0', 'translate-y-2');
+    toast.classList.add('opacity-0', cfg.exitClass);
     setTimeout(() => {
       try {
         toast.remove();
@@ -365,7 +410,7 @@ export function showToast(message, { action } = {}) {
     const actionBtn = document.createElement('button');
     actionBtn.type = 'button';
     actionBtn.className =
-      'min-h-[36px] min-w-[44px] px-3 py-1 text-xs font-bold font-mono text-[#D97E63] hover:underline cursor-pointer tactile-spring';
+      'min-h-[36px] min-w-[44px] px-3 py-1 text-xs font-bold font-mono text-[#C86D51] dark:text-[#D97E63] hover:underline cursor-pointer tactile-spring';
     actionBtn.textContent = action.label;
     actionBtn.addEventListener('click', (e) => {
       e.preventDefault();
@@ -379,7 +424,8 @@ export function showToast(message, { action } = {}) {
   }
 
   container.appendChild(toast);
-  timer = setTimeout(dismiss, 4000);
+  const timeoutMs = typeof duration === 'number' && duration > 0 ? duration : 4000;
+  timer = setTimeout(dismiss, timeoutMs);
 
   return dismiss;
 }
@@ -484,8 +530,9 @@ export function mountShell(rootEl) {
   tabContentElement.style.paddingRight = 'max(16px, env(safe-area-inset-right, 0px))';
   tabContentElement.style.paddingBottom = 'calc(max(12px, env(safe-area-inset-bottom, 12px)) + 88px)';
 
-  // --- Floating Toast Container ---
-  const toastContainer = createToastContainer();
+  // --- Floating Toast Containers ---
+  const toastContainer = createToastContainer('bottom');
+  const topToastContainer = createToastContainer('top');
 
   // --- Bottom Navigation Bar ---
   bottomNavElement = document.createElement('nav');
@@ -500,6 +547,7 @@ export function mountShell(rootEl) {
   shellLayout.appendChild(header);
   shellLayout.appendChild(tabContentElement);
   shellLayout.appendChild(toastContainer);
+  shellLayout.appendChild(topToastContainer);
   shellLayout.appendChild(bottomNavElement);
   rootEl.appendChild(shellLayout);
 

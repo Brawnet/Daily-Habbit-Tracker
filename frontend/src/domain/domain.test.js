@@ -30,10 +30,14 @@ import {
   resolveJournalDisplayHeader,
 } from './journal.js';
 import {
+  MINUTE_STEPS,
   isValidScheduledTime,
   normalizeScheduledTime,
   hasScheduledTime,
   formatScheduledTime,
+  isLocale12Hour,
+  to24Hour,
+  from24Hour,
   partitionAndSortHabits,
 } from './schedule.js';
 
@@ -971,6 +975,51 @@ describe('domain/schedule', () => {
       ]);
       expect(allAnytime.scheduled).toEqual([]);
       expect(allAnytime.anytime.map((h) => h.id)).toEqual(['a1', 'a2']);
+    });
+  });
+
+  describe('time picker helpers', () => {
+    it('exports 5-minute step strings from 00 to 55', () => {
+      expect(MINUTE_STEPS).toEqual([
+        '00',
+        '05',
+        '10',
+        '15',
+        '20',
+        '25',
+        '30',
+        '35',
+        '40',
+        '45',
+        '50',
+        '55',
+      ]);
+    });
+
+    it('detects 12-hour vs 24-hour Device locale cleanly', () => {
+      expect(isLocale12Hour('en-US')).toBe(true);
+      expect(isLocale12Hour('en-GB')).toBe(false);
+      expect(isLocale12Hour('de-DE')).toBe(false);
+    });
+
+    it('converts between 12-hour period pairs and 24-hour integers', () => {
+      expect(to24Hour(12, 'AM')).toBe(0);
+      expect(to24Hour(1, 'AM')).toBe(1);
+      expect(to24Hour(11, 'AM')).toBe(11);
+      expect(to24Hour(12, 'PM')).toBe(12);
+      expect(to24Hour(1, 'PM')).toBe(13);
+      expect(to24Hour(11, 'PM')).toBe(23);
+      expect(to24Hour(0, 'AM')).toBeNull();
+      expect(to24Hour(13, 'PM')).toBeNull();
+      expect(to24Hour(5, 'NOON')).toBeNull();
+
+      expect(from24Hour(0)).toEqual({ hour12: 12, period: 'AM' });
+      expect(from24Hour(5)).toEqual({ hour12: 5, period: 'AM' });
+      expect(from24Hour(12)).toEqual({ hour12: 12, period: 'PM' });
+      expect(from24Hour(17)).toEqual({ hour12: 5, period: 'PM' });
+      expect(from24Hour(23)).toEqual({ hour12: 11, period: 'PM' });
+      expect(from24Hour(-1)).toBeNull();
+      expect(from24Hour(24)).toBeNull();
     });
   });
 });

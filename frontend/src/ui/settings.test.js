@@ -313,31 +313,51 @@ describe('ui/settings.js Manage Habits Scheduled Time', () => {
     vi.restoreAllMocks();
   });
 
-  it('supports setting and clearing optional Scheduled Time when adding a Habit in Settings', async () => {
+  it('supports setting and clearing optional Scheduled Time via custom popover when adding a Habit in Settings', async () => {
+    function pickTime(scopeEl, hour24, minuteStr) {
+      const dialog = scopeEl.querySelector('[role="dialog"]');
+      const pmBtn = dialog.querySelector('[data-period="PM"]');
+      const amBtn = dialog.querySelector('[data-period="AM"]');
+      if (pmBtn && amBtn) {
+        if (hour24 >= 12) pmBtn.click();
+        else amBtn.click();
+        const h12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+        dialog.querySelector(`[data-hour="${h12}"]`).click();
+      } else {
+        dialog.querySelector(`[data-hour="${String(hour24).padStart(2, '0')}"]`).click();
+      }
+      dialog.querySelector(`[data-minute="${minuteStr}"]`).click();
+    }
+
     const { cleanup } = await mountSettingsWithHabits();
 
     const nameInput = mockDoc.getElementById('input-new-habit');
-    const timeInput = mockDoc.getElementById('input-new-habit-time');
-    const clearBtn = mockDoc.getElementById('btn-clear-new-habit-time');
+    const timeTrigger = mockDoc.getElementById('input-new-habit-time');
     const addBtn = mockDoc.getElementById('btn-add-habit');
+    const formAdd = mockDoc.getElementById('form-add-habit');
 
     expect(nameInput).not.toBeNull();
-    expect(timeInput).not.toBeNull();
-    expect(timeInput.type).toBe('time');
-    expect(timeInput.style.fontSize).toBe('16px');
-    expect(timeInput.classList.contains('min-h-[44px]')).toBe(true);
+    expect(timeTrigger).not.toBeNull();
+    expect(timeTrigger.tagName).toBe('BUTTON');
+    expect(timeTrigger.classList.contains('min-h-[44px]')).toBe(true);
+    expect(timeTrigger.classList.contains('min-w-[44px]')).toBe(true);
+
+    // Clear button inside popover resets time back to ''
+    timeTrigger.click();
+    pickTime(formAdd, 9, '00');
+    expect(timeTrigger.dataset.time).toBe('09:00');
+    const clearBtn = formAdd.querySelector('.time-picker-clear-btn');
     expect(clearBtn).not.toBeNull();
     expect(clearBtn.classList.contains('min-h-[44px]')).toBe(true);
     expect(clearBtn.classList.contains('min-w-[44px]')).toBe(true);
-
-    // Clear button resets time input back to ''
-    timeInput.value = '09:00';
     clearBtn.click();
-    expect(timeInput.value).toBe('');
+    expect(timeTrigger.dataset.time).toBe('');
 
     // Submit with Scheduled Time '05:00'
     nameInput.value = 'Journaling';
-    timeInput.value = '05:00';
+    timeTrigger.click();
+    pickTime(formAdd, 5, '00');
+    formAdd.querySelector('.time-picker-done-btn').click();
     addBtn.click();
     await new Promise((r) => setTimeout(r, 20));
 
@@ -345,7 +365,7 @@ describe('ui/settings.js Manage Habits Scheduled Time', () => {
       linkedActivity: null,
       scheduledTime: '05:00',
     });
-    expect(timeInput.value).toBe('');
+    expect(timeTrigger.dataset.time).toBe('');
 
     cleanup();
   });
@@ -419,7 +439,7 @@ describe('ui/settings.js Manage Habits Scheduled Time', () => {
     cleanup();
   });
 
-  it('supports changing and clearing Scheduled Time in inline Edit without premature blur submit, and aborts on Cancel/Escape', async () => {
+  it('supports changing and clearing Scheduled Time via custom popover in inline Edit without premature blur submit, and aborts on Cancel/Escape', async () => {
     const { cleanup } = await mountSettingsWithHabits([
       { id: 'h-1', name: 'Journaling', sortOrder: 1, archived: false, scheduledTime: '05:00', linkedActivity: 'journal' },
     ]);
@@ -429,18 +449,18 @@ describe('ui/settings.js Manage Habits Scheduled Time', () => {
 
     const form = row.querySelector('.rename-form');
     const nameInput = row.querySelector('.rename-input');
-    const timeInput = row.querySelector('.input-edit-scheduled-time');
-    const clearTimeBtn = row.querySelector('.btn-clear-edit-time');
+    const timeTrigger = row.querySelector('.input-edit-scheduled-time');
     const linkedSelect = row.querySelector('.select-edit-linked-activity');
     const cancelBtn = row.querySelector('.btn-cancel-edit');
 
     expect(form).not.toBeNull();
     expect(nameInput).not.toBeNull();
-    expect(timeInput).not.toBeNull();
-    expect(timeInput.value).toBe('05:00');
-    expect(timeInput.style.fontSize).toBe('16px');
-    expect(clearTimeBtn).not.toBeNull();
+    expect(timeTrigger).not.toBeNull();
+    expect(timeTrigger.tagName).toBe('BUTTON');
+    expect(timeTrigger.dataset.time).toBe('05:00');
+    expect(timeTrigger.classList.contains('min-h-[44px]')).toBe(true);
     expect(cancelBtn).not.toBeNull();
+    expect(linkedSelect).not.toBeNull();
 
     // Blur on name input must NOT close/commit the edit form prematurely
     nameInput.dispatchEvent({ type: 'blur' });
@@ -453,13 +473,16 @@ describe('ui/settings.js Manage Habits Scheduled Time', () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(repoModule.renameHabit).not.toHaveBeenCalled();
 
-    // Re-open, clear time, and submit -> clears scheduledTime to '' and unlocks moves
+    // Re-open, clear time inside popover, and submit -> clears scheduledTime to '' and unlocks moves
     const rowReopened = mockDoc.getElementById('settings-scheduled-habits-group').querySelector('.habit-row');
     rowReopened.querySelector('.btn-edit').click();
     const form2 = rowReopened.querySelector('.rename-form');
-    const clearBtn2 = rowReopened.querySelector('.btn-clear-edit-time');
+    const trigger2 = rowReopened.querySelector('.input-edit-scheduled-time');
+    trigger2.click();
+    const clearBtn2 = form2.querySelector('.time-picker-clear-btn');
+    expect(clearBtn2).not.toBeNull();
     clearBtn2.click();
-    expect(rowReopened.querySelector('.input-edit-scheduled-time').value).toBe('');
+    expect(trigger2.dataset.time).toBe('');
 
     form2.dispatchEvent({ type: 'submit', preventDefault: vi.fn() });
     await new Promise((r) => setTimeout(r, 20));
@@ -469,6 +492,46 @@ describe('ui/settings.js Manage Habits Scheduled Time', () => {
     // After clearing scheduledTime, habit now lives under Anytime group
     expect(mockDoc.getElementById('settings-scheduled-habits-group')).toBeNull();
     expect(mockDoc.getElementById('settings-anytime-habits-group')).not.toBeNull();
+
+    cleanup();
+  });
+
+  it('uses custom full-field time picker without Clear on Settings -> Reminder and saves on Done/close', async () => {
+    const { cleanup } = await mountSettingsWithHabits([]);
+
+    const reminderTrigger = mockDoc.getElementById('setting-reminder-time');
+    const reminderSection = mockDoc.getElementById('settings-reminder');
+    expect(reminderSection).not.toBeNull();
+    expect(reminderTrigger).not.toBeNull();
+    expect(reminderTrigger.tagName).toBe('BUTTON');
+    expect(reminderTrigger.classList.contains('min-h-[44px]')).toBe(true);
+    expect(reminderTrigger.dataset.time).toBe('20:00');
+
+    reminderTrigger.click();
+    const dialog = reminderSection.querySelector('[role="dialog"]');
+    expect(dialog).not.toBeNull();
+    expect(dialog.querySelector('.time-picker-clear-btn')).toBeNull();
+
+    const pmBtn = dialog.querySelector('[data-period="PM"]');
+    const amBtn = dialog.querySelector('[data-period="AM"]');
+    if (pmBtn && amBtn) {
+      pmBtn.click();
+      dialog.querySelector('[data-hour="9"]').click();
+    } else {
+      dialog.querySelector('[data-hour="21"]').click();
+    }
+    dialog.querySelector('[data-minute="30"]').click();
+
+    // Intermediate taps do NOT persist yet
+    expect(reminderTrigger.dataset.time).toBe('21:30');
+    expect(repoModule.setSetting).not.toHaveBeenCalled();
+
+    dialog.querySelector('.time-picker-done-btn').click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(repoModule.setSetting).toHaveBeenCalledTimes(1);
+    expect(repoModule.setSetting).toHaveBeenCalledWith('reminderTime', '21:30');
+    expect(shellModule.showToast).toHaveBeenCalledWith('Reminder time saved');
 
     cleanup();
   });

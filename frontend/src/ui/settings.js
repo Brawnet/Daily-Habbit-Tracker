@@ -27,7 +27,7 @@ import {
   hasScheduledTime,
 } from '../domain/schedule.js';
 import {
-  createScheduledTimePair,
+  createTimePickerField,
   populateLinkedActivitySelect,
   bindEscapeKey,
 } from './habit-form-controls.js';
@@ -179,6 +179,93 @@ function formatLastSynced(isoString) {
 }
 
 /**
+ * Builds the Reminder Settings card with the custom time picker and push notification controls.
+ *
+ * @param {ReturnType<typeof createTimePickerField>} reminderTimePicker
+ * @returns {HTMLElement}
+ */
+function createReminderSection(reminderTimePicker) {
+  const section = document.createElement('section');
+  section.id = 'settings-reminder';
+  section.className =
+    'editorial-card p-4 sm:p-5 space-y-4 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
+  section.setAttribute('aria-labelledby', 'heading-reminder');
+
+  const headerRow = document.createElement('div');
+  headerRow.className = 'flex items-center justify-between border-b border-[#E6E4DF] dark:border-[#33302C] pb-3';
+  const heading = document.createElement('h2');
+  heading.id = 'heading-reminder';
+  heading.className = 'text-base font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]';
+  heading.textContent = 'Reminder';
+  headerRow.appendChild(heading);
+
+  const timeBlock = document.createElement('div');
+  timeBlock.className = 'space-y-1.5';
+  const label = document.createElement('label');
+  label.htmlFor = 'setting-reminder-time';
+  label.className = 'block text-xs font-medium text-[#68655F] dark:text-[#A39E93]';
+  label.textContent = 'Daily Reminder Time (Asia/Jakarta)';
+
+  const helper = document.createElement('p');
+  helper.className = 'text-xs text-[#68655F] dark:text-[#A39E93]';
+  helper.textContent =
+    'Reminds you if there are active habits without check-ins or no journal entry today.';
+
+  timeBlock.appendChild(label);
+  timeBlock.appendChild(helper);
+  timeBlock.appendChild(reminderTimePicker.container);
+
+  const pushCard = document.createElement('div');
+  pushCard.className =
+    'p-3.5 rounded-lg bg-[#F6F5F2] dark:bg-[#161514] border border-[#E6E4DF] dark:border-[#33302C] space-y-3';
+
+  const statusRow = document.createElement('div');
+  statusRow.className = 'flex flex-wrap items-center justify-between gap-2';
+  const statusLabel = document.createElement('span');
+  statusLabel.className = 'text-xs sm:text-sm font-medium';
+  statusLabel.textContent = 'Notification Status';
+  const pushBadge = document.createElement('span');
+  pushBadge.id = 'push-status-badge';
+  pushBadge.className =
+    'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold font-mono bg-[#EFECE6] text-[#68655F] dark:bg-[#2C2926] dark:text-[#A39E93]';
+  pushBadge.textContent = 'Checking...';
+  statusRow.appendChild(statusLabel);
+  statusRow.appendChild(pushBadge);
+
+  const pushHelper = document.createElement('p');
+  pushHelper.id = 'push-status-helper';
+  pushHelper.className = 'text-xs text-[#68655F] dark:text-[#A39E93]';
+
+  const pushActions = document.createElement('div');
+  pushActions.className = 'flex flex-wrap items-center gap-2 pt-1';
+  const btnEnable = document.createElement('button');
+  btnEnable.id = 'btn-enable-push';
+  btnEnable.type = 'button';
+  btnEnable.className =
+    'btn-terracotta min-h-[44px] px-5 py-2 text-sm font-semibold rounded-lg cursor-pointer select-none disabled:opacity-50 disabled:cursor-not-allowed tactile-spring';
+  btnEnable.textContent = 'Enable Notifications';
+
+  const btnTest = document.createElement('button');
+  btnTest.id = 'btn-test-push';
+  btnTest.type = 'button';
+  btnTest.className =
+    'btn-secondary-surface min-h-[44px] px-4 py-2 text-sm font-medium rounded-lg border border-[#E6E4DF] dark:border-[#33302C] transition cursor-pointer select-none disabled:opacity-50 disabled:cursor-not-allowed tactile-spring';
+  btnTest.textContent = 'Send Test Notification';
+
+  pushActions.appendChild(btnEnable);
+  pushActions.appendChild(btnTest);
+
+  pushCard.appendChild(statusRow);
+  pushCard.appendChild(pushHelper);
+  pushCard.appendChild(pushActions);
+
+  section.appendChild(headerRow);
+  section.appendChild(timeBlock);
+  section.appendChild(pushCard);
+  return section;
+}
+
+/**
  * Mounts the Settings view into container element.
  *
  * @param {HTMLElement} el
@@ -189,6 +276,14 @@ export function mount(el) {
   let isArchivedOpen = false;
   let editingHabitId = null;
   let isAddingHabit = false;
+  let activeInlineEditPicker = null;
+
+  function destroyInlineEditPicker() {
+    if (activeInlineEditPicker) {
+      activeInlineEditPicker.destroy();
+      activeInlineEditPicker = null;
+    }
+  }
 
   const currentConfig = getConfig();
 
@@ -329,20 +424,16 @@ export function mount(el) {
   newHabitTimeLabel.className = 'sr-only';
   newHabitTimeLabel.textContent = 'Scheduled Time (optional)';
 
-  const { timeInput: inputNewHabitTime, clearBtn: btnClearNewHabitTime } = createScheduledTimePair({
-    inputId: 'input-new-habit-time',
-    inputClassName:
-      'flex-1 sm:w-40 min-h-[44px] min-w-[44px] px-3.5 py-2 text-base font-mono rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]',
+  const newHabitTimePicker = createTimePickerField({
+    id: 'input-new-habit-time',
     ariaLabel: 'Scheduled time (optional)',
-    clearButtonId: 'btn-clear-new-habit-time',
-    clearButtonClassName:
-      'btn-secondary-surface min-h-[44px] min-w-[44px] px-3 py-2 text-xs font-mono font-medium rounded-lg border border-[#E6E4DF] dark:border-[#33302C] cursor-pointer shrink-0 tactile-spring',
-    clearAriaLabel: 'Clear scheduled time',
+    placeholder: 'Anytime',
+    allowClear: true,
   });
+  newHabitTimePicker.container.className = 'relative flex-1 sm:flex-initial sm:w-40 min-w-0';
 
   addTimeWrap.appendChild(newHabitTimeLabel);
-  addTimeWrap.appendChild(inputNewHabitTime);
-  addTimeWrap.appendChild(btnClearNewHabitTime);
+  addTimeWrap.appendChild(newHabitTimePicker.container);
 
   const selectHabitLinkedActivity = document.createElement('select');
   selectHabitLinkedActivity.id = 'select-habit-linked-activity';
@@ -427,59 +518,29 @@ export function mount(el) {
   archivedSectionWrap.appendChild(archivedHabitsContainerEl);
   habitsSection.appendChild(archivedSectionWrap);
 
+  const reminderTimePicker = createTimePickerField({
+    id: 'setting-reminder-time',
+    ariaLabel: 'Daily Reminder Time',
+    placeholder: 'Select time',
+    value: '20:00',
+    allowClear: false,
+    onCommit: async (committedVal) => {
+      const val = committedVal || '20:00';
+      try {
+        await setSetting('reminderTime', val);
+        showToast('Reminder time saved');
+      } catch (err) {
+        showToast(err.message || 'Failed to save reminder');
+      }
+    },
+  });
+  reminderTimePicker.container.className = 'relative w-full sm:w-48';
+
+  const reminderSection = createReminderSection(reminderTimePicker);
+
   const restSectionsContainer = document.createElement('div');
   restSectionsContainer.className = 'space-y-6';
   restSectionsContainer.innerHTML = `
-      <!-- Section 3: Reminder -->
-      <section id="settings-reminder" class="editorial-card p-4 sm:p-5 space-y-4 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]" aria-labelledby="heading-reminder">
-        <div class="flex items-center justify-between border-b border-[#E6E4DF] dark:border-[#33302C] pb-3">
-          <h2 id="heading-reminder" class="text-base font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]">Reminder</h2>
-        </div>
-
-        <!-- Time Picker -->
-        <div class="space-y-1.5">
-          <label for="setting-reminder-time" class="block text-xs font-medium text-[#68655F] dark:text-[#A39E93]">
-            Daily Reminder Time (Asia/Jakarta)
-          </label>
-          <p class="text-xs text-[#68655F] dark:text-[#A39E93]">
-            Reminds you if there are active habits without check-ins or no journal entry today.
-          </p>
-          <input
-            id="setting-reminder-time"
-            type="time"
-            value="20:00"
-            class="w-full sm:w-48 min-h-[44px] px-3.5 py-2 text-base font-mono rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]"
-          />
-        </div>
-
-        <!-- Web Push Card -->
-        <div class="p-3.5 rounded-lg bg-[#F6F5F2] dark:bg-[#161514] border border-[#E6E4DF] dark:border-[#33302C] space-y-3">
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <span class="text-xs sm:text-sm font-medium">Notification Status</span>
-            <span id="push-status-badge" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold font-mono bg-[#EFECE6] text-[#68655F] dark:bg-[#2C2926] dark:text-[#A39E93]">
-              Checking...
-            </span>
-          </div>
-          <p id="push-status-helper" class="text-xs text-[#68655F] dark:text-[#A39E93]"></p>
-          <div class="flex flex-wrap items-center gap-2 pt-1">
-            <button
-              id="btn-enable-push"
-              type="button"
-              class="btn-terracotta min-h-[44px] px-5 py-2 text-sm font-semibold rounded-lg cursor-pointer select-none disabled:opacity-50 disabled:cursor-not-allowed tactile-spring"
-            >
-              Enable Notifications
-            </button>
-            <button
-              id="btn-test-push"
-              type="button"
-              class="btn-secondary-surface min-h-[44px] px-4 py-2 text-sm font-medium rounded-lg border border-[#E6E4DF] dark:border-[#33302C] transition cursor-pointer select-none disabled:opacity-50 disabled:cursor-not-allowed tactile-spring"
-            >
-              Send Test Notification
-            </button>
-          </div>
-        </div>
-      </section>
-
       <!-- Section 4: Install App -->
       <section id="settings-install" class="editorial-card p-4 sm:p-5 space-y-3 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]" aria-labelledby="heading-install">
         <div class="flex items-center justify-between border-b border-[#E6E4DF] dark:border-[#33302C] pb-3">
@@ -509,6 +570,7 @@ export function mount(el) {
   wrapper.appendChild(appearanceSection);
   wrapper.appendChild(syncSectionContainer);
   wrapper.appendChild(habitsSection);
+  wrapper.appendChild(reminderSection);
   wrapper.appendChild(restSectionsContainer);
   el.appendChild(wrapper);
 
@@ -523,7 +585,6 @@ export function mount(el) {
   const syncPendingBadgeEl = el.querySelector('#sync-pending-badge');
   const syncLastSyncedEl = el.querySelector('#sync-last-synced');
 
-  const settingReminderTimeInput = el.querySelector('#setting-reminder-time');
   const pushStatusBadgeEl = el.querySelector('#push-status-badge');
   const pushStatusHelperEl = el.querySelector('#push-status-helper');
   const btnEnablePush = el.querySelector('#btn-enable-push');
@@ -534,7 +595,6 @@ export function mount(el) {
   // Explicit value initialization for mock DOM environments
   if (syncGasUrlInput) syncGasUrlInput.value = currentConfig.gasUrl || '';
   if (syncPinInput) syncPinInput.value = currentConfig.pin || '';
-  if (settingReminderTimeInput) settingReminderTimeInput.value = '20:00';
   // --- SECTION 1: SYNC ---
 
   function updateSyncStatusRow(status) {
@@ -744,15 +804,16 @@ export function mount(el) {
       const editControlsRow = document.createElement('div');
       editControlsRow.className = 'flex flex-wrap items-center gap-1.5';
 
-      const { timeInput: editTimeInput, clearBtn: clearEditTimeBtn } = createScheduledTimePair({
-        inputClassName:
-          'input-edit-scheduled-time min-h-[44px] min-w-[44px] px-2.5 py-1.5 text-base font-mono rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]',
+      destroyInlineEditPicker();
+      const editTimePicker = createTimePickerField({
+        triggerClassName: 'input-edit-scheduled-time',
         ariaLabel: `Scheduled time for ${habit.name}`,
+        placeholder: 'Anytime',
         value: habit.scheduledTime || '',
-        clearButtonClassName:
-          'btn-clear-edit-time btn-secondary-surface min-h-[44px] min-w-[44px] px-3 py-1.5 text-xs font-mono font-medium rounded-lg border border-[#E6E4DF] dark:border-[#33302C] cursor-pointer shrink-0 tactile-spring',
-        clearAriaLabel: `Clear scheduled time for ${habit.name}`,
+        allowClear: true,
       });
+      editTimePicker.container.className = 'relative w-full sm:w-36 min-w-0';
+      activeInlineEditPicker = editTimePicker;
 
       const select = document.createElement('select');
       select.className =
@@ -780,8 +841,7 @@ export function mount(el) {
         'btn-terracotta px-4 py-1.5 min-h-[44px] min-w-[44px] text-xs font-mono font-semibold rounded-lg cursor-pointer transition shrink-0 tactile-spring';
       saveBtn.textContent = 'Save';
 
-      editControlsRow.appendChild(editTimeInput);
-      editControlsRow.appendChild(clearEditTimeBtn);
+      editControlsRow.appendChild(editTimePicker.container);
       editControlsRow.appendChild(select);
       editControlsRow.appendChild(cancelEditBtn);
       editControlsRow.appendChild(saveBtn);
@@ -797,6 +857,7 @@ export function mount(el) {
         if (finished) return;
         finished = true;
         editingHabitId = null;
+        destroyInlineEditPicker();
         renderHabits();
       };
 
@@ -806,8 +867,9 @@ export function mount(el) {
         editingHabitId = null;
         const newName = input.value.trim();
         const newLinked = select.value || null;
-        const newScheduledTime = (editTimeInput.value || '').trim();
+        const newScheduledTime = editTimePicker.getValue();
         const prevScheduledTime = habit.scheduledTime || '';
+        destroyInlineEditPicker();
         if (
           newName &&
           (newName !== habit.name ||
@@ -835,7 +897,9 @@ export function mount(el) {
       });
 
       cancelEditBtn.addEventListener('click', cancelEdit);
-      bindEscapeKey([form, input, editTimeInput], cancelEdit);
+      bindEscapeKey([form, input, editTimePicker.triggerBtn], () => {
+        if (!editTimePicker.isOpen()) cancelEdit();
+      });
     };
 
     nameSpan.addEventListener('click', startEditHabit);
@@ -902,6 +966,7 @@ export function mount(el) {
       const archivedHabits = allHabits.filter((h) => h.archived);
 
       // Render Active Habits
+      destroyInlineEditPicker();
       activeHabitsListEl.innerHTML = '';
       if (activeHabits.length === 0) {
         const emptyEl = document.createElement('div');
@@ -1031,10 +1096,10 @@ export function mount(el) {
     isAddingHabit = true;
     try {
       const linkedActivity = selectHabitLinkedActivity?.value || null;
-      const scheduledTime = inputNewHabitTime ? inputNewHabitTime.value.trim() : '';
+      const scheduledTime = newHabitTimePicker.getValue();
       await addHabit(name, { linkedActivity, scheduledTime });
       inputNewHabit.value = '';
-      if (inputNewHabitTime) inputNewHabitTime.value = '';
+      newHabitTimePicker.setValue('');
       if (selectHabitLinkedActivity) selectHabitLinkedActivity.value = '';
       showToast('Habit added');
       await renderHabits();
@@ -1069,28 +1134,15 @@ export function mount(el) {
   // --- SECTION 3: REMINDER ---
 
   async function loadReminderSetting() {
-    if (!isMounted || !settingReminderTimeInput) return;
-    if (typeof document !== 'undefined' && document.activeElement === settingReminderTimeInput) {
-      return;
-    }
+    if (!isMounted || reminderTimePicker.isOpen()) return;
     try {
       const val = await getSetting('reminderTime');
-      if (!isMounted) return;
-      settingReminderTimeInput.value = val || '20:00';
+      if (!isMounted || reminderTimePicker.isOpen()) return;
+      reminderTimePicker.setValue(val || '20:00');
     } catch {
-      settingReminderTimeInput.value = '20:00';
+      reminderTimePicker.setValue('20:00');
     }
   }
-
-  settingReminderTimeInput?.addEventListener('change', async () => {
-    const val = settingReminderTimeInput.value || '20:00';
-    try {
-      await setSetting('reminderTime', val);
-      showToast('Reminder time saved');
-    } catch (err) {
-      showToast(err.message || 'Failed to save reminder');
-    }
-  });
 
   async function updatePushUi() {
     if (!isMounted || !pushStatusBadgeEl || !pushStatusHelperEl) return;
@@ -1282,6 +1334,9 @@ export function mount(el) {
   // Cleanup handler
   return () => {
     isMounted = false;
+    newHabitTimePicker.destroy();
+    reminderTimePicker.destroy();
+    destroyInlineEditPicker();
     unsubSync();
     unsubChange();
     unsubInstall();

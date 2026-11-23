@@ -22,7 +22,7 @@ import { navigate, showToast } from './shell.js';
 import { LINKED_ACTIVITIES } from '../shared/contracts.js';
 import { JOURNAL_SUBVIEW } from '../domain/journal.js';
 import {
-  createScheduledTimePair,
+  createTimePickerField,
   populateLinkedActivitySelect,
   bindEscapeKey,
 } from './habit-form-controls.js';
@@ -128,6 +128,14 @@ export function mount(el) {
     }
   }
 
+  const activeTimePickers = [];
+
+  function destroyActiveTimePickers() {
+    while (activeTimePickers.length > 0) {
+      activeTimePickers.pop().destroy();
+    }
+  }
+
   // --- Habits Rendering Logic ---
   async function renderHabits() {
     const token = ++renderToken;
@@ -166,7 +174,8 @@ export function mount(el) {
     const completedCount = habitData.filter((item) => item.isChecked).length;
     progressEl.textContent = `${completedCount}/${habitData.length} done`;
 
-    // Clear habits list container
+    // Clear previous pickers and habits list container
+    destroyActiveTimePickers();
     habitsListContainerEl.innerHTML = '';
 
     if (habitData.length === 0) {
@@ -207,11 +216,11 @@ export function mount(el) {
       // Inline Quick Add Form
       const formEl = document.createElement('form');
       formEl.id = 'today-empty-form';
-      formEl.className = 'w-full max-w-md flex flex-col sm:flex-row gap-2';
+      formEl.className = 'w-full max-w-md flex flex-col gap-2.5';
       formEl.setAttribute('role', 'form');
 
       const inputWrap = document.createElement('div');
-      inputWrap.className = 'relative flex-1';
+      inputWrap.className = 'relative w-full';
 
       const labelEl = document.createElement('label');
       labelEl.htmlFor = 'today-empty-add-input';
@@ -234,18 +243,29 @@ export function mount(el) {
         'btn-terracotta min-h-[44px] min-w-[44px] px-5 py-2.5 text-sm font-semibold rounded-lg flex items-center justify-center cursor-pointer shrink-0 tactile-spring';
       addBtn.textContent = 'Add Habit';
 
+      const emptyTimePicker = createTimePickerField({
+        id: 'today-empty-scheduled-time',
+        ariaLabel: 'Scheduled time (optional)',
+        placeholder: 'Anytime',
+        allowClear: true,
+      });
+      emptyTimePicker.container.className = 'relative flex-1 min-w-0';
+      activeTimePickers.push(emptyTimePicker);
+
       let isSubmitting = false;
       async function handleAddHabit(habitName) {
         if (isSubmitting) return;
         const nameToAdd = habitName || inputEl.value;
         await executeAddHabit({
           name: nameToAdd,
+          scheduledTime: emptyTimePicker.getValue() || '',
           setSubmitting: (submitting) => {
             isSubmitting = submitting;
             addBtn.disabled = submitting;
           },
           onSuccess: () => {
             inputEl.value = '';
+            emptyTimePicker.setValue('');
           },
           onError: () => {
             inputEl.focus?.();
@@ -266,7 +286,12 @@ export function mount(el) {
       });
       inputWrap.appendChild(inputEl);
       formEl.appendChild(inputWrap);
-      formEl.appendChild(addBtn);
+
+      const actionRow = document.createElement('div');
+      actionRow.className = 'flex flex-col sm:flex-row items-stretch sm:items-center gap-2';
+      actionRow.appendChild(emptyTimePicker.container);
+      actionRow.appendChild(addBtn);
+      formEl.appendChild(actionRow);
       emptyCard.appendChild(formEl);
 
       // Starter Chips Section
@@ -291,7 +316,8 @@ export function mount(el) {
           'min-h-[44px] min-w-[44px] px-3.5 py-2 text-xs font-mono font-medium rounded-lg bg-[#FFFFFF] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] hover:border-[#C86D51] hover:text-[#C86D51] dark:hover:text-[#D97E63] border border-[#E6E4DF] dark:border-[#33302C] transition-all cursor-pointer flex items-center justify-center tactile-spring';
         chipBtn.textContent = `+ ${starter}`;
         chipBtn.addEventListener('click', () => {
-          handleAddHabit(starter);
+          inputEl.value = starter;
+          emptyTimePicker.focus();
         });
         chipsContainer.appendChild(chipBtn);
       }
@@ -563,24 +589,16 @@ export function mount(el) {
       timeLabelEl.className = 'text-xs font-medium text-[#68655F] dark:text-[#A39E93] font-mono';
       timeLabelEl.textContent = 'Scheduled Time (optional)';
 
-      const timeRowEl = document.createElement('div');
-      timeRowEl.className = 'flex items-center gap-2';
-
-      const { timeInput: timeInputEl, clearBtn: clearTimeBtn } = createScheduledTimePair({
-        inputId: 'today-add-habit-scheduled-time',
-        inputClassName:
-          'flex-1 min-h-[44px] min-w-[44px] px-3.5 py-2 text-base font-mono rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]',
+      const addTimePicker = createTimePickerField({
+        id: 'today-add-habit-scheduled-time',
         ariaLabel: 'Scheduled time (optional)',
-        clearButtonId: 'today-add-habit-clear-time',
-        clearButtonClassName:
-          'btn-secondary-surface min-h-[44px] min-w-[44px] px-3.5 py-2 text-xs font-mono font-medium rounded-lg border border-[#E6E4DF] dark:border-[#33302C] cursor-pointer shrink-0 tactile-spring',
-        clearAriaLabel: 'Clear scheduled time',
+        placeholder: 'Anytime',
+        allowClear: true,
       });
+      activeTimePickers.push(addTimePicker);
 
-      timeRowEl.appendChild(timeInputEl);
-      timeRowEl.appendChild(clearTimeBtn);
       timeFieldWrap.appendChild(timeLabelEl);
-      timeFieldWrap.appendChild(timeRowEl);
+      timeFieldWrap.appendChild(addTimePicker.container);
 
       formEl.appendChild(inputEl);
       formEl.appendChild(timeFieldWrap);
@@ -621,7 +639,7 @@ export function mount(el) {
         await executeAddHabit({
           name: inputEl.value,
           linkedActivity: selectActivityEl.value || null,
-          scheduledTime: timeInputEl.value || '',
+          scheduledTime: addTimePicker.getValue() || '',
           setSubmitting: (submitting) => {
             isSubmitting = submitting;
             submitBtn.disabled = submitting;
@@ -638,12 +656,14 @@ export function mount(el) {
 
       formEl.addEventListener('submit', handleSubmit);
       submitBtn.addEventListener('click', handleSubmit);
-      bindEscapeKey([formEl, timeInputEl], collapseAddControl);
+      bindEscapeKey([formEl, addTimePicker.triggerBtn], () => {
+        if (!addTimePicker.isOpen()) collapseAddControl();
+      });
       inputEl.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           if (typeof e.preventDefault === 'function') e.preventDefault();
           handleSubmit(e);
-        } else if (e.key === 'Escape') {
+        } else if (e.key === 'Escape' && !addTimePicker.isOpen()) {
           if (typeof e.preventDefault === 'function') e.preventDefault();
           collapseAddControl();
         }
@@ -693,6 +713,7 @@ export function mount(el) {
   // Return cleanup
   return () => {
     isMounted = false;
+    destroyActiveTimePickers();
     if (unsubscribe) {
       unsubscribe();
     }

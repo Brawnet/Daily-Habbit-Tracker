@@ -137,21 +137,72 @@ describe('ui/today.js empty state & first-launch onboarding', () => {
     expect(repoModule.addHabit).toHaveBeenCalledWith('Morning Meditation');
   });
 
-  it('renders 1-tap starter chips and creates habit on chip click', async () => {
+  it('fills habit name and focuses Scheduled Time when clicking a starter chip without auto-creating', async () => {
     const root = mockDoc.createElement('div');
     mount(root);
 
     await new Promise((r) => setTimeout(r, 20));
 
+    const input = mockDoc.getElementById('today-empty-add-input');
+    const timeTrigger = mockDoc.getElementById('today-empty-scheduled-time');
+    const addBtn = mockDoc.getElementById('today-empty-add-btn');
     const chips = root.querySelectorAll('[data-starter-chip]');
+
+    expect(timeTrigger).not.toBeNull();
+    expect(timeTrigger.tagName).toBe('BUTTON');
+    expect(timeTrigger.textContent).toContain('Anytime');
     expect(chips.length).toBeGreaterThanOrEqual(3);
 
-    // Click the first chip
+    const focusSpy = vi.spyOn(timeTrigger, 'focus');
     chips[0].click();
 
     await new Promise((r) => setTimeout(r, 20));
 
-    expect(repoModule.addHabit).toHaveBeenCalled();
+    expect(input.value).toBe(chips[0].dataset.starterChip);
+    expect(focusSpy).toHaveBeenCalled();
+    expect(mockDoc.activeElement).toBe(timeTrigger);
+    expect(timeTrigger.getAttribute('aria-expanded')).toBe('false');
+    expect(repoModule.addHabit).not.toHaveBeenCalled();
+
+    // Clicking Add Habit immediately creates the Habit as Anytime
+    addBtn.click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(repoModule.addHabit).toHaveBeenCalledWith(chips[0].dataset.starterChip);
+  });
+
+  it('allows setting optional Scheduled Time on Welcome form via custom popover', async () => {
+    const root = mockDoc.createElement('div');
+    mount(root);
+
+    await new Promise((r) => setTimeout(r, 20));
+
+    const input = mockDoc.getElementById('today-empty-add-input');
+    const timeTrigger = mockDoc.getElementById('today-empty-scheduled-time');
+    const addBtn = mockDoc.getElementById('today-empty-add-btn');
+
+    input.value = 'Morning Walk';
+    timeTrigger.click();
+    expect(timeTrigger.getAttribute('aria-expanded')).toBe('true');
+
+    const dialog = root.querySelector('#today-empty-form [role="dialog"]') || root.querySelector('[role="dialog"]');
+    expect(dialog).not.toBeNull();
+    const amBtn = dialog.querySelector('[data-period="AM"]');
+    if (amBtn) {
+      amBtn.click();
+      dialog.querySelector('[data-hour="6"]').click();
+    } else {
+      dialog.querySelector('[data-hour="06"]').click();
+    }
+    dialog.querySelector('[data-minute="30"]').click();
+    dialog.querySelector('.time-picker-done-btn').click();
+
+    expect(timeTrigger.dataset.time).toBe('06:30');
+
+    addBtn.click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(repoModule.addHabit).toHaveBeenCalledWith('Morning Walk', { scheduledTime: '06:30' });
   });
 
   it('navigates to settings when Manage Habits link is clicked', async () => {
@@ -174,12 +225,15 @@ describe('ui/today.js empty state & first-launch onboarding', () => {
     await new Promise((r) => setTimeout(r, 20));
 
     const input = mockDoc.getElementById('today-empty-add-input');
+    const timeTrigger = mockDoc.getElementById('today-empty-scheduled-time');
     const addBtn = mockDoc.getElementById('today-empty-add-btn');
     const manageBtn = mockDoc.getElementById('manage-habits-btn');
     const chips = root.querySelectorAll('[data-starter-chip]');
 
     expect(input.classList.contains('min-h-[44px]')).toBe(true);
     expect(input.classList.contains('min-w-[44px]')).toBe(true);
+    expect(timeTrigger.classList.contains('min-h-[44px]')).toBe(true);
+    expect(timeTrigger.classList.contains('min-w-[44px]')).toBe(true);
     expect(addBtn.classList.contains('min-h-[44px]')).toBe(true);
     expect(addBtn.classList.contains('min-w-[44px]')).toBe(true);
     expect(manageBtn.classList.contains('min-h-[44px]')).toBe(true);
@@ -715,7 +769,22 @@ describe('ui/today.js Scheduled Time', () => {
     cleanup2();
   });
 
-  it('supports optional scheduledTime and Clear button in + Add Habit form without breaking untimed adds', async () => {
+  it('supports optional custom time picker and popover Clear in + Add Habit form without breaking untimed adds', async () => {
+    function pickTime(formEl, hour24, minuteStr) {
+      const dialog = formEl.querySelector('[role="dialog"]');
+      const pmBtn = dialog.querySelector('[data-period="PM"]');
+      const amBtn = dialog.querySelector('[data-period="AM"]');
+      if (pmBtn && amBtn) {
+        if (hour24 >= 12) pmBtn.click();
+        else amBtn.click();
+        const h12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+        dialog.querySelector(`[data-hour="${h12}"]`).click();
+      } else {
+        dialog.querySelector(`[data-hour="${String(hour24).padStart(2, '0')}"]`).click();
+      }
+      dialog.querySelector(`[data-minute="${minuteStr}"]`).click();
+    }
+
     repoModule._setHabits([{ id: 'h-init', name: 'Existing', sortOrder: 0 }]);
 
     const root = mockDoc.createElement('div');
@@ -726,22 +795,40 @@ describe('ui/today.js Scheduled Time', () => {
     mockDoc.getElementById('today-add-habit-trigger').click();
     await new Promise((r) => setTimeout(r, 20));
 
+    const form1 = mockDoc.getElementById('today-add-habit-form');
     const nameInput = mockDoc.getElementById('today-add-habit-input');
-    const timeInput = mockDoc.getElementById('today-add-habit-scheduled-time');
-    const clearBtn = mockDoc.getElementById('today-add-habit-clear-time');
+    const timeTrigger = mockDoc.getElementById('today-add-habit-scheduled-time');
     const linkedSelect = mockDoc.getElementById('today-add-habit-linked-activity');
     const submitBtn = mockDoc.getElementById('today-add-habit-submit');
 
-    expect(timeInput).not.toBeNull();
-    expect(timeInput.type).toBe('time');
-    expect(timeInput.style.fontSize).toBe('16px');
-    expect(timeInput.classList.contains('min-h-[44px]')).toBe(true);
+    expect(timeTrigger).not.toBeNull();
+    expect(timeTrigger.tagName).toBe('BUTTON');
+    expect(timeTrigger.classList.contains('min-h-[44px]')).toBe(true);
+    expect(timeTrigger.classList.contains('min-w-[44px]')).toBe(true);
+
+    timeTrigger.click();
+    const clearBtn = form1.querySelector('.time-picker-clear-btn');
     expect(clearBtn).not.toBeNull();
     expect(clearBtn.classList.contains('min-h-[44px]')).toBe(true);
     expect(clearBtn.classList.contains('min-w-[44px]')).toBe(true);
 
+    pickTime(form1, 5, '00');
+    form1.querySelector('.time-picker-done-btn').click();
+    expect(timeTrigger.dataset.time).toBe('05:00');
+
+    // Escape closes open popover first without collapsing form; second Escape collapses form
+    timeTrigger.click();
+    expect(timeTrigger.getAttribute('aria-expanded')).toBe('true');
+    mockDoc.dispatchEvent({
+      type: 'keydown',
+      key: 'Escape',
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+    });
+    expect(timeTrigger.getAttribute('aria-expanded')).toBe('false');
+    expect(mockDoc.getElementById('today-add-habit-form')).not.toBeNull();
+
     nameInput.value = 'Journaling';
-    timeInput.value = '05:00';
     linkedSelect.value = 'journal';
     submitBtn.click();
     await new Promise((r) => setTimeout(r, 20));
@@ -755,8 +842,11 @@ describe('ui/today.js Scheduled Time', () => {
     mockDoc.getElementById('today-add-habit-trigger').click();
     await new Promise((r) => setTimeout(r, 20));
 
+    const form2 = mockDoc.getElementById('today-add-habit-form');
     mockDoc.getElementById('today-add-habit-input').value = 'Walk';
-    mockDoc.getElementById('today-add-habit-scheduled-time').value = '18:30';
+    mockDoc.getElementById('today-add-habit-scheduled-time').click();
+    pickTime(form2, 18, '30');
+    form2.querySelector('.time-picker-done-btn').click();
     mockDoc.getElementById('today-add-habit-submit').click();
     await new Promise((r) => setTimeout(r, 20));
 
@@ -764,14 +854,17 @@ describe('ui/today.js Scheduled Time', () => {
       scheduledTime: '18:30',
     });
 
-    // 3. Clearing scheduledTime resets value back to '' and calls single-arg addHabit
+    // 3. Clearing scheduledTime in popover resets value back to '' and calls single-arg addHabit
     mockDoc.getElementById('today-add-habit-trigger').click();
     await new Promise((r) => setTimeout(r, 20));
 
-    const timeInput3 = mockDoc.getElementById('today-add-habit-scheduled-time');
-    timeInput3.value = '07:00';
-    mockDoc.getElementById('today-add-habit-clear-time').click();
-    expect(timeInput3.value).toBe('');
+    const form3 = mockDoc.getElementById('today-add-habit-form');
+    const trigger3 = mockDoc.getElementById('today-add-habit-scheduled-time');
+    trigger3.click();
+    pickTime(form3, 7, '00');
+    expect(trigger3.dataset.time).toBe('07:00');
+    form3.querySelector('.time-picker-clear-btn').click();
+    expect(trigger3.dataset.time).toBe('');
 
     mockDoc.getElementById('today-add-habit-input').value = 'Hydrate';
     mockDoc.getElementById('today-add-habit-submit').click();

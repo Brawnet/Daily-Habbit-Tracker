@@ -126,6 +126,10 @@ export class MockElement {
 
   removeAttribute(name) {
     delete this.attributes[name];
+    if (name.startsWith('data-')) {
+      const key = name.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+      delete this.dataset[key];
+    }
     if (name === 'id') {
       if (this.doc && this._id) {
         this.doc.elementsById.delete(this._id);
@@ -163,7 +167,20 @@ export class MockElement {
     }
   }
 
-  focus() {}
+  contains(node) {
+    if (!node) return false;
+    if (node === this) return true;
+    for (const child of this.children) {
+      if (child.contains && child.contains(node)) return true;
+    }
+    return false;
+  }
+
+  focus() {
+    if (this.doc) {
+      this.doc.activeElement = this;
+    }
+  }
 
   addEventListener(type, handler) {
     if (!this.listeners[type]) this.listeners[type] = [];
@@ -210,29 +227,56 @@ export class MockElement {
       return Array.from(set);
     }
 
+    const matchesSimple = (el, rawSelector) => {
+      let rest = rawSelector.trim();
+      if (!rest) return false;
+
+      // Optional leading tag name
+      const tagMatch = rest.match(/^[a-zA-Z0-9_-]+/);
+      if (tagMatch) {
+        if (el.tagName.toLowerCase() !== tagMatch[0].toLowerCase()) return false;
+        rest = rest.slice(tagMatch[0].length);
+      }
+
+      // Parse zero or more #id, .class, or [attr(=val)] tokens
+      while (rest.length > 0) {
+        if (rest.startsWith('#')) {
+          const m = rest.match(/^#([a-zA-Z0-9_-]+)/);
+          if (!m) return false;
+          if (el.id !== m[1] && el.getAttribute('id') !== m[1]) return false;
+          rest = rest.slice(m[0].length);
+        } else if (rest.startsWith('.')) {
+          const m = rest.match(/^\.([a-zA-Z0-9_-]+)/);
+          if (!m) return false;
+          if (!el.classList.contains(m[1])) return false;
+          rest = rest.slice(m[0].length);
+        } else if (rest.startsWith('[')) {
+          const m = rest.match(/^\[([a-zA-Z0-9_-]+)(?:=["']?([^"'\]]*)["']?)?\]/);
+          if (!m) return false;
+          const attrName = m[1];
+          const expected = m[2];
+          let actual = el.getAttribute(attrName);
+          if (actual === null && attrName.startsWith('data-')) {
+            const camel = attrName.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+            if (camel in el.dataset) actual = String(el.dataset[camel]);
+          }
+          if (expected === undefined) {
+            if (actual === null) return false;
+          } else if (actual !== expected) {
+            return false;
+          }
+          rest = rest.slice(m[0].length);
+        } else {
+          return false;
+        }
+      }
+
+      return true;
+    };
+
     const results = [];
     const check = (el) => {
-      let match = true;
-      if (selector.startsWith('#')) {
-        const id = selector.slice(1);
-        if (el.id !== id && el.getAttribute('id') !== id) match = false;
-      } else if (selector.startsWith('.')) {
-        const cls = selector.slice(1);
-        if (!el.classList.contains(cls)) match = false;
-      } else if (selector.includes('[data-action=')) {
-        const action = selector.match(/\[data-action="?([^"\]]+)"?\]/)?.[1];
-        if (el.dataset.action !== action) match = false;
-      } else if (selector.includes('[data-id=')) {
-        const id = selector.match(/\[data-id="?([^"\]]+)"?\]/)?.[1];
-        if (el.dataset.id !== id && el.getAttribute('data-id') !== id) match = false;
-      } else if (selector.includes('[data-starter-chip]')) {
-        if (!('starterChip' in el.dataset)) match = false;
-      } else if (selector.includes('[data-tab]')) {
-        if (!('tab' in el.dataset)) match = false;
-      } else if (/^[a-zA-Z0-9_-]+$/.test(selector)) {
-        if (el.tagName.toLowerCase() !== selector.toLowerCase()) match = false;
-      }
-      if (match && el !== this) results.push(el);
+      if (matchesSimple(el, selector) && el !== this) results.push(el);
 
       for (const child of el.children) {
         check(child);
@@ -247,6 +291,7 @@ export class MockDocument {
   constructor() {
     this.elementsById = new Map();
     this.visibilityState = 'visible';
+    this.activeElement = null;
     this.listeners = {};
   }
 

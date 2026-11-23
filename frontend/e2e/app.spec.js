@@ -908,11 +908,62 @@ test.describe('Habbit App E2E', () => {
     await expectNoHorizontalOverflow();
   });
 
-  test('supports optional Scheduled Time on Habits across Today, Settings, reload, archive/restore, and omits from History', async ({ page }) => {
-    // 1. Add Evening Walk (21:00) and Drink Water (Anytime) in Settings -> Manage Habits
+  test('supports custom full-field time picker across Welcome/starters, Today, Settings & Reminder, reload, archive/restore, and omits from History', async ({ page }) => {
+    async function pickCustomTime(triggerLocator, hour24, minuteStr) {
+      await triggerLocator.click();
+      const dialog = page.locator('.habbit-time-picker-popover:not(.hidden)');
+      await expect(dialog).toBeVisible();
+
+      const layout = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        innerWidth: window.innerWidth,
+        dialogRect: document.querySelector('.habbit-time-picker-popover:not(.hidden)')?.getBoundingClientRect(),
+      }));
+      expect(layout.scrollWidth).toBeLessThanOrEqual(layout.innerWidth);
+      expect(layout.dialogRect.left).toBeGreaterThanOrEqual(0);
+      expect(layout.dialogRect.right).toBeLessThanOrEqual(layout.innerWidth);
+
+      const pmBtn = dialog.locator('[data-period="PM"]');
+      if ((await pmBtn.count()) > 0) {
+        await (hour24 >= 12 ? pmBtn : dialog.locator('[data-period="AM"]')).click();
+        const h12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+        await dialog.locator(`[data-hour="${h12}"]`).click();
+      } else {
+        await dialog.locator(`[data-hour="${String(hour24).padStart(2, '0')}"]`).click();
+      }
+      await dialog.locator(`[data-minute="${minuteStr}"]`).click();
+      await dialog.locator('.time-picker-done-btn').click();
+      await expect(dialog).toBeHidden();
+    }
+
+    // 0. Welcome empty state: clicking Popular Starter fills name and focuses Scheduled Time without instant creation
+    const starterBtn = page.locator('[data-starter-chip="Morning Walk"]');
+    await expect(starterBtn).toBeVisible();
+    await starterBtn.click();
+    await expect(page.locator('#today-empty-add-input')).toHaveValue('Morning Walk');
+    await expect(page.locator('#today-empty-scheduled-time')).toBeFocused();
+    await expect(page.locator('#habits-empty-state')).toBeVisible();
+
+    await pickCustomTime(page.locator('#today-empty-scheduled-time'), 6, '30');
+    await expect(page.locator('#today-empty-scheduled-time')).toHaveAttribute('data-time', '06:30');
+    await page.click('#today-empty-add-btn');
+    await expect(page.locator('#today-scheduled-list li', { hasText: 'Morning Walk' })).toBeVisible();
+
+    // 1. In Settings (dark mode), configure Reminder (no Clear button) and add Evening Walk (21:00) + Drink Water (Anytime)
     await page.click('button[data-tab="settings"]');
+    await page.click('#theme-option-dark');
+
+    await page.click('#setting-reminder-time');
+    const reminderDialog = page.locator('#settings-reminder .habbit-time-picker-popover:not(.hidden)');
+    await expect(reminderDialog).toBeVisible();
+    await expect(reminderDialog.locator('.time-picker-clear-btn')).toHaveCount(0);
+    await reminderDialog.locator('.time-picker-done-btn').click();
+    await pickCustomTime(page.locator('#setting-reminder-time'), 21, '30');
+    await expect(page.locator('#toast-container')).toContainText('Reminder time saved');
+    await expect(page.locator('#setting-reminder-time')).toHaveAttribute('data-time', '21:30');
+
     await page.fill('#input-new-habit', 'Evening Walk');
-    await page.fill('#input-new-habit-time', '21:00');
+    await pickCustomTime(page.locator('#input-new-habit-time'), 21, '00');
     await page.click('#btn-add-habit');
     await expect(page.locator('#settings-scheduled-habits-group')).toContainText('Evening Walk');
 
@@ -924,40 +975,41 @@ test.describe('Habbit App E2E', () => {
     await page.click('button[data-tab="today"]');
     await page.click('#today-add-habit-trigger');
     await page.fill('#today-add-habit-input', 'Journaling');
-    await page.fill('#today-add-habit-scheduled-time', '05:00');
+    await pickCustomTime(page.locator('#today-add-habit-scheduled-time'), 5, '00');
     await page.click('#today-add-habit-submit');
 
     await page.click('#today-add-habit-trigger');
     await page.fill('#today-add-habit-input', 'Stretch');
     await page.click('#today-add-habit-submit');
 
-    // 3. Verify Today chronological order (05:00 then 21:00), conditional Anytime heading, and card time display
+    // 3. Verify Today chronological order (05:00 -> 06:30 -> 21:00), conditional Anytime heading, and card time display
     const scheduledItems = page.locator('#today-scheduled-list li');
     const anytimeItems = page.locator('#today-anytime-list li');
-    await expect(scheduledItems).toHaveCount(2);
+    await expect(scheduledItems).toHaveCount(3);
     await expect(scheduledItems.nth(0)).toContainText('Journaling');
     await expect(scheduledItems.nth(0).locator('.habit-scheduled-time')).toBeVisible();
-    await expect(scheduledItems.nth(1)).toContainText('Evening Walk');
-    await expect(scheduledItems.nth(1).locator('.habit-scheduled-time')).toBeVisible();
+    await expect(scheduledItems.nth(1)).toContainText('Morning Walk');
+    await expect(scheduledItems.nth(2)).toContainText('Evening Walk');
 
     await expect(page.locator('#today-anytime-heading')).toHaveText('Anytime');
     await expect(anytimeItems).toHaveCount(2);
     await expect(anytimeItems.nth(0)).toContainText('Drink Water');
     await expect(anytimeItems.nth(1)).toContainText('Stretch');
 
-    // 4. Complete check-in on Journaling -> stays in first slot and persists across reload
+    // 4. Complete check-in on Journaling -> stays in first slot and persists across reload (alongside Reminder time)
     await scheduledItems.nth(0).locator('button[data-action="toggle-checkin"]').click();
-    await expect(page.locator('#today-progress')).toContainText('1/4 done');
+    await expect(page.locator('#today-progress')).toContainText('1/5 done');
     await page.reload();
-    await expect(page.locator('#today-progress')).toContainText('1/4 done');
+    await expect(page.locator('#today-progress')).toContainText('1/5 done');
     await expect(scheduledItems.nth(0)).toContainText('Journaling');
     await expect(scheduledItems.nth(0).locator('button[data-action="toggle-checkin"]')).toHaveAttribute(
       'aria-pressed',
       'true'
     );
 
-    // 5. Settings -> locked timed move toast, Anytime reorder, inline Clear unlocking moves, Archive/Restore preservation
+    // 5. Settings -> persisted Reminder, locked timed move toast, Anytime reorder, inline Clear unlocking moves, Archive/Restore preservation
     await page.click('button[data-tab="settings"]');
+    await expect(page.locator('#setting-reminder-time')).toHaveAttribute('data-time', '21:30');
     await expect(page.locator('#settings-scheduled-order-note')).toHaveText(
       "Scheduled habits follow clock order automatically. Clear a habit's time to reorder it manually."
     );
@@ -979,15 +1031,16 @@ test.describe('Habbit App E2E', () => {
     await page.click('button[data-tab="today"]');
     await expect(anytimeItems.nth(0)).toContainText('Stretch');
 
-    // Clear Scheduled Time on Journaling via inline Edit -> moves into Anytime with unlocked ▲/▼
+    // Clear Scheduled Time on Journaling via inline Edit custom popover -> moves into Anytime with unlocked ▲/▼
     await page.click('button[data-tab="settings"]');
     const journalingRow = page
       .locator('#settings-scheduled-habits-group .habit-row')
       .filter({ hasText: 'Journaling' });
     await journalingRow.locator('.btn-edit').click();
-    await expect(page.locator('.input-edit-scheduled-time')).toHaveValue('05:00');
-    await page.click('.btn-clear-edit-time');
-    await expect(page.locator('.input-edit-scheduled-time')).toHaveValue('');
+    await expect(page.locator('.input-edit-scheduled-time')).toHaveAttribute('data-time', '05:00');
+    await page.click('.input-edit-scheduled-time');
+    await page.locator('.rename-form .time-picker-clear-btn').click();
+    await expect(page.locator('.input-edit-scheduled-time')).toHaveAttribute('data-time', '');
     await page.click('.rename-form button[type="submit"]');
 
     const unlockedJournalingRow = page
@@ -1001,7 +1054,7 @@ test.describe('Habbit App E2E', () => {
       .locator('#settings-scheduled-habits-group .habit-row')
       .filter({ hasText: 'Evening Walk' });
     await walkRow.locator('.btn-archive').click();
-    await expect(page.locator('#settings-scheduled-habits-group')).toHaveCount(0);
+    await expect(page.locator('#settings-scheduled-habits-group .habit-row', { hasText: 'Evening Walk' })).toHaveCount(0);
 
     await page.click('#btn-toggle-archived');
     await page

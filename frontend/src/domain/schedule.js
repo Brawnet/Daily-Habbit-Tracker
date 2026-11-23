@@ -5,6 +5,21 @@
 
 export const SCHEDULED_TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
+export const MINUTE_STEPS = Object.freeze([
+  '00',
+  '05',
+  '10',
+  '15',
+  '20',
+  '25',
+  '30',
+  '35',
+  '40',
+  '45',
+  '50',
+  '55',
+]);
+
 /**
  * Checks whether a value is a valid canonical 24-hour 'HH:MM' Scheduled Time.
  *
@@ -54,6 +69,58 @@ export function formatScheduledTime(scheduledTime, locale = undefined) {
     hour: 'numeric',
     minute: '2-digit',
   }).format(date);
+}
+
+/**
+ * Detects whether the given (or Device default) locale formats wall-clock time in 12-hour format.
+ *
+ * @param {string | string[] | undefined} [locale]
+ * @returns {boolean}
+ */
+export function isLocale12Hour(locale = undefined) {
+  try {
+    const resolved = new Intl.DateTimeFormat(locale, { hour: 'numeric' }).resolvedOptions();
+    if (typeof resolved.hour12 === 'boolean') {
+      return resolved.hour12;
+    }
+    if (resolved.hourCycle) {
+      return resolved.hourCycle === 'h11' || resolved.hourCycle === 'h12';
+    }
+  } catch {
+    // Ignore malformed locale strings and fall back safely to 24-hour mode
+  }
+  return false;
+}
+
+/**
+ * Converts a 12-hour clock hour (1-12) and period ('AM' | 'PM') to a 24-hour integer (0-23).
+ * Returns null for invalid inputs.
+ *
+ * @param {number} hour12
+ * @param {'AM' | 'PM'} period
+ * @returns {number | null}
+ */
+export function to24Hour(hour12, period) {
+  const n = Number(hour12);
+  if (!Number.isInteger(n) || n < 1 || n > 12) return null;
+  if (period === 'AM') return n === 12 ? 0 : n;
+  if (period === 'PM') return n === 12 ? 12 : n + 12;
+  return null;
+}
+
+/**
+ * Converts a 24-hour integer (0-23) into `{ hour12, period }`.
+ * Returns null for invalid inputs.
+ *
+ * @param {number} hour24
+ * @returns {{ hour12: number, period: 'AM' | 'PM' } | null}
+ */
+export function from24Hour(hour24) {
+  const n = Number(hour24);
+  if (!Number.isInteger(n) || n < 0 || n > 23) return null;
+  const period = n < 12 ? 'AM' : 'PM';
+  const rem = n % 12;
+  return { hour12: rem === 0 ? 12 : rem, period };
 }
 
 /**

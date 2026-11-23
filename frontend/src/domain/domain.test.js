@@ -29,6 +29,17 @@ import {
   isJournalEntryWritten,
   resolveJournalDisplayHeader,
 } from './journal.js';
+import {
+  MINUTE_STEPS,
+  isValidScheduledTime,
+  normalizeScheduledTime,
+  hasScheduledTime,
+  formatScheduledTime,
+  isLocale12Hour,
+  to24Hour,
+  from24Hour,
+  partitionAndSortHabits,
+} from './schedule.js';
 
 describe('domain/day', () => {
   describe('toDay and today', () => {
@@ -846,5 +857,179 @@ describe('domain/journal', () => {
   it('keeps computeWordCount strictly scoped to reflection prompt answers', () => {
     const answers = { p1: '<p>Quiet reflection</p>' };
     expect(computeWordCount(answers, 'Ignored Title Words')).toBe(2);
+  });
+});
+
+describe('domain/schedule', () => {
+  describe('isValidScheduledTime', () => {
+    it('accepts valid 24-hour HH:MM strings and rejects empty or malformed inputs', () => {
+      expect(isValidScheduledTime('00:00')).toBe(true);
+      expect(isValidScheduledTime('05:00')).toBe(true);
+      expect(isValidScheduledTime('09:30')).toBe(true);
+      expect(isValidScheduledTime('23:59')).toBe(true);
+
+      expect(isValidScheduledTime('')).toBe(false);
+      expect(isValidScheduledTime('   ')).toBe(false);
+      expect(isValidScheduledTime('5:00')).toBe(false);
+      expect(isValidScheduledTime('24:00')).toBe(false);
+      expect(isValidScheduledTime('12:60')).toBe(false);
+      expect(isValidScheduledTime('abc')).toBe(false);
+      expect(isValidScheduledTime('=05:00')).toBe(false);
+      expect(isValidScheduledTime(null)).toBe(false);
+      expect(isValidScheduledTime(undefined)).toBe(false);
+    });
+  });
+
+  describe('normalizeScheduledTime', () => {
+    it('returns trimmed HH:MM for valid times and empty string otherwise', () => {
+      expect(normalizeScheduledTime('05:00')).toBe('05:00');
+      expect(normalizeScheduledTime('  23:59  ')).toBe('23:59');
+      expect(normalizeScheduledTime('')).toBe('');
+      expect(normalizeScheduledTime('   ')).toBe('');
+      expect(normalizeScheduledTime(null)).toBe('');
+      expect(normalizeScheduledTime(undefined)).toBe('');
+      expect(normalizeScheduledTime('24:00')).toBe('');
+      expect(normalizeScheduledTime('5:00')).toBe('');
+      expect(normalizeScheduledTime('=05:00')).toBe('');
+    });
+  });
+
+  describe('hasScheduledTime', () => {
+    it('detects whether a Habit has a valid Scheduled Time', () => {
+      expect(hasScheduledTime({ id: 'h1', scheduledTime: '05:00' })).toBe(true);
+      expect(hasScheduledTime({ id: 'h2', scheduledTime: '' })).toBe(false);
+      expect(hasScheduledTime({ id: 'h3' })).toBe(false);
+      expect(hasScheduledTime({ id: 'h4', scheduledTime: 'invalid' })).toBe(false);
+      expect(hasScheduledTime(null)).toBe(false);
+      expect(hasScheduledTime(undefined)).toBe(false);
+    });
+  });
+
+  describe('formatScheduledTime', () => {
+    it('formats HH:MM using locale conventions and returns empty string for invalid/blank inputs', () => {
+      expect(formatScheduledTime('05:00', 'en-US')).toMatch(/^5:00\s*AM$/i);
+      expect(formatScheduledTime('17:30', 'en-US')).toMatch(/^5:30\s*PM$/i);
+      expect(formatScheduledTime('05:00', 'en-GB')).toMatch(/^0?5:00$/);
+      expect(formatScheduledTime('17:30', 'en-GB')).toBe('17:30');
+
+      expect(formatScheduledTime('')).toBe('');
+      expect(formatScheduledTime(null)).toBe('');
+      expect(formatScheduledTime('invalid')).toBe('');
+
+      const defaultLocaleResult = formatScheduledTime('05:00');
+      expect(typeof defaultLocaleResult).toBe('string');
+      expect(defaultLocaleResult.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('partitionAndSortHabits', () => {
+    it('orders timed Habits chronologically (ties by sortOrder) before Anytime Habits sorted by sortOrder', () => {
+      const input = [
+        { id: 'any-2', name: 'Untimed B', sortOrder: 5, scheduledTime: '' },
+        { id: 'night', name: 'Read', sortOrder: 1, scheduledTime: '21:00' },
+        { id: 'tie-b', name: 'Meditate', sortOrder: 4, scheduledTime: '05:00', createdAt: '2026-01-01T00:00:00Z' },
+        { id: 'any-1', name: 'Untimed A', sortOrder: 2 },
+        { id: 'tie-a', name: 'Journaling', sortOrder: 3, scheduledTime: '05:00', createdAt: '2026-01-02T00:00:00Z' },
+        { id: 'noon', name: 'Walk', sortOrder: 0, scheduledTime: '12:30' },
+      ];
+      const snapshot = input.map((h) => ({ ...h }));
+
+      const { scheduled, anytime, all } = partitionAndSortHabits(input);
+
+      // Must not mutate input order
+      expect(input).toEqual(snapshot);
+
+      expect(scheduled.map((h) => h.id)).toEqual(['tie-a', 'tie-b', 'noon', 'night']);
+      expect(anytime.map((h) => h.id)).toEqual(['any-1', 'any-2']);
+      expect(all.map((h) => h.id)).toEqual(['tie-a', 'tie-b', 'noon', 'night', 'any-1', 'any-2']);
+    });
+
+    it('breaks equal sortOrder ties deterministically by createdAt then id', () => {
+      const input = [
+        { id: 'h-b', sortOrder: 1, scheduledTime: '08:00', createdAt: '2026-01-01T00:00:00Z' },
+        { id: 'h-a', sortOrder: 1, scheduledTime: '08:00', createdAt: '2026-01-01T00:00:00Z' },
+        { id: 'h-early', sortOrder: 1, scheduledTime: '08:00', createdAt: '2025-12-31T00:00:00Z' },
+        { id: 'u-b', sortOrder: 1, createdAt: '2026-01-02T00:00:00Z' },
+        { id: 'u-a', sortOrder: 1, createdAt: '2026-01-01T00:00:00Z' },
+      ];
+
+      const { scheduled, anytime } = partitionAndSortHabits(input);
+      expect(scheduled.map((h) => h.id)).toEqual(['h-early', 'h-a', 'h-b']);
+      expect(anytime.map((h) => h.id)).toEqual(['u-a', 'u-b']);
+    });
+
+    it('handles all-timed, all-untimed, and empty arrays cleanly', () => {
+      expect(partitionAndSortHabits([])).toEqual({ scheduled: [], anytime: [], all: [] });
+      expect(partitionAndSortHabits(null)).toEqual({ scheduled: [], anytime: [], all: [] });
+
+      const allTimed = partitionAndSortHabits([
+        { id: 't2', sortOrder: 0, scheduledTime: '20:00' },
+        { id: 't1', sortOrder: 1, scheduledTime: '06:00' },
+      ]);
+      expect(allTimed.scheduled.map((h) => h.id)).toEqual(['t1', 't2']);
+      expect(allTimed.anytime).toEqual([]);
+
+      const allAnytime = partitionAndSortHabits([
+        { id: 'a2', sortOrder: 2 },
+        { id: 'a1', sortOrder: 1, scheduledTime: '' },
+      ]);
+      expect(allAnytime.scheduled).toEqual([]);
+      expect(allAnytime.anytime.map((h) => h.id)).toEqual(['a1', 'a2']);
+    });
+  });
+
+  describe('time picker helpers', () => {
+    it('exports 5-minute step strings from 00 to 55', () => {
+      expect(MINUTE_STEPS).toEqual([
+        '00',
+        '05',
+        '10',
+        '15',
+        '20',
+        '25',
+        '30',
+        '35',
+        '40',
+        '45',
+        '50',
+        '55',
+      ]);
+    });
+
+    it('detects 12-hour vs 24-hour Device locale cleanly', () => {
+      expect(isLocale12Hour('en-US')).toBe(true);
+      expect(isLocale12Hour('en-GB')).toBe(false);
+      expect(isLocale12Hour('de-DE')).toBe(false);
+    });
+
+    it('converts between 12-hour period pairs and 24-hour integers', () => {
+      expect(to24Hour(12, 'AM')).toBe(0);
+      expect(to24Hour(1, 'AM')).toBe(1);
+      expect(to24Hour(11, 'AM')).toBe(11);
+      expect(to24Hour(12, 'PM')).toBe(12);
+      expect(to24Hour(1, 'PM')).toBe(13);
+      expect(to24Hour(11, 'PM')).toBe(23);
+      expect(to24Hour(0, 'AM')).toBeNull();
+      expect(to24Hour(13, 'PM')).toBeNull();
+      expect(to24Hour(5, 'NOON')).toBeNull();
+      expect(to24Hour(null, 'AM')).toBeNull();
+      expect(to24Hour('', 'AM')).toBeNull();
+      expect(to24Hour(false, 'AM')).toBeNull();
+
+      expect(from24Hour(0)).toEqual({ hour12: 12, period: 'AM' });
+      expect(from24Hour(5)).toEqual({ hour12: 5, period: 'AM' });
+      expect(from24Hour(12)).toEqual({ hour12: 12, period: 'PM' });
+      expect(from24Hour(17)).toEqual({ hour12: 5, period: 'PM' });
+      expect(from24Hour(23)).toEqual({ hour12: 11, period: 'PM' });
+      expect(from24Hour(-1)).toBeNull();
+      expect(from24Hour(24)).toBeNull();
+      expect(from24Hour(null)).toBeNull();
+      expect(from24Hour('')).toBeNull();
+      expect(from24Hour(false)).toBeNull();
+    });
+
+    it('falls back to canonical HH:MM in formatScheduledTime when locale is malformed', () => {
+      expect(formatScheduledTime('05:00', 'invalid_locale_tag_!!!')).toBe('05:00');
+    });
   });
 });

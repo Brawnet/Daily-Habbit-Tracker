@@ -4,8 +4,8 @@ Aplikasi PWA pribadi Habit Tracker & Daily Journal untuk satu pengguna di banyak
 
 Sumber kebenaran lain (baca dulu, jangan diduplikasi di sini):
 
-- `GLOSSARY.md` — istilah domain. Pakai istilah ini **persis** di kode, UI, nama sheet, dan komentar (Habit, Archived Habit, Check-in, Streak, Day, Journal Entry, Diary, Device, Reminder).
-- `docs/adr/0001` offline-first · `0002` Sheets sumber kebenaran, Diary satu arah · `0003` arsitektur Reminder · `0004` layout `--app-height` & floating bottom nav · `0005` Journal History & pengeditan entry lampau · `0006` judul opsional Journal Entry & Heading 3 Diary.
+- `GLOSSARY.md` — istilah domain. Pakai istilah ini **persis** di kode, UI, nama sheet, dan komentar (Habit, Scheduled Time, Archived Habit, Check-in, Streak, Day, Journal Entry, Diary, Device, Reminder).
+- `docs/adr/0001` offline-first · `0002` Sheets sumber kebenaran, Diary satu arah · `0003` arsitektur Reminder · `0004` layout `--app-height` & floating bottom nav · `0005` Journal History & pengeditan entry lampau · `0006` judul opsional Journal Entry & Heading 3 Diary · `0007` Scheduled Time opsional pada Habit & Kolom ke-8 `Habits`.
 
 Nama aplikasi: **Habbit** (dengan dua "b", disengaja). UI berbahasa **Inggris**. Pengaturan tema per Device tersedia dalam 3 pilihan: `Light`, `Dark`, dan `System` (default mengikuti tema Device).
 
@@ -18,7 +18,7 @@ Nama aplikasi: **Habbit** (dengan dua "b", disengaja). UI berbahasa **Inggris**.
 | Day | `YYYY-MM-DD` dari waktu **lokal Device**, ganti tengah malam. Bangun dari `getFullYear/getMonth/getDate` — jangan `toISOString()` (UTC). Saat app terbuka melewati tengah malam atau kembali terlihat, UI re-render ke Day baru. |
 | Check-in | Biner. Maks satu per Habit per Day. ID deterministik `${habitId}:${day}`. Membatalkan = `deleted: true` (tombstone), bukan hapus baris. |
 | Jendela Check-in | Hanya **hari ini dan kemarin** yang bisa ditambah/dibatalkan. Masa depan & lebih lama dari kemarin: read-only. |
-| Habit | Hanya harian. Bisa tambah, ganti nama, urut naik/turun, arsip/aktifkan lagi. **Tidak ada hapus.** Ganti nama tidak mengubah riwayat. |
+| Habit | Hanya harian. Bisa tambah, ganti nama, atur `Scheduled Time` opsional (`HH:MM` lokal Device atau `""` untuk `Anytime`), urut naik/turun (khusus `Anytime`; `Habit` terjadwal otomatis urut kronologis), arsip/aktifkan lagi (mempertahankan `scheduledTime`). `Scheduled Time` bersifat panduan visual lunak tanpa penalti terlambat maupun trigger push terpisah. **Tidak ada hapus.** Ganti nama tidak mengubah riwayat. |
 | Streak | Lihat GLOSSARY. Hari ini belum Check-in → hitung dari kemarin. Contoh: Check-in 17,18,19; tanggal 20 pagi = 3; tanggal 21 tanpa Check-in 20 = 0. |
 | Journal Entry | Maks satu per Day, key = `day`. Judul opsional (`title`: single-line trim, maks. 120 karakter, fallback dinamis ke `Day` milik entri saat kosong), tanpa Mood. Entry yang sudah ada dapat diedit kembali untuk semua Day hingga hari ini (`day <= today`), sedangkan pembuatan entry baru dibatasi di Device maksimal 7 hari ke belakang (`[today - 7, today]`). Masa depan dilarang. Entry dianggap "ada/tertulis" bila `!isBlank(title) || !isBlank(content)`. |
 | Diary | Google Docs, satu file per tahun, urut kronologis. Ditulis Apps Script, tidak pernah dibaca aplikasi. Lihat §6.3. |
@@ -61,7 +61,7 @@ Vanilla JS (ES modules), tanpa framework UI. Install dengan versi **exact** (`np
 Semua timestamp ISO-8601 UTC string. `updatedAt` diisi Device saat mutasi; `serverUpdatedAt` diisi server saat menulis (dipakai untuk cursor pull, kebal clock skew).
 
 ```js
-/** @typedef {{ id: string /*uuid*/, name: string /*1–60*/, sortOrder: number, archived: boolean, linkedActivity?: 'journal' | 'book_summary' | null, createdAt: string, updatedAt: string }} Habit */
+/** @typedef {{ id: string /*uuid*/, name: string /*1–60*/, sortOrder: number, archived: boolean, linkedActivity?: 'journal' | 'book_summary' | null, scheduledTime?: string /*HH:MM or ''*/, createdAt: string, updatedAt: string }} Habit */
 /** @typedef {{ id: string /*uuid*/, habitId: string, day: string /*YYYY-MM-DD*/, deleted: boolean, updatedAt: string }} CheckIn */
 /** @typedef {{ day: string /*YYYY-MM-DD*/, title?: string /*<=120*/, content: string, updatedAt: string, printedToDiaryAt: string }} JournalEntry */
 /** @typedef {{ key: 'reminderTime', value: string, updatedAt: string }} Setting */
@@ -73,7 +73,7 @@ Google Sheets (dibuat `setup()`; seluruh sheet diformat teks `@` agar tanggal ti
 
 | Sheet | Kolom (header baris 1) |
 |---|---|
-| `Habits` | id, name, sortOrder, archived, createdAt, updatedAt, serverUpdatedAt |
+| `Habits` | id, name, sortOrder, archived, createdAt, updatedAt, serverUpdatedAt, scheduledTime |
 | `Check_Ins` | id, habitId, day, deleted, updatedAt, serverUpdatedAt |
 | `Journal_Entries` | day, content, updatedAt, printedToDiaryAt, serverUpdatedAt, title |
 | `Settings` | key, value, updatedAt, serverUpdatedAt |
@@ -134,7 +134,7 @@ Satu file, tetapi logika murni (format/parse heading Diary, posisi sisip, keputu
 
 ### 6.2 `setup()` — idempoten, dijalankan manual sekali
 
-Buat sheet + header (termasuk perluasan otomatis header `Journal_Entries` dari 5 ke 6 kolom pada spreadsheet eksisting) + format teks bila belum ada; buat folder Drive `Habbit Diary`; generate `PUSH_SHARED_SECRET` bila kosong; hapus lalu pasang ulang trigger `printDiary` (harian ~02:00) dan `checkReminder` (tiap 10 menit); log ringkasan + langkah berikutnya.
+Buat sheet + header (termasuk perluasan otomatis header `Habits` dari 7 ke 8 kolom dan `Journal_Entries` dari 5 ke 6 kolom pada spreadsheet eksisting) + format teks bila belum ada; buat folder Drive `Habbit Diary`; generate `PUSH_SHARED_SECRET` bila kosong; hapus lalu pasang ulang trigger `printDiary` (harian ~02:00) dan `checkReminder` (tiap 10 menit); log ringkasan + langkah berikutnya.
 
 ### 6.3 `syncDiaryEntries()` & `printDiary()` (auto-sync 10 menit & trigger harian)
 
@@ -186,15 +186,16 @@ Keluar bila: `nowHHMM < reminderTime`, atau `LAST_REMINDER_DAY === todayJakarta`
 
 ## 10. UI (4 tab, floating solid flat bottom nav dengan ikon + label terlihat dan warna aktif Terracotta: Today · Activities · History · Settings; route `?tab=`)
 
-- **Today**: tanggal panjang; progres `3/5 done`; daftar Habit aktif (urut `sortOrder`) dengan tombol Check-in + Streak (`🔥 5`); textarea Journal Entry autosave (debounce 800 ms) dengan status "Saved"; empty state → link ke Manage Habits.
-- **History**: khusus riwayat Habit (kartu per Habit aktif: heatmap 12 minggu dengan kolom = minggu dan baris Senin–Minggu, Streak saat ini, Streak terpanjang, completion 30 hari dengan penyebut = Day dalam 30 hari terakhir sejak `createdAt` Habit; sel hari ini & kemarin bisa di-tap untuk toggle Check-in, lainnya read-only; bagian "Archived Habits" ter-collapse).
-- **Settings**: *Appearance* (pilihan tema per Device: `Light` | `Dark` | `System`, berlaku seketika tanpa tombol simpan) · *Sync* (URL Web App, PIN `type=password`, Test connection → `ping`, Sync now, last synced, status) · *Manage Habits* (tambah, rename inline, ▲▼, archive/unarchive) · *Reminder* (input jam, Enable notifications, Send test notification, status) · *Install App* (§8) · versi aplikasi.
+- **Today**: tanggal panjang; progres `3/5 done`; daftar Habit aktif terurut kronologis `Scheduled Time` (`00:00` → `23:59`, seri waktu oleh `sortOrder`) di atas kelompok `Anytime` (`sortOrder`) dengan heading `Anytime` kondisional hanya bila keduanya ada; setiap Habit terjadwal menampilkan `Scheduled Time` sesuai locale Device pada baris metadata sekunder; kartu Habit selesai tetap di posisi kronologisnya; tombol Check-in + Streak (`🔥 5`); kontrol `+ Add Habit` dan form onboarding *Welcome* empty state memakai *custom time picker popover* klik penuh (kolom jam + langkah 5 menit `:00`–`:55`, adaptif locale 12/24 jam Device, tombol `Clear` & `Done` di dalam popover); klik *Popular Starter* chip mengisi nama Habit lalu memfokuskan kolom `Scheduled Time` (tidak otomatis membuat sebelum disubmit); link ke Manage Habits.
+- **History**: khusus riwayat Habit (tetap tanpa tampilan `Scheduled Time`; kartu per Habit aktif: heatmap 12 minggu dengan kolom = minggu dan baris Senin–Minggu, Streak saat ini, Streak terpanjang, completion 30 hari dengan penyebut = Day dalam 30 hari terakhir sejak `createdAt` Habit; sel hari ini & kemarin bisa di-tap untuk toggle Check-in, lainnya read-only; bagian "Archived Habits" ter-collapse).
+- **Settings**: *Appearance* (pilihan tema per Device: `Light` | `Dark` | `System`, berlaku seketika tanpa tombol simpan) · *Sync* (URL Web App, PIN `type=password`, Test connection → `ping`, Sync now, last synced, status) · *Manage Habits* (tambah + *custom time picker popover* `Scheduled Time` opsional & `Clear` di dalam popover, daftar aktif dikelompokkan *Scheduled* kronologis di atas *Anytime* sesuai *Today*, catatan bahwa Habit terjadwal otomatis ikut urutan jam, edit inline nama/*custom time picker* `Scheduled Time`/`Clear`/`Linked Activity`, `▲`/`▼` terkunci dengan `aria-disabled="true"` + toast penjelas bagi Habit terjadwal namun bebas di antara `Anytime`, archive/unarchive yang menjaga `scheduledTime`) · *Reminder* (*custom time picker popover* tanpa tombol `Clear` yang menyimpan saat `Done`/tutup, Enable notifications, Send test notification, status) · *Install App* (§8) · versi aplikasi.
 - **Activities**: Choice Hub untuk **Books Summary** (pustaka buku, tambah buku, *Continue Summary* per Book Chapter, dan *Read the Summary* terkompilasi) serta **Journals** (menu 2 pilihan *Write a Journal* dan *Journal History*, sementara deep link `?tab=activities&subview=journal` langsung ke *Write a Journal*). *Write a Journal* dan *Edit Journal* menyediakan input judul opsional (`maxlength="120"`, `16px`, target sentuh `>= 44×44px`) di atas baris metadata `Day` dengan *placeholder* fallback `Title (defaults to <Day>)` yang ikut autosave (sedangkan hitungan kata tetap khusus jawaban refleksi), serta tombol utama **Done** (`>= 44×44px`) di bagian bawah kartu prompt yang melakukan flush autosave tertunda, menampilkan notifikasi toast di atas (`"Your journal has been saved"`, hilang otomatis 3 detik), lalu mengembalikan pengguna ke tab **Today** (`?tab=today` sekaligus membersihkan parameter `subview=journal`) pada mode *Write a Journal*, atau kembali ke *Entry Reader* pada mode *Edit Journal* (sementara tautan kembali di bilah atas tetap `← Back to Journals` / `← Back to Entry`). *Write a Journal* juga menyediakan kalender `[today - 7, today]` dan Prompt Cards Stack (tombol *Customize Prompts* hanya pada hari ini). *Journal History* menampilkan judul kustom dengan tanggal pendek di baris sekunder (atau langsung tanggal pendek bila tanpa judul), menyediakan search offline dengan `<mark>` di judul dan cuplikan, empty state CTA *Write Today's Journal*, tampilan *Entry Reader* read-only (judul kustom sebagai `<h1>` + tanggal panjang di subjudul, atau tanggal panjang sebagai `<h1>` tanpa duplikasi bila tanpa judul), serta tombol *Edit Journal* untuk mengedit entry `day <= today` (termasuk prompt arsip yang sudah berjawaban).
 
 ## 11. Tes (Vitest) — wajib hijau
 
 - `domain/day`: toDay lokal (bukan UTC) dekat tengah malam, addDays lintas bulan/tahun, jendela Check-in, `isJournalEditable` (`day <= today`), `isJournalCreatable` (batas 7 hari inklusif).
 - `domain/journal`: kompilasi/dekompilasi prompt, sanitasi HTML, normalisasi judul opsional (`<=120`), status tertulis judul-saja, resolusi fallback `Day`, hitungan kata khusus jawaban prompt.
+- `domain/schedule`: validasi/normalisasi `Scheduled Time` (`HH:MM` / `""`), format locale Device (`Intl.DateTimeFormat`), partisi & pengurutan kronologis `Habit` terjadwal + `Anytime`.
 - `domain/streak`: contoh §1, hari ini sudah/belum Check-in, gap, Check-in `deleted` diabaikan, longest streak.
 - `domain/stats`: completion rate dengan Habit baru < 30 hari; bentuk heatmap & awal minggu Senin.
 - `domain/search`: AND token lintas judul/`content`/tanggal, diakritik, cocok tanggal, rentang highlight judul & `content`.

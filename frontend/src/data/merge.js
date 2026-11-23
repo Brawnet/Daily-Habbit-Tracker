@@ -1,5 +1,6 @@
 import { STORES } from '../shared/contracts.js';
 import { normalizeJournalTitle } from '../domain/journal.js';
+import { normalizeScheduledTime } from '../domain/schedule.js';
 
 export const TYPE_CONFIG = Object.freeze({
   habits: {
@@ -127,6 +128,10 @@ export function mergeRecord(type, incoming, local, outboxEntry, isLocked = false
   } else {
     resultRecord = { ...local };
     removeFromOutbox = false;
+  }
+
+  if (type === 'habits') {
+    resultRecord.scheduledTime = normalizeScheduledTime(resultRecord.scheduledTime);
   }
 
   // Journal entries: printedToDiaryAt is owned by server and always adopted from server

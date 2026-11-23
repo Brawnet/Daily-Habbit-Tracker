@@ -205,3 +205,334 @@ describe('ui/settings.js Appearance section', () => {
     cleanup();
   });
 });
+
+describe('ui/settings.js Manage Habits Scheduled Time', () => {
+  let mockDoc;
+  let shellModule;
+  let repoModule;
+  let mount;
+
+  async function mountSettingsWithHabits(initialHabits = []) {
+    vi.resetModules();
+
+    const habits = initialHabits.map((h) => ({ ...h }));
+    const memoryStorage = createMemoryStorage();
+    mockDoc = new MockDocument();
+    mockDoc.documentElement = mockDoc.createElement('html');
+
+    global.document = mockDoc;
+    global.HTMLElement = MockElement;
+    global.localStorage = memoryStorage;
+    global.window = {
+      matchMedia: vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    };
+
+    shellModule = {
+      showToast: vi.fn(),
+      navigate: vi.fn(),
+    };
+    repoModule = {
+      listHabits: vi.fn(async ({ includeArchived = false } = {}) => {
+        const list = includeArchived ? habits : habits.filter((h) => !h.archived);
+        return list.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+      }),
+      addHabit: vi.fn(async (name, { linkedActivity = null, scheduledTime = '' } = {}) => {
+        const created = {
+          id: `h-${habits.length + 1}`,
+          name,
+          sortOrder: habits.length + 1,
+          archived: false,
+          linkedActivity,
+          scheduledTime,
+          createdAt: '2026-10-20T00:00:00Z',
+        };
+        habits.push(created);
+        return created;
+      }),
+      renameHabit: vi.fn(async (id, name, linkedActivity, scheduledTime) => {
+        const target = habits.find((h) => h.id === id);
+        if (!target) throw new Error('Not found');
+        target.name = name;
+        if (linkedActivity !== undefined) target.linkedActivity = linkedActivity;
+        if (scheduledTime !== undefined) target.scheduledTime = scheduledTime;
+        return { ...target };
+      }),
+      moveHabit: vi.fn(async () => [...habits]),
+      setHabitArchived: vi.fn(async (id, archived) => {
+        const target = habits.find((h) => h.id === id);
+        if (target) target.archived = Boolean(archived);
+        return target;
+      }),
+      getSetting: vi.fn(async () => '20:00'),
+      setSetting: vi.fn(),
+      onChange: vi.fn(() => () => {}),
+    };
+
+    vi.doMock('./shell.js', () => shellModule);
+    vi.doMock('../data/repo.js', () => repoModule);
+    vi.doMock('../data/config.js', () => ({
+      getConfig: () => ({ gasUrl: '', pin: '', deviceId: 'dev-1' }),
+      setConfig: vi.fn(),
+      isValidGasUrl: vi.fn(() => true),
+    }));
+    vi.doMock('../data/api.js', () => ({ callApi: vi.fn() }));
+    vi.doMock('../data/sync.js', () => ({
+      syncNow: vi.fn(async () => {}),
+      getSyncStatus: vi.fn(() => ({ state: 'not-configured', pending: 0, lastSyncedAt: null, error: null })),
+      onSyncStatus: vi.fn(() => () => {}),
+    }));
+    vi.doMock('../pwa/install.js', () => ({
+      getInstallState: vi.fn(() => 'unsupported'),
+      promptInstall: vi.fn(async () => false),
+      onInstallStateChange: vi.fn(() => () => {}),
+    }));
+    vi.doMock('../pwa/push.js', () => ({
+      getPushState: vi.fn(async () => 'unsupported'),
+      enablePush: vi.fn(async () => false),
+      sendTestPush: vi.fn(async () => {}),
+    }));
+
+    const settingsMod = await import('./settings.js');
+    mount = settingsMod.mount;
+
+    const root = mockDoc.createElement('div');
+    const cleanup = mount(root);
+    await new Promise((r) => setTimeout(r, 20));
+    return { root, cleanup, habits };
+  }
+
+  afterEach(() => {
+    delete global.document;
+    delete global.HTMLElement;
+    delete global.localStorage;
+    delete global.window;
+    vi.restoreAllMocks();
+  });
+
+  it('supports setting and clearing optional Scheduled Time via custom popover when adding a Habit in Settings', async () => {
+    function pickTime(scopeEl, hour24, minuteStr) {
+      const dialog = scopeEl.querySelector('[role="dialog"]');
+      const pmBtn = dialog.querySelector('[data-period="PM"]');
+      const amBtn = dialog.querySelector('[data-period="AM"]');
+      if (pmBtn && amBtn) {
+        if (hour24 >= 12) pmBtn.click();
+        else amBtn.click();
+        const h12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+        dialog.querySelector(`[data-hour="${h12}"]`).click();
+      } else {
+        dialog.querySelector(`[data-hour="${String(hour24).padStart(2, '0')}"]`).click();
+      }
+      dialog.querySelector(`[data-minute="${minuteStr}"]`).click();
+    }
+
+    const { cleanup } = await mountSettingsWithHabits();
+
+    const nameInput = mockDoc.getElementById('input-new-habit');
+    const timeTrigger = mockDoc.getElementById('input-new-habit-time');
+    const addBtn = mockDoc.getElementById('btn-add-habit');
+    const formAdd = mockDoc.getElementById('form-add-habit');
+
+    expect(nameInput).not.toBeNull();
+    expect(timeTrigger).not.toBeNull();
+    expect(timeTrigger.tagName).toBe('BUTTON');
+    expect(timeTrigger.classList.contains('min-h-[44px]')).toBe(true);
+    expect(timeTrigger.classList.contains('min-w-[44px]')).toBe(true);
+
+    // Clear button inside popover resets time back to ''
+    timeTrigger.click();
+    pickTime(formAdd, 9, '00');
+    expect(timeTrigger.dataset.time).toBe('09:00');
+    const clearBtn = formAdd.querySelector('.time-picker-clear-btn');
+    expect(clearBtn).not.toBeNull();
+    expect(clearBtn.classList.contains('min-h-[44px]')).toBe(true);
+    expect(clearBtn.classList.contains('min-w-[44px]')).toBe(true);
+    clearBtn.click();
+    expect(timeTrigger.dataset.time).toBe('');
+
+    // Submit with Scheduled Time '05:00'
+    nameInput.value = 'Journaling';
+    timeTrigger.click();
+    pickTime(formAdd, 5, '00');
+    formAdd.querySelector('.time-picker-done-btn').click();
+    addBtn.click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(repoModule.addHabit).toHaveBeenCalledWith('Journaling', {
+      linkedActivity: null,
+      scheduledTime: '05:00',
+    });
+    expect(timeTrigger.dataset.time).toBe('');
+
+    cleanup();
+  });
+
+  it('mirrors Today grouping (Scheduled chronological above Anytime), shows explanatory note, locks timed move buttons with tap toast, and renders linkedActivity badge cleanly', async () => {
+    const { root, cleanup } = await mountSettingsWithHabits([
+      { id: 'any-1', name: 'Drink Water', sortOrder: 1, archived: false, scheduledTime: '' },
+      { id: 'sched-late', name: 'Evening Walk', sortOrder: 2, archived: false, scheduledTime: '21:00' },
+      { id: 'any-2', name: 'Stretch', sortOrder: 3, archived: false, scheduledTime: '' },
+      { id: 'sched-early', name: 'Journaling', sortOrder: 4, archived: false, scheduledTime: '05:00', linkedActivity: 'journal' },
+    ]);
+
+    const activeList = mockDoc.getElementById('active-habits-list');
+    const scheduledGroup = mockDoc.getElementById('settings-scheduled-habits-group');
+    const anytimeGroup = mockDoc.getElementById('settings-anytime-habits-group');
+    const noteEl = mockDoc.getElementById('settings-scheduled-order-note');
+
+    expect(scheduledGroup).not.toBeNull();
+    expect(anytimeGroup).not.toBeNull();
+    expect(noteEl).not.toBeNull();
+    expect(noteEl.textContent).toBe(
+      "Scheduled habits follow clock order automatically. Clear a habit's time to reorder it manually."
+    );
+
+    // Scheduled group renders before Anytime group
+    expect(activeList.children[0]).toBe(scheduledGroup);
+    expect(activeList.children[1]).toBe(anytimeGroup);
+
+    const scheduledRows = scheduledGroup.querySelectorAll('.habit-row');
+    expect(scheduledRows.map((r) => r.dataset.habitId)).toEqual(['sched-early', 'sched-late']);
+    expect(scheduledRows[0].querySelector('.habit-scheduled-time-badge').textContent.length).toBeGreaterThan(0);
+    expect(scheduledRows[0].textContent).toContain('Journal');
+
+    // Timed row ▲ / ▼ must be aria-disabled="true" (NOT disabled) and trigger explanatory toast on click
+    const earlyUp = scheduledRows[0].querySelector('.btn-move-up');
+    const earlyDown = scheduledRows[0].querySelector('.btn-move-down');
+    expect(earlyUp.getAttribute('aria-disabled')).toBe('true');
+    expect(earlyDown.getAttribute('aria-disabled')).toBe('true');
+    expect(earlyUp.disabled).toBe(false);
+    expect(earlyDown.disabled).toBe(false);
+
+    earlyUp.click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(repoModule.moveHabit).not.toHaveBeenCalled();
+    expect(shellModule.showToast).toHaveBeenCalledWith(
+      'Scheduled habits follow clock order — clear time to reorder'
+    );
+
+    earlyDown.click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(repoModule.moveHabit).not.toHaveBeenCalled();
+
+    // Anytime group bounds and moves
+    const anytimeRows = anytimeGroup.querySelectorAll('.habit-row');
+    expect(anytimeRows.map((r) => r.dataset.habitId)).toEqual(['any-1', 'any-2']);
+
+    const any1Up = anytimeRows[0].querySelector('.btn-move-up');
+    const any1Down = anytimeRows[0].querySelector('.btn-move-down');
+    const any2Up = anytimeRows[1].querySelector('.btn-move-up');
+    const any2Down = anytimeRows[1].querySelector('.btn-move-down');
+
+    expect(any1Up.disabled).toBe(true);
+    expect(any1Down.disabled).toBe(false);
+    expect(any2Up.disabled).toBe(false);
+    expect(any2Down.disabled).toBe(true);
+
+    any2Up.click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(repoModule.moveHabit).toHaveBeenCalledWith('any-2', 'up');
+
+    cleanup();
+  });
+
+  it('supports changing and clearing Scheduled Time via custom popover in inline Edit without premature blur submit, and aborts on Cancel/Escape', async () => {
+    const { cleanup } = await mountSettingsWithHabits([
+      { id: 'h-1', name: 'Journaling', sortOrder: 1, archived: false, scheduledTime: '05:00', linkedActivity: 'journal' },
+    ]);
+
+    const row = mockDoc.getElementById('settings-scheduled-habits-group').querySelector('.habit-row');
+    row.querySelector('.btn-edit').click();
+
+    const form = row.querySelector('.rename-form');
+    const nameInput = row.querySelector('.rename-input');
+    const timeTrigger = row.querySelector('.input-edit-scheduled-time');
+    const linkedSelect = row.querySelector('.select-edit-linked-activity');
+    const cancelBtn = row.querySelector('.btn-cancel-edit');
+
+    expect(form).not.toBeNull();
+    expect(nameInput).not.toBeNull();
+    expect(timeTrigger).not.toBeNull();
+    expect(timeTrigger.tagName).toBe('BUTTON');
+    expect(timeTrigger.dataset.time).toBe('05:00');
+    expect(timeTrigger.classList.contains('min-h-[44px]')).toBe(true);
+    expect(cancelBtn).not.toBeNull();
+    expect(linkedSelect).not.toBeNull();
+
+    // Blur on name input must NOT close/commit the edit form prematurely
+    nameInput.dispatchEvent({ type: 'blur' });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(repoModule.renameHabit).not.toHaveBeenCalled();
+    expect(row.querySelector('.rename-form')).not.toBeNull();
+
+    // Test Cancel aborts without saving
+    cancelBtn.click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(repoModule.renameHabit).not.toHaveBeenCalled();
+
+    // Re-open, clear time inside popover, and submit -> clears scheduledTime to '' and unlocks moves
+    const rowReopened = mockDoc.getElementById('settings-scheduled-habits-group').querySelector('.habit-row');
+    rowReopened.querySelector('.btn-edit').click();
+    const form2 = rowReopened.querySelector('.rename-form');
+    const trigger2 = rowReopened.querySelector('.input-edit-scheduled-time');
+    trigger2.click();
+    const clearBtn2 = form2.querySelector('.time-picker-clear-btn');
+    expect(clearBtn2).not.toBeNull();
+    clearBtn2.click();
+    expect(trigger2.dataset.time).toBe('');
+
+    form2.dispatchEvent({ type: 'submit', preventDefault: vi.fn() });
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(repoModule.renameHabit).toHaveBeenCalledWith('h-1', 'Journaling', 'journal', '');
+
+    // After clearing scheduledTime, habit now lives under Anytime group
+    expect(mockDoc.getElementById('settings-scheduled-habits-group')).toBeNull();
+    expect(mockDoc.getElementById('settings-anytime-habits-group')).not.toBeNull();
+
+    cleanup();
+  });
+
+  it('uses custom full-field time picker without Clear on Settings -> Reminder and saves on Done/close', async () => {
+    const { cleanup } = await mountSettingsWithHabits([]);
+
+    const reminderTrigger = mockDoc.getElementById('setting-reminder-time');
+    const reminderSection = mockDoc.getElementById('settings-reminder');
+    expect(reminderSection).not.toBeNull();
+    expect(reminderTrigger).not.toBeNull();
+    expect(reminderTrigger.tagName).toBe('BUTTON');
+    expect(reminderTrigger.classList.contains('min-h-[44px]')).toBe(true);
+    expect(reminderTrigger.dataset.time).toBe('20:00');
+
+    reminderTrigger.click();
+    const dialog = reminderSection.querySelector('[role="dialog"]');
+    expect(dialog).not.toBeNull();
+    expect(dialog.querySelector('.time-picker-clear-btn')).toBeNull();
+
+    const pmBtn = dialog.querySelector('[data-period="PM"]');
+    const amBtn = dialog.querySelector('[data-period="AM"]');
+    if (pmBtn && amBtn) {
+      pmBtn.click();
+      dialog.querySelector('[data-hour="9"]').click();
+    } else {
+      dialog.querySelector('[data-hour="21"]').click();
+    }
+    dialog.querySelector('[data-minute="30"]').click();
+
+    // Intermediate taps do NOT persist yet
+    expect(reminderTrigger.dataset.time).toBe('21:30');
+    expect(repoModule.setSetting).not.toHaveBeenCalled();
+
+    dialog.querySelector('.time-picker-done-btn').click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(repoModule.setSetting).toHaveBeenCalledTimes(1);
+    expect(repoModule.setSetting).toHaveBeenCalledWith('reminderTime', '21:30');
+    expect(shellModule.showToast).toHaveBeenCalledWith('Reminder time saved');
+
+    cleanup();
+  });
+});

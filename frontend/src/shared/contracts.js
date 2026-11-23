@@ -1,7 +1,7 @@
 /**
  * Habbit Data Model Typedefs & Constants (SPEC §4)
  *
- * @typedef {{ id: string, name: string, sortOrder: number, archived: boolean, linkedActivity?: 'journal' | 'book_summary' | null, createdAt: string, updatedAt: string }} Habit
+ * @typedef {{ id: string, name: string, sortOrder: number, archived: boolean, linkedActivity?: 'journal' | 'book_summary' | null, scheduledTime?: string, createdAt: string, updatedAt: string }} Habit
  * @typedef {{ id: string, habitId: string, day: string, deleted: boolean, updatedAt: string }} CheckIn
  * @typedef {{ day: string, title?: string, content: string, updatedAt: string, printedToDiaryAt: string }} JournalEntry
  * @typedef {{ key: 'reminderTime', value: string, updatedAt: string }} Setting

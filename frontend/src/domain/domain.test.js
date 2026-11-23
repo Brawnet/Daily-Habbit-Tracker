@@ -1012,6 +1012,9 @@ describe('domain/schedule', () => {
       expect(to24Hour(0, 'AM')).toBeNull();
       expect(to24Hour(13, 'PM')).toBeNull();
       expect(to24Hour(5, 'NOON')).toBeNull();
+      expect(to24Hour(null, 'AM')).toBeNull();
+      expect(to24Hour('', 'AM')).toBeNull();
+      expect(to24Hour(false, 'AM')).toBeNull();
 
       expect(from24Hour(0)).toEqual({ hour12: 12, period: 'AM' });
       expect(from24Hour(5)).toEqual({ hour12: 5, period: 'AM' });
@@ -1020,6 +1023,13 @@ describe('domain/schedule', () => {
       expect(from24Hour(23)).toEqual({ hour12: 11, period: 'PM' });
       expect(from24Hour(-1)).toBeNull();
       expect(from24Hour(24)).toBeNull();
+      expect(from24Hour(null)).toBeNull();
+      expect(from24Hour('')).toBeNull();
+      expect(from24Hour(false)).toBeNull();
+    });
+
+    it('falls back to canonical HH:MM in formatScheduledTime when locale is malformed', () => {
+      expect(formatScheduledTime('05:00', 'invalid_locale_tag_!!!')).toBe('05:00');
     });
   });
 });

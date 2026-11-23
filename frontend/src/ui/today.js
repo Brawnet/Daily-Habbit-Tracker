@@ -136,6 +136,166 @@ export function mount(el) {
     }
   }
 
+  function renderEmptyStateCard() {
+    const emptyCard = document.createElement('div');
+    emptyCard.id = 'habits-empty-state';
+    emptyCard.className =
+      'editorial-card flex flex-col items-center justify-center p-6 sm:p-8 text-center border-dashed gap-5 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
+
+    const headerWrap = document.createElement('div');
+    headerWrap.className = 'flex flex-col items-center gap-1.5 max-w-sm';
+
+    const iconWrap = document.createElement('div');
+    iconWrap.className =
+      'w-14 h-14 rounded-xl bg-[#EEF5F2] dark:bg-[rgba(61,107,88,0.25)] text-[#3D6B58] dark:text-[#5F8776] flex items-center justify-center mb-1 border border-[#E6E4DF] dark:border-[#33302C]';
+    iconWrap.innerHTML = `
+      <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+      </svg>
+    `;
+    headerWrap.appendChild(iconWrap);
+
+    const titleEl = document.createElement('h3');
+    titleEl.id = 'today-empty-title';
+    titleEl.className = 'text-lg sm:text-xl font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]';
+    titleEl.textContent = 'Welcome to Habbit';
+    headerWrap.appendChild(titleEl);
+
+    const subtitleEl = document.createElement('p');
+    subtitleEl.id = 'today-empty-subtitle';
+    subtitleEl.className = 'text-xs sm:text-sm text-[#68655F] dark:text-[#A39E93] leading-relaxed';
+    subtitleEl.textContent =
+      'Start building your daily momentum. Your data stays on this Device.';
+    headerWrap.appendChild(subtitleEl);
+    emptyCard.appendChild(headerWrap);
+
+    const formEl = document.createElement('form');
+    formEl.id = 'today-empty-form';
+    formEl.className = 'w-full max-w-md flex flex-col gap-2.5';
+    formEl.setAttribute('role', 'form');
+
+    const inputWrap = document.createElement('div');
+    inputWrap.className = 'relative w-full';
+
+    const labelEl = document.createElement('label');
+    labelEl.htmlFor = 'today-empty-add-input';
+    labelEl.className = 'sr-only';
+    labelEl.textContent = 'Add your first habit';
+    inputWrap.appendChild(labelEl);
+
+    const inputEl = document.createElement('input');
+    inputEl.type = 'text';
+    inputEl.id = 'today-empty-add-input';
+    inputEl.className =
+      'w-full min-h-[44px] min-w-[44px] px-3.5 py-2.5 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F] focus:outline-none focus:ring-2 focus:ring-[#C86D51] transition-colors';
+    inputEl.style.fontSize = '16px';
+    inputEl.placeholder = 'e.g. Drink 2L water, Morning walk...';
+
+    const addBtn = document.createElement('button');
+    addBtn.type = 'submit';
+    addBtn.id = 'today-empty-add-btn';
+    addBtn.className =
+      'btn-terracotta min-h-[44px] min-w-[44px] px-5 py-2.5 text-sm font-semibold rounded-lg flex items-center justify-center cursor-pointer shrink-0 tactile-spring';
+    addBtn.textContent = 'Add Habit';
+
+    const emptyTimePicker = createTimePickerField({
+      id: 'today-empty-scheduled-time',
+      ariaLabel: 'Scheduled time (optional)',
+      placeholder: 'Anytime',
+      allowClear: true,
+    });
+    emptyTimePicker.container.className = 'relative flex-1 min-w-0';
+    activeTimePickers.push(emptyTimePicker);
+
+    let isSubmitting = false;
+    async function handleAddHabit(habitName) {
+      if (isSubmitting) return;
+      const nameToAdd = habitName || inputEl.value;
+      await executeAddHabit({
+        name: nameToAdd,
+        scheduledTime: emptyTimePicker.getValue() || '',
+        setSubmitting: (submitting) => {
+          isSubmitting = submitting;
+          addBtn.disabled = submitting;
+        },
+        onSuccess: () => {
+          inputEl.value = '';
+          emptyTimePicker.setValue('');
+        },
+        onError: () => {
+          inputEl.focus?.();
+        },
+      });
+    }
+    const onSubmit = (e) => {
+      e?.preventDefault?.();
+      handleAddHabit();
+    };
+
+    formEl.addEventListener('submit', onSubmit);
+    addBtn.addEventListener('click', onSubmit);
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        onSubmit(e);
+      }
+    });
+    inputWrap.appendChild(inputEl);
+    formEl.appendChild(inputWrap);
+
+    const actionRow = document.createElement('div');
+    actionRow.className = 'flex flex-col sm:flex-row items-stretch sm:items-center gap-2';
+    actionRow.appendChild(emptyTimePicker.container);
+    actionRow.appendChild(addBtn);
+    formEl.appendChild(actionRow);
+    emptyCard.appendChild(formEl);
+
+    const startersWrap = document.createElement('div');
+    startersWrap.className = 'flex flex-col items-center gap-2 pt-1 w-full';
+
+    const startersLabel = document.createElement('span');
+    startersLabel.className =
+      'text-[11px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider';
+    startersLabel.textContent = 'Or try a popular starter:';
+    startersWrap.appendChild(startersLabel);
+
+    const chipsContainer = document.createElement('div');
+    chipsContainer.className = 'flex flex-wrap items-center justify-center gap-2';
+
+    const starterHabits = ['Drink 2L Water', 'Read 10 mins', 'Morning Walk'];
+    for (const starter of starterHabits) {
+      const chipBtn = document.createElement('button');
+      chipBtn.type = 'button';
+      chipBtn.dataset.starterChip = starter;
+      chipBtn.className =
+        'min-h-[44px] min-w-[44px] px-3.5 py-2 text-xs font-mono font-medium rounded-lg bg-[#FFFFFF] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] hover:border-[#C86D51] hover:text-[#C86D51] dark:hover:text-[#D97E63] border border-[#E6E4DF] dark:border-[#33302C] transition-all cursor-pointer flex items-center justify-center tactile-spring';
+      chipBtn.textContent = `+ ${starter}`;
+      chipBtn.addEventListener('click', () => {
+        inputEl.value = starter;
+        emptyTimePicker.focus();
+      });
+      chipsContainer.appendChild(chipBtn);
+    }
+    startersWrap.appendChild(chipsContainer);
+    emptyCard.appendChild(startersWrap);
+
+    const manageWrap = document.createElement('div');
+    manageWrap.className = 'pt-1';
+
+    const manageBtn = document.createElement('button');
+    manageBtn.type = 'button';
+    manageBtn.id = 'manage-habits-btn';
+    manageBtn.className =
+      'min-h-[44px] min-w-[44px] px-4 py-2 text-xs font-semibold text-[#68655F] hover:text-[#C86D51] dark:text-[#A39E93] dark:hover:text-[#D97E63] transition-colors cursor-pointer inline-flex items-center gap-1.5 focus:outline-none focus:underline tactile-spring';
+    manageBtn.textContent = 'Manage Habits in Settings →';
+    manageBtn.addEventListener('click', () => {
+      navigate('settings');
+    });
+    manageWrap.appendChild(manageBtn);
+    emptyCard.appendChild(manageWrap);
+
+    habitsListContainerEl.appendChild(emptyCard);
+  }
+
   // --- Habits Rendering Logic ---
   async function renderHabits() {
     const token = ++renderToken;
@@ -179,169 +339,7 @@ export function mount(el) {
     habitsListContainerEl.innerHTML = '';
 
     if (habitData.length === 0) {
-      // Empty state card
-      const emptyCard = document.createElement('div');
-      emptyCard.id = 'habits-empty-state';
-      emptyCard.className =
-        'editorial-card flex flex-col items-center justify-center p-6 sm:p-8 text-center border-dashed gap-5 bg-[#FFFFFF] dark:bg-[#22201E] border-[#E6E4DF] dark:border-[#33302C]';
-
-      // Icon & Greeting
-      const headerWrap = document.createElement('div');
-      headerWrap.className = 'flex flex-col items-center gap-1.5 max-w-sm';
-
-      const iconWrap = document.createElement('div');
-      iconWrap.className =
-        'w-14 h-14 rounded-xl bg-[#EEF5F2] dark:bg-[rgba(61,107,88,0.25)] text-[#3D6B58] dark:text-[#5F8776] flex items-center justify-center mb-1 border border-[#E6E4DF] dark:border-[#33302C]';
-      iconWrap.innerHTML = `
-        <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-        </svg>
-      `;
-      headerWrap.appendChild(iconWrap);
-
-      const titleEl = document.createElement('h3');
-      titleEl.id = 'today-empty-title';
-      titleEl.className = 'text-lg sm:text-xl font-serif font-semibold text-[#1C1B18] dark:text-[#F4F1EA]';
-      titleEl.textContent = 'Welcome to Habbit';
-      headerWrap.appendChild(titleEl);
-
-      const subtitleEl = document.createElement('p');
-      subtitleEl.id = 'today-empty-subtitle';
-      subtitleEl.className = 'text-xs sm:text-sm text-[#68655F] dark:text-[#A39E93] leading-relaxed';
-      subtitleEl.textContent =
-        'Start building your daily momentum. Your data stays on this Device.';
-      headerWrap.appendChild(subtitleEl);
-      emptyCard.appendChild(headerWrap);
-
-      // Inline Quick Add Form
-      const formEl = document.createElement('form');
-      formEl.id = 'today-empty-form';
-      formEl.className = 'w-full max-w-md flex flex-col gap-2.5';
-      formEl.setAttribute('role', 'form');
-
-      const inputWrap = document.createElement('div');
-      inputWrap.className = 'relative w-full';
-
-      const labelEl = document.createElement('label');
-      labelEl.htmlFor = 'today-empty-add-input';
-      labelEl.className = 'sr-only';
-      labelEl.textContent = 'Add your first habit';
-      inputWrap.appendChild(labelEl);
-
-      const inputEl = document.createElement('input');
-      inputEl.type = 'text';
-      inputEl.id = 'today-empty-add-input';
-      inputEl.className =
-        'w-full min-h-[44px] min-w-[44px] px-3.5 py-2.5 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] placeholder-[#68655F] focus:outline-none focus:ring-2 focus:ring-[#C86D51] transition-colors';
-      inputEl.style.fontSize = '16px';
-      inputEl.placeholder = 'e.g. Drink 2L water, Morning walk...';
-
-      const addBtn = document.createElement('button');
-      addBtn.type = 'submit';
-      addBtn.id = 'today-empty-add-btn';
-      addBtn.className =
-        'btn-terracotta min-h-[44px] min-w-[44px] px-5 py-2.5 text-sm font-semibold rounded-lg flex items-center justify-center cursor-pointer shrink-0 tactile-spring';
-      addBtn.textContent = 'Add Habit';
-
-      const emptyTimePicker = createTimePickerField({
-        id: 'today-empty-scheduled-time',
-        ariaLabel: 'Scheduled time (optional)',
-        placeholder: 'Anytime',
-        allowClear: true,
-      });
-      emptyTimePicker.container.className = 'relative flex-1 min-w-0';
-      activeTimePickers.push(emptyTimePicker);
-
-      let isSubmitting = false;
-      async function handleAddHabit(habitName) {
-        if (isSubmitting) return;
-        const nameToAdd = habitName || inputEl.value;
-        await executeAddHabit({
-          name: nameToAdd,
-          scheduledTime: emptyTimePicker.getValue() || '',
-          setSubmitting: (submitting) => {
-            isSubmitting = submitting;
-            addBtn.disabled = submitting;
-          },
-          onSuccess: () => {
-            inputEl.value = '';
-            emptyTimePicker.setValue('');
-          },
-          onError: () => {
-            inputEl.focus?.();
-          },
-        });
-      }
-      const onSubmit = (e) => {
-        e?.preventDefault?.();
-        handleAddHabit();
-      };
-
-      formEl.addEventListener('submit', onSubmit);
-      addBtn.addEventListener('click', onSubmit);
-      inputEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          onSubmit(e);
-        }
-      });
-      inputWrap.appendChild(inputEl);
-      formEl.appendChild(inputWrap);
-
-      const actionRow = document.createElement('div');
-      actionRow.className = 'flex flex-col sm:flex-row items-stretch sm:items-center gap-2';
-      actionRow.appendChild(emptyTimePicker.container);
-      actionRow.appendChild(addBtn);
-      formEl.appendChild(actionRow);
-      emptyCard.appendChild(formEl);
-
-      // Starter Chips Section
-      const startersWrap = document.createElement('div');
-      startersWrap.className = 'flex flex-col items-center gap-2 pt-1 w-full';
-
-      const startersLabel = document.createElement('span');
-      startersLabel.className =
-        'text-[11px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider';
-      startersLabel.textContent = 'Or try a popular starter:';
-      startersWrap.appendChild(startersLabel);
-
-      const chipsContainer = document.createElement('div');
-      chipsContainer.className = 'flex flex-wrap items-center justify-center gap-2';
-
-      const starterHabits = ['Drink 2L Water', 'Read 10 mins', 'Morning Walk'];
-      for (const starter of starterHabits) {
-        const chipBtn = document.createElement('button');
-        chipBtn.type = 'button';
-        chipBtn.dataset.starterChip = starter;
-        chipBtn.className =
-          'min-h-[44px] min-w-[44px] px-3.5 py-2 text-xs font-mono font-medium rounded-lg bg-[#FFFFFF] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] hover:border-[#C86D51] hover:text-[#C86D51] dark:hover:text-[#D97E63] border border-[#E6E4DF] dark:border-[#33302C] transition-all cursor-pointer flex items-center justify-center tactile-spring';
-        chipBtn.textContent = `+ ${starter}`;
-        chipBtn.addEventListener('click', () => {
-          inputEl.value = starter;
-          emptyTimePicker.focus();
-        });
-        chipsContainer.appendChild(chipBtn);
-      }
-      startersWrap.appendChild(chipsContainer);
-      emptyCard.appendChild(startersWrap);
-
-      // Manage Habits link (satisfies SPEC §10 contract)
-      const manageWrap = document.createElement('div');
-      manageWrap.className = 'pt-1';
-
-      const manageBtn = document.createElement('button');
-      manageBtn.type = 'button';
-      manageBtn.id = 'manage-habits-btn';
-      manageBtn.className =
-        'min-h-[44px] min-w-[44px] px-4 py-2 text-xs font-semibold text-[#68655F] hover:text-[#C86D51] dark:text-[#A39E93] dark:hover:text-[#D97E63] transition-colors cursor-pointer inline-flex items-center gap-1.5 focus:outline-none focus:underline tactile-spring';
-      manageBtn.textContent = 'Manage Habits in Settings →';
-      manageBtn.addEventListener('click', () => {
-        navigate('settings');
-      });
-      manageWrap.appendChild(manageBtn);
-      emptyCard.appendChild(manageWrap);
-
-
-      habitsListContainerEl.appendChild(emptyCard);
+      renderEmptyStateCard();
     } else {
       const scheduledData = habitData.filter((item) => hasScheduledTime(item.habit));
       const anytimeData = habitData.filter((item) => !hasScheduledTime(item.habit));
@@ -607,6 +605,7 @@ export function mount(el) {
       actionsWrap.className = 'flex items-center gap-2 justify-end';
 
       function collapseAddControl() {
+        if (!isAddHabitExpanded) return;
         isAddHabitExpanded = false;
         renderHabits();
         const trigger = containerEl.querySelector('#today-add-habit-trigger');
@@ -656,16 +655,13 @@ export function mount(el) {
 
       formEl.addEventListener('submit', handleSubmit);
       submitBtn.addEventListener('click', handleSubmit);
-      bindEscapeKey([formEl, addTimePicker.triggerBtn], () => {
+      bindEscapeKey([formEl, inputEl, addTimePicker.triggerBtn], () => {
         if (!addTimePicker.isOpen()) collapseAddControl();
       });
       inputEl.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           if (typeof e.preventDefault === 'function') e.preventDefault();
           handleSubmit(e);
-        } else if (e.key === 'Escape' && !addTimePicker.isOpen()) {
-          if (typeof e.preventDefault === 'function') e.preventDefault();
-          collapseAddControl();
         }
       });
 

@@ -787,8 +787,11 @@ export function mount(el) {
     nameWrapper.appendChild(nameSpan);
     nameWrapper.appendChild(editBtn);
 
+    let actionsWrapper = null;
+
     const startEditHabit = () => {
       editingHabitId = habit.id;
+      actionsWrapper?.classList.add('hidden');
       const form = document.createElement('form');
       form.className = 'rename-form flex-1 flex flex-col gap-2 min-w-0';
 
@@ -817,7 +820,7 @@ export function mount(el) {
 
       const select = document.createElement('select');
       select.className =
-        'select-edit-linked-activity min-h-[44px] px-2.5 py-1.5 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
+        'select-edit-linked-activity w-full sm:w-auto min-w-0 max-w-full min-h-[44px] px-2.5 py-1.5 text-base rounded-lg border border-[#E6E4DF] dark:border-[#33302C] bg-[#F6F5F2] dark:bg-[#161514] text-[#1C1B18] dark:text-[#F4F1EA] focus:outline-none focus:ring-2 focus:ring-[#C86D51]';
       select.setAttribute('aria-label', `Linked activity for ${habit.name}`);
       select.style.fontSize = '16px';
       populateLinkedActivitySelect(select, {
@@ -857,6 +860,7 @@ export function mount(el) {
         if (finished) return;
         finished = true;
         editingHabitId = null;
+        actionsWrapper?.classList.remove('hidden');
         destroyInlineEditPicker();
         renderHabits();
       };
@@ -912,7 +916,7 @@ export function mount(el) {
     editBtn.addEventListener('click', startEditHabit);
 
     // Action buttons: Move up, Move down, Archive
-    const actionsWrapper = document.createElement('div');
+    actionsWrapper = document.createElement('div');
     actionsWrapper.className = 'flex items-center gap-1 shrink-0';
 
     const upBtn = createMoveButton({

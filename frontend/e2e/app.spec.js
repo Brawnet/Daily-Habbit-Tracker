@@ -1016,8 +1016,10 @@ test.describe('Habbit App E2E', () => {
 
     const settingsSchedRows = page.locator('#settings-scheduled-habits-group .habit-row');
     await expect(settingsSchedRows.nth(0)).toContainText('Journaling');
-    await expect(settingsSchedRows.nth(0).locator('.btn-move-up')).toHaveAttribute('aria-disabled', 'true');
-    await settingsSchedRows.nth(0).locator('.btn-move-up').click({ force: true });
+    const lockedMoveUpBtn = settingsSchedRows.nth(0).locator('.btn-move-up');
+    await expect(lockedMoveUpBtn).toBeVisible();
+    await expect(lockedMoveUpBtn).toHaveAttribute('aria-disabled', 'true');
+    await lockedMoveUpBtn.dispatchEvent('click');
     await expect(page.locator('#toast-container')).toContainText(
       'Scheduled habits follow clock order — clear time to reorder'
     );
@@ -1033,15 +1035,25 @@ test.describe('Habbit App E2E', () => {
 
     // Clear Scheduled Time on Journaling via inline Edit custom popover -> moves into Anytime with unlocked ▲/▼
     await page.click('button[data-tab="settings"]');
+    const originalViewport = page.viewportSize();
+    await page.setViewportSize({ width: 375, height: 812 });
     const journalingRow = page
       .locator('#settings-scheduled-habits-group .habit-row')
       .filter({ hasText: 'Journaling' });
     await journalingRow.locator('.btn-edit').click();
     await expect(page.locator('.input-edit-scheduled-time')).toHaveAttribute('data-time', '05:00');
     await page.click('.input-edit-scheduled-time');
+    const inlineEditOverflow = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth,
+    }));
+    expect(inlineEditOverflow.scrollWidth).toBeLessThanOrEqual(inlineEditOverflow.innerWidth);
     await page.locator('.rename-form .time-picker-clear-btn').click();
     await expect(page.locator('.input-edit-scheduled-time')).toHaveAttribute('data-time', '');
     await page.click('.rename-form button[type="submit"]');
+    if (originalViewport) {
+      await page.setViewportSize(originalViewport);
+    }
 
     const unlockedJournalingRow = page
       .locator('#settings-anytime-habits-group .habit-row')

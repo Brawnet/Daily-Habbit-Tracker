@@ -266,4 +266,45 @@ describe('ui/habit-form-controls createTimePickerField', () => {
     optionalPicker.destroy();
     reminderPicker.destroy();
   });
+
+  it('uses WCAG AA dark-mode contrast on selected controls, on-token trigger styles, and resets partial blank drafts on reopen', () => {
+    const addSpy = vi.spyOn(mockDoc, 'addEventListener');
+    const picker = createTimePickerField({
+      id: 'picker-tokens',
+      ariaLabel: 'Scheduled Time',
+      use12Hour: true,
+      locale: 'en-US',
+    });
+    host.appendChild(picker.container);
+
+    // Trigger aligns with app surface/focus tokens and capture-phase document click closes before unmount
+    expect(picker.triggerBtn.className).toContain('bg-[#F6F5F2]');
+    expect(picker.triggerBtn.className).toContain('dark:bg-[#161514]');
+    expect(picker.triggerBtn.className).toContain('focus:ring-[#C86D51]');
+    expect(addSpy).toHaveBeenCalledWith('click', expect.any(Function), true);
+
+    picker.triggerBtn.click();
+    const dialog = picker.container.querySelector('[role="dialog"]');
+    const pmBtn = dialog.querySelector('[data-period="PM"]');
+    const amBtn = dialog.querySelector('[data-period="AM"]');
+    const min35Btn = dialog.querySelector('[data-minute="35"]');
+
+    // Tap PM and :35 without picking an hour (value remains '')
+    pmBtn.click();
+    min35Btn.click();
+    expect(picker.getValue()).toBe('');
+    expect(pmBtn.getAttribute('aria-pressed')).toBe('true');
+    expect(pmBtn.className).toContain('dark:text-[#1C1B18]');
+    expect(min35Btn.getAttribute('aria-pressed')).toBe('true');
+    expect(min35Btn.className).toContain('dark:text-[#1C1B18]');
+
+    // Close without committing an hour, then reopen -> stale draft highlights reset cleanly
+    dialog.querySelector('.time-picker-done-btn').click();
+    picker.triggerBtn.click();
+    expect(amBtn.getAttribute('aria-pressed')).toBe('true');
+    expect(pmBtn.getAttribute('aria-pressed')).toBe('false');
+    expect(min35Btn.getAttribute('aria-pressed')).toBe('false');
+
+    picker.destroy();
+  });
 });

@@ -65,10 +65,30 @@ export function formatScheduledTime(scheduledTime, locale = undefined) {
   if (!normalized) return '';
   const [hoursStr, minutesStr] = normalized.split(':');
   const date = new Date(2000, 0, 1, Number(hoursStr), Number(minutesStr), 0, 0);
-  return new Intl.DateTimeFormat(locale, {
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(date);
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(date);
+  } catch {
+    return normalized;
+  }
+}
+
+/**
+ * Parses a strict non-negative integer value (number or digit string), rejecting null/boolean/empty coercions.
+ *
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function parseStrictInt(value) {
+  if (typeof value === 'number') {
+    return Number.isInteger(value) ? value : null;
+  }
+  if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
+    return Number(value.trim());
+  }
+  return null;
 }
 
 /**
@@ -101,8 +121,8 @@ export function isLocale12Hour(locale = undefined) {
  * @returns {number | null}
  */
 export function to24Hour(hour12, period) {
-  const n = Number(hour12);
-  if (!Number.isInteger(n) || n < 1 || n > 12) return null;
+  const n = parseStrictInt(hour12);
+  if (n === null || n < 1 || n > 12) return null;
   if (period === 'AM') return n === 12 ? 0 : n;
   if (period === 'PM') return n === 12 ? 12 : n + 12;
   return null;
@@ -116,8 +136,8 @@ export function to24Hour(hour12, period) {
  * @returns {{ hour12: number, period: 'AM' | 'PM' } | null}
  */
 export function from24Hour(hour24) {
-  const n = Number(hour24);
-  if (!Number.isInteger(n) || n < 0 || n > 23) return null;
+  const n = parseStrictInt(hour24);
+  if (n === null || n < 0 || n > 23) return null;
   const period = n < 12 ? 'AM' : 'PM';
   const rem = n % 12;
   return { hour12: rem === 0 ? 12 : rem, period };

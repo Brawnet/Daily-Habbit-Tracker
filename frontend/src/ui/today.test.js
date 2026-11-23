@@ -139,7 +139,7 @@ describe('ui/today.js empty state & first-launch onboarding', () => {
 
   it('fills habit name and focuses Scheduled Time when clicking a starter chip without auto-creating', async () => {
     const root = mockDoc.createElement('div');
-    mount(root);
+    const cleanup = mount(root);
 
     await new Promise((r) => setTimeout(r, 20));
 
@@ -169,11 +169,12 @@ describe('ui/today.js empty state & first-launch onboarding', () => {
     await new Promise((r) => setTimeout(r, 20));
 
     expect(repoModule.addHabit).toHaveBeenCalledWith(chips[0].dataset.starterChip);
+    cleanup();
   });
 
   it('allows setting optional Scheduled Time on Welcome form via custom popover', async () => {
     const root = mockDoc.createElement('div');
-    mount(root);
+    const cleanup = mount(root);
 
     await new Promise((r) => setTimeout(r, 20));
 
@@ -185,7 +186,7 @@ describe('ui/today.js empty state & first-launch onboarding', () => {
     timeTrigger.click();
     expect(timeTrigger.getAttribute('aria-expanded')).toBe('true');
 
-    const dialog = root.querySelector('#today-empty-form [role="dialog"]') || root.querySelector('[role="dialog"]');
+    const dialog = mockDoc.getElementById('today-empty-form').querySelector('[role="dialog"]');
     expect(dialog).not.toBeNull();
     const amBtn = dialog.querySelector('[data-period="AM"]');
     if (amBtn) {
@@ -203,6 +204,7 @@ describe('ui/today.js empty state & first-launch onboarding', () => {
     await new Promise((r) => setTimeout(r, 20));
 
     expect(repoModule.addHabit).toHaveBeenCalledWith('Morning Walk', { scheduledTime: '06:30' });
+    cleanup();
   });
 
   it('navigates to settings when Manage Habits link is clicked', async () => {
